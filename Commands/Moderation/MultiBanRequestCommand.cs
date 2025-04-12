@@ -124,7 +124,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 staffmembers.Where(x => x.Permissions.HasPermission(Permissions.BanMembers)).ToList();
             var onlineStaffWithBanPerms = staffWithBanPerms
                 .Where(member => (member.Presence?.Status ?? UserStatus.Offline) != UserStatus.Offline)
-                .Where(member => member.Id != 441192596325531648).Where(member => member.Id != 515404778021322773)
+                .Where(member => member.Id != 441192596325531648)
                 .ToList();
             var embedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Bannanfrage")
@@ -157,7 +157,8 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             List<DiscordButtonComponent> staffbuttons = new(2)
             {
                 new DiscordButtonComponent(ButtonStyle.Success, $"modbanrequest_accept_{caseid}", "Annehmen"),
-                new DiscordButtonComponent(ButtonStyle.Danger, $"modbanrequest_deny_{caseid}", "Ablehnen")
+                new DiscordButtonComponent(ButtonStyle.Danger, $"modbanrequest_deny_{caseid}", "Ablehnen"),
+                new DiscordButtonComponent(ButtonStyle.Primary, $"modbanrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.UsernameWithDiscriminator})")
             };
             // enable buttons
             staffbuttons.ForEach(x => x.Enable());
@@ -176,6 +177,16 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
 
             var staffresult = await interactivity.WaitForButtonAsync(message, interaction =>
             {
+                if (interaction.Id == $"modbanrequest_cancel_{caseid}")
+                {
+                 
+                    if (interaction.User.Id != ctx.User.Id)
+                        return false;
+                    buttons.ForEach(x => x.Disable());
+                    return true;
+                    
+                }
+                
                 if (interaction.User is DiscordMember guildUser)
                     return guildUser.Permissions.HasPermission(Permissions.BanMembers);
 
@@ -195,6 +206,21 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithEmbed(denyEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(denyMessage);
+                return;
+            }
+            
+            if (staffresult.Result.Id == $"modbanrequest_cancel_{caseid}")
+            {
+                var cancelEmbedBuilder = new DiscordEmbedBuilder()
+                    .WithTitle("Anfrage abgebrochen")
+                    .WithDescription("Deine Anfrage wurde abgebrochen.")
+                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithColor(DiscordColor.Red);
+                var cancelEmbed = cancelEmbedBuilder.Build();
+                var cancelMessage = new DiscordMessageBuilder()
+                    .WithEmbed(cancelEmbed)
+                    .WithReply(ctx.Message.Id);
+                await message.ModifyAsync(cancelMessage);
                 return;
             }
 

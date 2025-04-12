@@ -91,7 +91,6 @@ public sealed class BanRequestCommand : BaseCommandModule
                 if (!GlobalProperties.DebugMode)
                     staffMentionString = string.Join(" ", onlineStaffWithBanPerms
                         .Where(member => member.Id != 441192596325531648)
-                        .Where(member => member.Id != 515404778021322773)
                         .Select(member => member.Mention));
                 else
                     staffMentionString = "DEBUG MODE AKTIV | Kein Ping wird ausgeführt";
@@ -109,7 +108,8 @@ public sealed class BanRequestCommand : BaseCommandModule
             List<DiscordButtonComponent> buttons = new(2)
             {
                 new DiscordButtonComponent(ButtonStyle.Success, $"banrequest_accept_{caseid}", "Annehmen"),
-                new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_deny_{caseid}", "Ablehnen")
+                new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_deny_{caseid}", "Ablehnen"),
+                new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.UsernameWithDiscriminator})")
             };
 
             var builder = new DiscordMessageBuilder()
@@ -133,6 +133,16 @@ public sealed class BanRequestCommand : BaseCommandModule
             buttons.ForEach(x => x.Disable());
             var result = await interactivity.WaitForButtonAsync(message, interaction =>
             {
+                if (interaction.Id == $"banrequest_cancel_{caseid}")
+                {
+                 
+                    if (interaction.User.Id != ctx.User.Id)
+                            return false;
+                    buttons.ForEach(x => x.Disable());
+                    return true;
+                    
+                }
+                    
                 if (interaction.User is DiscordMember guildUser)
                     return guildUser.Permissions.HasPermission(Permissions.BanMembers);
 
@@ -147,6 +157,25 @@ public sealed class BanRequestCommand : BaseCommandModule
                             $"Die Bannanfrage für {user} (``{user.Id}``) wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                         .WithColor(DiscordColor.Red).Build());
                 await message.ModifyAsync(embed_);
+                return;
+            }
+            
+            if (result.Result.Id == $"banrequest_cancel_{caseid}")
+            {
+                await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
+                var cancelEmbedBuilder = new DiscordEmbedBuilder()
+                    .WithTitle("Bannanfrage abgebrochen")
+                    .WithDescription(
+                        $"Die Bannanfrage für {user} (``{user.Id}``) wurde abgebrochen.\n\n" +
+                        $"Grund: Abgebrochen von `{ctx.User.UsernameWithDiscriminator}`")
+                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithColor(DiscordColor.Red);
+
+                var cancelEmbed = cancelEmbedBuilder.Build();
+                var CancelMessage = new DiscordMessageBuilder()
+                    .WithEmbed(cancelEmbed)
+                    .WithReply(ctx.Message.Id);
+                await message.ModifyAsync(CancelMessage);
                 return;
             }
 
