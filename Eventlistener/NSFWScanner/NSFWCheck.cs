@@ -125,7 +125,7 @@ public class NSFWCheck : BaseCommandModule
     }
 
 
-    [Event]
+    //[Event]
     public async Task GuildMemberUpdated(DiscordClient _client, GuildMemberUpdateEventArgs _args)
     {
         _ = Task.Run(async () =>
