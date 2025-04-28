@@ -1,5 +1,6 @@
 ﻿#region
 
+using AGC_Management.Utils;
 using KawaiiAPI.NET;
 using KawaiiAPI.NET.Enums;
 
@@ -87,9 +88,29 @@ public class WelcomeMessage : BaseCommandModule
 
 
                 await channel.SendMessageAsync(args.Member.Mention, embed);
+                await CalcLevel(client, args);
             }
         );
         return Task.CompletedTask;
+    }
+
+
+    private async Task CalcLevel(DiscordClient client, GuildMemberAddEventArgs args)
+    {
+        /*
+         * 
+         */
+        _ = new Task(async () =>
+        {
+            await LevelUtils.RecalculateUserLevel(args.Member.Id);
+            if (args.Guild != GlobalProperties.AGCGuild) return;
+            if (args.Guild is not null && args.Member is not null)
+            {
+                var guild = await client.GetGuildAsync(args.Guild.Id);
+                var member = await guild.GetMemberAsync(args.Member.Id);
+                await LevelUtils.UpdateLevelRoles(member);
+            }
+        });
     }
 
 
