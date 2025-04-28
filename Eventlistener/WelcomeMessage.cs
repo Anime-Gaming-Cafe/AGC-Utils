@@ -89,9 +89,35 @@ public class WelcomeMessage : BaseCommandModule
 
                 await channel.SendMessageAsync(args.Member.Mention, embed);
                 await CalcLevel(client, args);
+                await AddCosmeticRolesAndLevel0OnJoin(args.Member);
             }
         );
         return Task.CompletedTask;
+    }
+
+    private async Task AddCosmeticRolesAndLevel0OnJoin(DiscordMember member)
+    {
+        List<ulong> roles = new() { 767031029068201994, 767056290148384799, 875679019054551050, 767031210055958538, 750450099871547462 };
+        List<DiscordRole> rolesToAdd = new();
+        foreach (var role in roles)
+        {
+            var r = await member.Guild.GetRoleAsync(role);
+            if (r != null) rolesToAdd.Add(r);
+        }
+        if (rolesToAdd.Count > 0)
+        {
+            foreach (var role in rolesToAdd)
+            {
+                try
+                {
+                    await member.GrantRoleAsync(role);
+                }
+                catch (Exception e)
+                {
+                    CurrentApplication.DiscordClient.Logger.LogError(e, "Error while adding role to member");
+                }
+            }
+        }
     }
 
 
