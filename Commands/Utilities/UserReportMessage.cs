@@ -84,6 +84,8 @@ public class UserReportMessage : ApplicationCommandsModule
         var messagecontent = message.Content;
         var reporter = ctx.User;
 
+        var reportedUser = message.Author;
+
         if (string.IsNullOrWhiteSpace(messagecontent))
             messagecontent = "Kein Textinhalt. Möglicherweise ein Bild oder Sticker oder ähnliches.";
 
@@ -92,7 +94,7 @@ public class UserReportMessage : ApplicationCommandsModule
         var embed = new DiscordEmbedBuilder()
             .WithTitle("Nachricht gemeldet")
             .WithDescription(
-                $"**Gemeldeter User: {reporter.Mention} ({reporter.UsernameWithDiscriminator}) **```{reporter.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{result.Result.Interaction.Data.Components[0].Value}```")
+                $"**Gemeldeter User: {reportedUser.Mention} ({reportedUser.UsernameWithDiscriminator}) **```{reportedUser.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{result.Result.Interaction.Data.Components[0].Value}```")
             .WithColor(DiscordColor.Red)
             .WithFooter($"Gemeldet in #{channel.Name}")
             .Build();
