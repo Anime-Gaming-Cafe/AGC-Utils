@@ -41,6 +41,8 @@ jobs:
         if [[ ! "${GIT_TAG_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
           echo "::error::Invalid tag format: ${GIT_TAG_VERSION}. Expected format: v1.2.3 or v1.2.3-suffix"
           exit 1
+        else
+          echo "Valid tag format: ${GIT_TAG_VERSION}"
         fi
 
     - name: Build
