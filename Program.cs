@@ -35,13 +35,77 @@ namespace AGC_Management;
 
 public class CurrentApplication
 {
-    public static string VersionString { get; set; } = "v2.6.0";
+    public static string VersionString { get; set; } = GetVersionString();
     public static DiscordClient DiscordClient { get; set; }
     public static DiscordGuild TargetGuild { get; set; }
     public static ILogger Logger { get; set; }
     public static IServiceProvider ServiceProvider { get; set; }
     public static string BotPrefix { get; set; }
     public static HttpClient HttpClient { get; set; }
+
+    private static string GetVersionString()
+    {
+        try
+        {
+            string version = Environment.GetEnvironmentVariable("GIT_TAG_VERSION");
+            if (!string.IsNullOrEmpty(version))
+            {
+                if (version.StartsWith("v"))
+                {
+                    return version;
+                }
+                try
+                {
+                    if (Logger != null)
+                    {
+                        Logger.Warning($"Version string '{version}' doesn't follow the expected format (should start with 'v')");
+                    }
+                }
+                catch
+                {
+
+                }
+
+                return version;
+            }
+
+            try
+            {
+                string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+                return $"nightly-{timestamp}";
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    if (Logger != null)
+                    {
+                        Logger.Error(ex, "Failed to generate timestamp for version string");
+                    }
+                }
+                catch
+                {
+                }
+
+                return "nightly-unknown";
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                if (Logger != null)
+                {
+                    Logger.Error(ex, "Failed to determine version string");
+                }
+            }
+            catch
+            {
+            }
+
+            return "unknown-version";
+        }
+    }
 }
 
 internal class Program : BaseCommandModule
@@ -57,7 +121,7 @@ internal class Program : BaseCommandModule
         CurrentApplication.HttpClient = new HttpClient();
         CurrentApplication.HttpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                                                                               "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-        
+
         LogEventLevel loglevel;
         try
         {
@@ -148,7 +212,7 @@ internal class Program : BaseCommandModule
             options.Cookie.HttpOnly = true;
             options.Cookie.IsEssential = true;
         });
-        
+
         builder.Services.AddAuthentication(opt =>
             {
                 opt.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -266,7 +330,7 @@ internal class Program : BaseCommandModule
         _ = RunAspAsync(builder.Build());
         await Task.Delay(-1);
     }
-    
+
     private static async Task Client_ComponentInteractionCreatedAsync(DiscordClient sender, ComponentInteractionCreateEventArgs e)
     {
         if (e.Id == "pgb-skip-left" || e.Id == "pgb-skip-right" || e.Id == "pgb-right" || e.Id == "pgb-left" || e.Id == "pgb-stop" || e.Id == "leftskip" || e.Id == "rightskip" || e.Id == "stop" || e.Id == "left" || e.Id == "right")
