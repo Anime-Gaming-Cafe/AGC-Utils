@@ -47,7 +47,10 @@ public class CurrentApplication
     {
         try
         {
-            string version = Environment.GetEnvironmentVariable("GIT_TAG_VERSION");
+            var version = Assembly.GetEntryAssembly()?
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+
             if (!string.IsNullOrEmpty(version))
             {
                 if (version.StartsWith("v"))
@@ -63,7 +66,6 @@ public class CurrentApplication
                 }
                 catch
                 {
-
                 }
 
                 return version;
@@ -71,8 +73,8 @@ public class CurrentApplication
 
             try
             {
-                string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-                return $"nightly-{timestamp}";
+                string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                return $"0.0.1-nightly.{timestamp}";
             }
             catch (Exception ex)
             {
@@ -87,7 +89,7 @@ public class CurrentApplication
                 {
                 }
 
-                return "nightly-unknown";
+                return "0.0.1-nightly.unknown";
             }
         }
         catch (Exception ex)
@@ -103,7 +105,7 @@ public class CurrentApplication
             {
             }
 
-            return "unknown-version";
+            return "0.0.1-unknown";
         }
     }
 }

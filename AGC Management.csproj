@@ -5,6 +5,9 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>AGC_Management</RootNamespace>
+        <Version Condition="'$(GIT_TAG_VERSION)' != ''">$(GIT_TAG_VERSION)</Version>
+        <Version Condition="'$(GIT_TAG_VERSION)' == ''">0.0.1-nightly.$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</Version>
+        <InformationalVersion>$(Version)</InformationalVersion>
     </PropertyGroup>
 
     <Target Name="UpdateSourceRevisionId" BeforeTargets="BeforeBuild">

@@ -34,7 +34,8 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Set version from tag
-      run: echo "GIT_TAG_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      run: echo "GIT_TAG_VERSION=${GITHUB_REF#refs/tags/}+$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
 
     - name: Validate tag format
       run: |
@@ -46,7 +47,9 @@ jobs:
         fi
 
     - name: Build
-      run: dotnet publish -c Release -o ./publish
+      run: |
+        echo "Building with version: ${{ env.GIT_TAG_VERSION }}"
+        dotnet publish -c Release -o ./publish -p:InformationalVer=${{ env.GIT_TAG_VERSION }}
       env:
         GIT_TAG_VERSION: ${{ env.GIT_TAG_VERSION }}
 
