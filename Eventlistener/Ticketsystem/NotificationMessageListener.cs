@@ -84,7 +84,7 @@ public class NotificationMessageListener : BaseCommandModule
         var toticketbutton = new DiscordLinkButtonComponent(
             $"https://discord.com/channels/{message.Guild.Id}/{message.Channel.Id}/{message.Id}", "Zum Ticket");
         var mb = new DiscordMessageBuilder();
-        mb.WithEmbed(eb);
+        mb.AddEmbed(eb);
         mb.AddComponents(toticketbutton);
         try
         {

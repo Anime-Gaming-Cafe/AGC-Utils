@@ -113,7 +113,7 @@ public class TicketManagerHelper
         var message = await interaction.Channel.GetMessageAsync(interaction.Message.Id);
         var mb = new DiscordMessageBuilder();
         mb.WithContent(message.Content);
-        mb.WithEmbed(message.Embeds[0]);
+        mb.AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetTicketClaimedActionRow();
         List<DiscordActionRowComponent> row = new()
         {
@@ -150,7 +150,7 @@ public class TicketManagerHelper
             .WithDescription("**Ticket-Typ: Support-Ticket**");
         var mb = new DiscordMessageBuilder();
         mb.WithContent(pingstring);
-        mb.WithEmbed(eb.Build());
+        mb.AddEmbed(eb.Build());
         var rowComponents = TicketComponents.GetTicketActionRow();
         List<DiscordActionRowComponent> row = new()
         {
@@ -179,7 +179,7 @@ public class TicketManagerHelper
                     .WithDescription("**Ticket-Typ: Report-Ticket**");
                 var mb = new DiscordMessageBuilder();
                 mb.WithContent(pingstring);
-                mb.WithEmbed(eb.Build());
+                mb.AddEmbed(eb.Build());
                 var rowComponents = TicketComponents.GetTicketActionRow();
                 List<DiscordActionRowComponent> row = new()
                 {
@@ -205,7 +205,7 @@ public class TicketManagerHelper
                     .WithDescription("**Ticket-Typ: Support-Ticket**");
                 var mb = new DiscordMessageBuilder();
                 mb.WithContent(pingstring);
-                mb.WithEmbed(eb.Build());
+                mb.AddEmbed(eb.Build());
                 var rowComponents = TicketComponents.GetTicketActionRow();
                 List<DiscordActionRowComponent> row = new()
                 {
@@ -292,7 +292,7 @@ public class TicketManagerHelper
         var imsg = await interaction.Channel.GetMessageAsync(interaction.Message.Id);
         var imsgmb = new DiscordMessageBuilder();
         imsgmb.WithContent(imsg.Content);
-        imsgmb.WithEmbed(imsg.Embeds[0]);
+        imsgmb.AddEmbed(imsg.Embeds[0]);
         imsgmb.AddComponents(del_ticketbutton);
         await imsg.ModifyAsync(imsgmb);
         await NotificationManager.ClearMode(interaction.Channel.Id);
@@ -303,7 +303,7 @@ public class TicketManagerHelper
             .WithColor(BotConfig.GetEmbedColor())
             .WithFooter("AGC-Support-System").Build();
         var mb = new DiscordMessageBuilder();
-        mb.WithEmbed(ebct);
+        mb.AddEmbed(ebct);
         var ms = await interaction.Channel.SendMessageAsync("Transcript wird generiert...");
         var transcriptURL = await GenerateTranscript(interaction.Channel);
         await InsertTransscriptIntoDB(interaction.Channel, TranscriptType.Team, transcriptURL);
@@ -395,7 +395,7 @@ public class TicketManagerHelper
                 .WithDescription($"Du wurdest von {ctx.User.Mention} zu einem Ticket hinzugefügt!")
                 .WithColor(DiscordColor.Green).Build();
             DiscordMessageBuilder userDM = new();
-            userDM.WithEmbed(userEmbed);
+            userDM.AddEmbed(userEmbed);
             DiscordLinkButtonComponent button = new($"https://discord.com/channels/{ctx.Guild.Id}/{channel.Id}",
                 "Zum Ticket");
             userDM.AddComponents(button);
@@ -458,7 +458,7 @@ public class TicketManagerHelper
                 .WithColor(DiscordColor.Green).Build();
             DiscordLinkButtonComponent button = new($"https://discord.com/channels/{interaction.Guild.Id}/{channel.Id}",
                 "Zum Ticket");
-            var userDM = new DiscordMessageBuilder().WithEmbed(userEmbed).AddComponents(button);
+            var userDM = new DiscordMessageBuilder().AddEmbed(userEmbed).AddComponents(button);
             try
             {
                 await user.SendMessageAsync(userDM);

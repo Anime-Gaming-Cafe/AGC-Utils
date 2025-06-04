@@ -31,7 +31,7 @@ public class SupportPanel : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Danger, "selectticketcategory", "Ticket öffnen ✉️")
         };
         DiscordMessageBuilder msgb = new();
-        msgb.WithEmbed(embed).AddComponents(buttons);
+        msgb.AddEmbed(embed).AddComponents(buttons);
         var msg = await ctx.Channel.SendMessageAsync(msgb);
         BotConfig.SetConfig("TicketConfig", "SupportPanelMessage", msg.Id.ToString());
         BotConfig.SetConfig("TicketConfig", "SupportPanelChannel", ctx.Channel.Id.ToString());

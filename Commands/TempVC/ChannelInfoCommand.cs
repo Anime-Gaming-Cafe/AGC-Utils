@@ -125,9 +125,9 @@ public sealed class ChannelInfoCommand : TempVoiceHelper
 
 
             var mb = new DiscordMessageBuilder()
-                .WithEmbed(ebb).AddComponents(buttons);
+                .AddEmbed(ebb).AddComponents(buttons);
             var omb = new DiscordMessageBuilder()
-                .WithEmbed(ebb);
+                .AddEmbed(ebb);
             var msg = await ctx.RespondAsync(mb);
             var interactivity = ctx.Client.GetInteractivity();
             var results = await interactivity.WaitForButtonAsync(msg, channelowner, TimeSpan.FromMinutes(3));

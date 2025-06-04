@@ -273,7 +273,7 @@ public static class ToolSet
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Kein Grund angegeben!")
                 .WithDescription("Bitte gebe einen Grund an")
                 .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.UsernameWithDiscriminator}", ctx.User.AvatarUrl);
-            var msg = new DiscordMessageBuilder().WithEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
+            var msg = new DiscordMessageBuilder().AddEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(msg);
 
 
@@ -285,7 +285,7 @@ public static class ToolSet
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Kein Grund angegeben!")
                 .WithDescription("Bitte gebe einen Grund an")
                 .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.UsernameWithDiscriminator}", ctx.User.AvatarUrl);
-            var msg = new DiscordMessageBuilder().WithEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
+            var msg = new DiscordMessageBuilder().AddEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(msg);
             return true;
         }
@@ -375,7 +375,7 @@ public static class ToolSet
         var buttonack = new DiscordButtonComponent(ButtonStyle.Primary, "ackwarn", "Kenntnisnahme",
             emoji: new DiscordComponentEmoji(DiscordEmoji.FromName(ctx.Client, ":white_check_mark:")));
         var mb = new DiscordMessageBuilder()
-            .WithEmbed(userembed).AddComponents(buttonack).WithContent(user.Mention);
+            .AddEmbed(userembed).AddComponents(buttonack).WithContent(user.Mention);
         await wchannel.SendMessageAsync(mb);
     }
 
@@ -389,7 +389,7 @@ public static class ToolSet
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Ticket-URL enthalten")
                 .WithDescription("Bitte schreibe den Grund ohne Ticket-URL").WithColor(DiscordColor.Red);
             var embed = embedBuilder.Build();
-            var msg_e = new DiscordMessageBuilder().WithEmbed(embed).WithReply(ctx.Message.Id);
+            var msg_e = new DiscordMessageBuilder().AddEmbed(embed).WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(msg_e);
 
             return true;

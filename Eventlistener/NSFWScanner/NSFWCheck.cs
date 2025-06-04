@@ -36,7 +36,7 @@ public class NSFWCheck : BaseCommandModule
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.1000.0 Safari/537.36");
 
             var attachments = args.Message.Attachments;
-            var urls = attachments.Select(att => att.Url).ToList();
+            var urls = attachments.Select(att => att.Url.ToString()).ToList();
 
             if (!attachments.Any())
             {
@@ -185,7 +185,7 @@ public class NSFWCheck : BaseCommandModule
             .AddField(new DiscordEmbedField("Avatar Link", user.AvatarUrl));
 
         var mb = new DiscordMessageBuilder()
-            .WithEmbed(embed)
+            .AddEmbed(embed)
             .WithContent($"NSFW Inhalt von {user.Mention} wurde erkannt! **(Avatar)**");
         return mb;
     }
@@ -203,7 +203,7 @@ public class NSFWCheck : BaseCommandModule
             .AddField(new DiscordEmbedField("Avatar Link", user.AvatarUrl));
 
         var mb = new DiscordMessageBuilder()
-            .WithEmbed(embed)
+            .AddEmbed(embed)
             .WithContent($"NSFW Inhalt von {user.Mention} wurde erkannt! **(Avatar)**");
         return mb;
     }
@@ -228,7 +228,7 @@ public class NSFWCheck : BaseCommandModule
         var button = new DiscordLinkButtonComponent(
             $"https://discord.com/channels/{message.Guild.Id}/{message.Channel.Id}/{message.Id}", "Zur Nachricht");
         var mb = new DiscordMessageBuilder()
-            .WithEmbed(embed)
+            .AddEmbed(embed)
             .WithReply(message.Id)
             .WithContent($"NSFW Inhalt von {user.Mention} wurde erkannt! **(Nachricht)**")
             .AddComponents(button);

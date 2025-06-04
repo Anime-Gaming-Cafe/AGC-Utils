@@ -100,7 +100,7 @@ public class UserReportMessage : ApplicationCommandsModule
             .Build();
         var mb = new DiscordMessageBuilder();
         mb.AddComponents(targetmessagebutton);
-        mb.WithEmbed(embed);
+        mb.AddEmbed(embed);
         var m = await reportChannel.SendMessageAsync(mb);
 
         var targetuser = message.Author;

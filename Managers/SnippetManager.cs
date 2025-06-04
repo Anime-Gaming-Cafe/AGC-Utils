@@ -52,7 +52,7 @@ public class SnippetListener
                 foreach (var user in users_in_ticket) ping = ping + $" {user.Mention}";
 
                 DiscordMessageBuilder mb = new();
-                mb.WithContent(ping).WithEmbed(eb);
+                mb.WithContent(ping).AddEmbed(eb);
                 await e.Message.Channel.SendMessageAsync(mb);
             }
         });

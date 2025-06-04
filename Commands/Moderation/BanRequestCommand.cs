@@ -53,14 +53,14 @@ public sealed class BanRequestCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Secondary, $"br_deny_{caseid}", "❌")
         };
         var confirmMessage = new DiscordMessageBuilder()
-            .WithEmbed(embed__).AddComponents(buttons_).WithReply(ctx.Message.Id);
+            .AddEmbed(embed__).AddComponents(buttons_).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);
         var interaction = await interactivity_.WaitForButtonAsync(confirm, ctx.User, TimeSpan.FromSeconds(60));
         buttons_.ForEach(x => x.Disable());
         if (interaction.TimedOut)
         {
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Banrequest wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
@@ -73,7 +73,7 @@ public sealed class BanRequestCommand : BaseCommandModule
         {
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var sembed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Banrequest wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
@@ -113,7 +113,7 @@ public sealed class BanRequestCommand : BaseCommandModule
             };
 
             var builder = new DiscordMessageBuilder()
-                .WithEmbed(embed)
+                .AddEmbed(embed)
                 .AddComponents(buttons)
                 .WithContent(staffMentionString)
                 .WithReply(ctx.Message.Id);
@@ -152,7 +152,7 @@ public sealed class BanRequestCommand : BaseCommandModule
             if (result.TimedOut)
             {
                 var embed_ = new DiscordMessageBuilder()
-                    .WithEmbed(embedBuilder.WithTitle("Bannanfrage abgebrochen")
+                    .AddEmbed(embedBuilder.WithTitle("Bannanfrage abgebrochen")
                         .WithDescription(
                             $"Die Bannanfrage für {user} (``{user.Id}``) wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                         .WithColor(DiscordColor.Red).Build());
@@ -173,7 +173,7 @@ public sealed class BanRequestCommand : BaseCommandModule
 
                 var cancelEmbed = cancelEmbedBuilder.Build();
                 var CancelMessage = new DiscordMessageBuilder()
-                    .WithEmbed(cancelEmbed)
+                    .AddEmbed(cancelEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(CancelMessage);
                 return;
@@ -197,7 +197,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                     .WithColor(DiscordColor.Yellow);
                 var loadingEmbed = loadingEmbedBuilder.Build();
                 var loadingMessage = new DiscordMessageBuilder()
-                    .WithEmbed(loadingEmbed).AddComponents(buttons)
+                    .AddEmbed(loadingEmbed).AddComponents(buttons)
                     .WithReply(ctx.Message.Id);
                 await confirm.ModifyAsync(loadingMessage);
 
@@ -267,7 +267,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithColor(ec);
                 var discordEmbed = discordEmbedBuilder.Build();
-                await confirm.ModifyAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed));
+                await confirm.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));
             }
             else if (result.Result.Id == $"banrequest_deny_{caseid}")
             {
@@ -283,7 +283,7 @@ public sealed class BanRequestCommand : BaseCommandModule
 
                 var declineEmbed = declineEmbedBuilder.Build();
                 var DeclineMessage = new DiscordMessageBuilder()
-                    .WithEmbed(declineEmbed)
+                    .AddEmbed(declineEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(DeclineMessage);
             }

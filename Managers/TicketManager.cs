@@ -163,7 +163,7 @@ public class TicketManager
         var channelmessages = await ctx.Channel.GetMessagesAsync();
         var message = channelmessages.LastOrDefault();
         var umb = new DiscordMessageBuilder();
-        umb.WithContent(message.Content).WithEmbed(message.Embeds[0]);
+        umb.WithContent(message.Content).AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
         List<DiscordActionRowComponent> row = new()
         {
@@ -236,7 +236,7 @@ public class TicketManager
         await ticket_channel.ModifyAsync(x => x.Name = $"closed-{ticket_channel.Name}");
         var mb = new DiscordMessageBuilder();
         mb.WithContent(ctx.User.Mention);
-        mb.WithEmbed(teb.Build());
+        mb.AddEmbed(teb.Build());
         mb.AddComponents(del_ticketbutton);
         await ctx.Channel.SendMessageAsync(mb);
 
@@ -257,7 +257,7 @@ public class TicketManager
         var channelmessages = await ticket_channel.GetMessagesAsync();
         var message = channelmessages.LastOrDefault();
         var umb = new DiscordMessageBuilder();
-        umb.WithContent(message.Content).WithEmbed(message.Embeds[0]);
+        umb.WithContent(message.Content).AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
         List<DiscordActionRowComponent> row = new()
         {
@@ -333,7 +333,7 @@ public class TicketManager
         await ticket_channel.ModifyAsync(x => x.Name = $"closed-{ticket_channel.Name}");
         var mb = new DiscordMessageBuilder();
         mb.WithContent($"<@{CurrentApplication.DiscordClient.CurrentUser.Id}>");
-        mb.WithEmbed(teb.Build());
+        mb.AddEmbed(teb.Build());
         mb.AddComponents(del_ticketbutton);
         await ticket_channel.SendMessageAsync(mb);
 
@@ -362,7 +362,7 @@ public class TicketManager
         var message = await ticket_channel.GetMessageAsync(interaction.Message.Id);
         var umb = new DiscordMessageBuilder();
         umb.WithContent(message.Content);
-        umb.WithEmbed(message.Embeds[0]);
+        umb.AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
         List<DiscordActionRowComponent> row = new()
         {
@@ -438,7 +438,7 @@ public class TicketManager
         await ticket_channel.ModifyAsync(x => x.Name = $"closed-{ticket_channel.Name}");
         DiscordMessageBuilder mb = new();
         mb.WithContent(interaction.User.Mention);
-        mb.WithEmbed(teb);
+        mb.AddEmbed(teb);
         mb.AddComponents(del_ticketbutton);
         await interaction.Channel.SendMessageAsync(mb);
 

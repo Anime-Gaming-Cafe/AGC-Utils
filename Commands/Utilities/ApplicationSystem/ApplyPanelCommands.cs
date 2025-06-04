@@ -117,7 +117,7 @@ public sealed class ApplyPanelCommands : BaseCommandModule
             .WithFooter("AGC Bewerbungssystem", CurrentApplication.TargetGuild.IconUrl);
 
         var msgb = new DiscordMessageBuilder()
-            .WithEmbed(emb);
+            .AddEmbed(emb);
 
         if (categories.Count == 0) emb.WithDescription(paneltext + "\n\nEs sind keine Bewerbungspositionen verfügbar.");
 

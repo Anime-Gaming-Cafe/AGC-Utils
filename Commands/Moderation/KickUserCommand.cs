@@ -45,14 +45,14 @@ public sealed class KickUserCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Secondary, $"kick_deny_{caseid}", "❌")
         };
         var confirmMessage = new DiscordMessageBuilder()
-            .WithEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
+            .AddEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);
         var interaction = await interactivity.WaitForButtonAsync(confirm, ctx.User, TimeSpan.FromSeconds(60));
         buttons.ForEach(x => x.Disable());
         if (interaction.TimedOut)
         {
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Kick wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
@@ -65,7 +65,7 @@ public sealed class KickUserCommand : BaseCommandModule
         {
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Kick wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
@@ -84,7 +84,7 @@ public sealed class KickUserCommand : BaseCommandModule
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
             var loadingMessage = new DiscordMessageBuilder()
-                .WithEmbed(loadingEmbed).AddComponents(buttons)
+                .AddEmbed(loadingEmbed).AddComponents(buttons)
                 .WithReply(ctx.Message.Id);
             await confirm.ModifyAsync(loadingMessage);
 
@@ -149,7 +149,7 @@ public sealed class KickUserCommand : BaseCommandModule
                 .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                 .WithColor(ec);
             var discordEmbed = discordEmbedBuilder.Build();
-            await confirm.ModifyAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed));
+            await confirm.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));
         }
     }
 }

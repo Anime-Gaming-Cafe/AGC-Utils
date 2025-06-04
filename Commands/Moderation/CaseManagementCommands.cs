@@ -203,7 +203,8 @@ public sealed class CaseManagement : BaseCommandModule
                 {
                     var rndm = new Random();
                     var rnd = rndm.Next(1000, 9999);
-                    var imageBytes = await CurrentApplication.HttpClient.GetByteArrayAsync(attachment.Url);
+                    var url = attachment.Url;
+                    var imageBytes = await CurrentApplication.HttpClient.GetByteArrayAsync(attachment.Url.ToUri());
                     var fileName = $"{caseid}_{rnd}{Path.GetExtension(attachment.Filename).ToLower()}";
                     urls += $"\n{ImageStoreProvider.SaveModerativeImage(fileName, imageBytes, ImageStoreType.Warn)}";
                     imageBytes = null;
@@ -244,7 +245,7 @@ public sealed class CaseManagement : BaseCommandModule
                 {
                     var rndm = new Random();
                     var rnd = rndm.Next(1000, 9999);
-                    var imageBytes = await CurrentApplication.HttpClient.GetByteArrayAsync(attachment.Url);
+                    var imageBytes = await CurrentApplication.HttpClient.GetByteArrayAsync(attachment.Url.ToUri());
                     var fileName = $"{caseid}_{rnd}{Path.GetExtension(attachment.Filename).ToLower()}";
                     urls += $"\n{ImageStoreProvider.SaveModerativeImage(fileName, imageBytes, ImageStoreType.Flag)}";
                     imageBytes = null;

@@ -24,7 +24,7 @@ public class DmWarning : BaseCommandModule
                             "Support wird nicht mehr per DM bearbeitet. \nBitte nutze den untenstehenden Button um zum Support zu gelangen!")
                         .WithColor(BotConfig.GetEmbedColor());
                     var msgbuilder = new DiscordMessageBuilder().AddComponents(supportbutton)
-                        .WithEmbed(embed);
+                        .AddEmbed(embed);
                     await args.Message.RespondAsync(msgbuilder);
                 }
             }

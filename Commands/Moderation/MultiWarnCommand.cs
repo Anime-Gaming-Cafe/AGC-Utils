@@ -38,7 +38,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
-                .WithEmbed(failsuccessEmbed)
+                .AddEmbed(failsuccessEmbed)
                 .WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(failSuccessMessage);
             return;
@@ -66,7 +66,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Danger, $"multiwarn_deny_{caseid}", "Abbrechen")
         };
         var messageBuilder = new DiscordMessageBuilder()
-            .WithEmbed(embed)
+            .AddEmbed(embed)
             .WithReply(ctx.Message.Id)
             .AddComponents(buttons);
         var message = await ctx.Channel.SendMessageAsync(messageBuilder);
@@ -82,7 +82,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var timeoutEmbed = timeoutEmbedBuilder.Build();
             var timeoutMessage = new DiscordMessageBuilder()
-                .WithEmbed(timeoutEmbed).AddComponents(buttons)
+                .AddEmbed(timeoutEmbed).AddComponents(buttons)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(timeoutMessage);
             return;
@@ -98,7 +98,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var loadingEmbed = loadingEmbedBuilder.Build();
             var loadingMessage = new DiscordMessageBuilder()
-                .WithEmbed(loadingEmbed)
+                .AddEmbed(loadingEmbed)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             return;
@@ -116,7 +116,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
             var loadingMessage = new DiscordMessageBuilder()
-                .WithEmbed(loadingEmbed).AddComponents(disbtn)
+                .AddEmbed(loadingEmbed).AddComponents(disbtn)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             var for_str = "";
@@ -145,7 +145,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                     {
                         var rndm = new Random();
                         var rnd = rndm.Next(1000, 9999);
-                        var imageBytes = await new HttpClient().GetByteArrayAsync(attachment.Url);
+                        var imageBytes = await new HttpClient().GetByteArrayAsync(attachment.Url.ToUri());
                         var fileName = $"{caseid}_{rnd}{Path.GetExtension(attachment.Filename).ToLower()}";
                         urls += $"\n{ImageStoreProvider.SaveModerativeImage(fileName, imageBytes, ImageStoreType.Warn)}";
                     }
@@ -250,7 +250,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithColor(ec);
             var sembed = embedBuilder.Build();
             var smessageBuilder = new DiscordMessageBuilder()
-                .WithEmbed(sembed)
+                .AddEmbed(sembed)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(smessageBuilder);
         }

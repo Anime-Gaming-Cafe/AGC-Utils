@@ -316,10 +316,10 @@ public sealed class SessionManagement : TempVoiceHelper
                         new DiscordButtonComponent(ButtonStyle.Secondary, $"close_msg_{caseid}",
                             "Nachricht schließen")
                     };
-                    mb.WithEmbed(ebb);
+                    mb.AddEmbed(ebb);
                     mb.AddComponents(buttons);
                     var nmb = new DiscordMessageBuilder();
-                    nmb.WithEmbed(ebb);
+                    nmb.AddEmbed(ebb);
                     msg = await msg.ModifyAsync(mb);
                     var interactiviy = ctx.Client.GetInteractivity();
                     var response = await interactiviy.WaitForButtonAsync(msg, ctx.User,

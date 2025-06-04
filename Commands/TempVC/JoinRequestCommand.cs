@@ -86,7 +86,7 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                 ebb.WithColor(BotConfig.GetEmbedColor());
                 var eb = ebb.Build();
                 DiscordMessageBuilder mb = new();
-                mb.WithEmbed(eb);
+                mb.AddEmbed(eb);
                 mb.WithContent($"{TargetUser.Mention}");
                 mb.AddComponents(buttons);
 
@@ -115,7 +115,7 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                 if (!userchannel.Users.Contains(TargetUser) && TargetUser != user)
                 {
                     DiscordMessageBuilder msgb = new();
-                    msgb.WithEmbed(null);
+                    msgb.AddEmbed(null);
                     msgb.WithContent(
                         "<:attention:1085333468688433232> **Fehler!** Der User ist nicht mehr in deinem Channel.");
                     await msg.ModifyAsync(msgb);
@@ -133,7 +133,7 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                     eb_.Build();
 
                     DiscordMessageBuilder msgb = new();
-                    msgb.WithEmbed(eb_);
+                    msgb.AddEmbed(eb_);
 
                     await msg.ModifyAsync(msgb);
                     return;
@@ -171,7 +171,7 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                     };
                     DiscordMessageBuilder msgb = new();
                     msgb.AddComponents(urlb);
-                    msgb.WithEmbed(eb_);
+                    msgb.AddEmbed(eb_);
                     await msg.ModifyAsync(msgb);
                 }
 
@@ -187,7 +187,7 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                     eb_.Build();
 
                     DiscordMessageBuilder msgb = new();
-                    msgb.WithEmbed(eb_);
+                    msgb.AddEmbed(eb_);
                     await msg.ModifyAsync(msgb);
                 }
             }

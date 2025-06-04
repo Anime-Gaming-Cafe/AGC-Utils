@@ -256,7 +256,7 @@ public static class ModerationHelper
         {
             new DiscordActionRowComponent(selector)
         };
-        var message = await ctx.RespondAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed)
+        var message = await ctx.RespondAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed)
             .AddComponents(discordActionRowComponents));
         var interactivity = ctx.Client.GetInteractivity();
         var interaction = await interactivity.WaitForSelectAsync(message, ctx.User, caseId,
@@ -322,7 +322,7 @@ public static class ModerationHelper
         {
             new DiscordActionRowComponent(selector)
         };
-        var message = await ctx.RespondAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed)
+        var message = await ctx.RespondAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed)
             .AddComponents(discordActionRowComponents));
         var interactivity = ctx.Client.GetInteractivity();
         var interaction = await interactivity.WaitForSelectAsync(message, ctx.User, caseId,

@@ -50,7 +50,7 @@ public class TicketCommands : BaseCommandModule
             .WithDescription($"Du wurdest von {ctx.Member.Mention} kontaktiert! -> {ticket_channel.Mention}").Build();
         var channellink = $"https://discord.com/channels/{ctx.Guild.Id}/{ticket_channel.Id}";
         var button = new DiscordLinkButtonComponent(channellink, "Zum Ticket");
-        var mb = new DiscordMessageBuilder().WithEmbed(eb).AddComponents(button);
+        var mb = new DiscordMessageBuilder().AddEmbed(eb).AddComponents(button);
         await member.SendMessageAsync(mb);
         await ctx.Message.CreateReactionAsync(DiscordEmoji.FromName(ctx.Client, ":envelope:"));
     }

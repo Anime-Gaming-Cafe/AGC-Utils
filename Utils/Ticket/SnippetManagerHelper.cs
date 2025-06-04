@@ -45,7 +45,7 @@ public class SnippetManagerHelper
         foreach (var user in users_in_ticket) ping = ping + $" {user.Mention}";
 
         DiscordMessageBuilder mb = new();
-        mb.WithContent(ping).WithEmbed(eb);
+        mb.WithContent(ping).AddEmbed(eb);
         await e.Channel.SendMessageAsync(mb);
         var nrb = new DiscordWebhookBuilder();
         nrb.WithContent("Snippet gesendet!");

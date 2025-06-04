@@ -194,7 +194,7 @@ public partial class LevelSystemSettings
             .WithDescription(embedDescString.ToString())
             .WithColor(DiscordColor.Blurple);
 
-        var messageBuilder = new DiscordMessageBuilder().WithEmbed(embed.Build());
+        var messageBuilder = new DiscordMessageBuilder().AddEmbed(embed.Build());
 
         return messageBuilder;
     }

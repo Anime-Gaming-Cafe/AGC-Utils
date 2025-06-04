@@ -37,7 +37,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
-                .WithEmbed(failsuccessEmbed)
+                .AddEmbed(failsuccessEmbed)
                 .WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(failSuccessMessage);
             return;
@@ -65,7 +65,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Danger, $"multibanrequest_deny_{caseid}", "Abbrechen")
         };
         var messageBuilder = new DiscordMessageBuilder()
-            .WithEmbed(embed)
+            .AddEmbed(embed)
             .WithReply(ctx.Message.Id)
             .AddComponents(buttons);
         var message = await ctx.Channel.SendMessageAsync(messageBuilder);
@@ -81,7 +81,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var timeoutEmbed = timeoutEmbedBuilder.Build();
             var timeoutMessage = new DiscordMessageBuilder()
-                .WithEmbed(timeoutEmbed).AddComponents(buttons)
+                .AddEmbed(timeoutEmbed).AddComponents(buttons)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(timeoutMessage);
             return;
@@ -98,7 +98,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var denyEmbed = denyEmbedBuilder.Build();
             var denyMessage = new DiscordMessageBuilder()
-                .WithEmbed(denyEmbed).AddComponents(buttons)
+                .AddEmbed(denyEmbed).AddComponents(buttons)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(denyMessage);
             return;
@@ -164,7 +164,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             staffbuttons.ForEach(x => x.Enable());
 
             var builder = new DiscordMessageBuilder()
-                .WithEmbed(embed_)
+                .AddEmbed(embed_)
                 .AddComponents(staffbuttons)
                 .WithContent(staffMentionString)
                 .WithReply(ctx.Message.Id);
@@ -203,7 +203,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithColor(DiscordColor.Red);
                 var denyEmbed = denyEmbedBuilder.Build();
                 var denyMessage = new DiscordMessageBuilder()
-                    .WithEmbed(denyEmbed)
+                    .AddEmbed(denyEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(denyMessage);
                 return;
@@ -218,7 +218,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithColor(DiscordColor.Red);
                 var cancelEmbed = cancelEmbedBuilder.Build();
                 var cancelMessage = new DiscordMessageBuilder()
-                    .WithEmbed(cancelEmbed)
+                    .AddEmbed(cancelEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(cancelMessage);
                 return;
@@ -234,7 +234,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithColor(DiscordColor.Red);
                 var denyEmbed = denyEmbedBuilder.Build();
                 var denyMessage = new DiscordMessageBuilder()
-                    .WithEmbed(denyEmbed)
+                    .AddEmbed(denyEmbed)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(denyMessage);
                 return;
@@ -253,7 +253,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithColor(DiscordColor.Yellow);
                 var loadingEmbed = loadingEmbedBuilder.Build();
                 var loadingMessage = new DiscordMessageBuilder()
-                    .WithEmbed(loadingEmbed).AddComponents(disbtn)
+                    .AddEmbed(loadingEmbed).AddComponents(disbtn)
                     .WithReply(ctx.Message.Id);
                 await message.ModifyAsync(loadingMessage);
 
@@ -317,7 +317,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithColor(ec);
                 var discordEmbed = discordEmbedBuilder.Build();
-                await message.ModifyAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed));
+                await message.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));
             }
         }
     }

@@ -37,7 +37,7 @@ public sealed class MultiBanCommand : BaseCommandModule
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
-                .WithEmbed(failsuccessEmbed)
+                .AddEmbed(failsuccessEmbed)
                 .WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(failSuccessMessage);
             return;
@@ -73,7 +73,7 @@ public sealed class MultiBanCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Secondary, $"multiban_deny_{caseid}", "❌")
         };
         var builder = new DiscordMessageBuilder()
-            .WithEmbed(confirmEmbed)
+            .AddEmbed(confirmEmbed)
             .AddComponents(buttons)
             .WithReply(ctx.Message.Id);
         var interactivity = ctx.Client.GetInteractivity();
@@ -83,7 +83,7 @@ public sealed class MultiBanCommand : BaseCommandModule
         if (result.TimedOut)
         {
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Multiban wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
@@ -96,7 +96,7 @@ public sealed class MultiBanCommand : BaseCommandModule
         {
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Multiban wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
@@ -117,7 +117,7 @@ public sealed class MultiBanCommand : BaseCommandModule
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
             var loadingMessage = new DiscordMessageBuilder()
-                .WithEmbed(loadingEmbed).AddComponents(disbtn)
+                .AddEmbed(loadingEmbed).AddComponents(disbtn)
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
 
@@ -179,7 +179,7 @@ public sealed class MultiBanCommand : BaseCommandModule
                 .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                 .WithColor(ec);
             var discordEmbed = discordEmbedBuilder.Build();
-            await message.ModifyAsync(new DiscordMessageBuilder().WithEmbed(discordEmbed));
+            await message.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));
         }
     }
 }

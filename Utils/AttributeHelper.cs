@@ -91,7 +91,7 @@ public class RequireDatabase : CheckBaseAttribute
                 $"Command deaktiviert. Bitte informiere den Botentwickler ``{ctx.Client.GetUserAsync(GlobalProperties.BotOwnerId).Result.UsernameWithDiscriminator}``")
             .WithColor(DiscordColor.Red);
         var embed = embedBuilder.Build();
-        var msg_e = new DiscordMessageBuilder().WithEmbed(embed).WithReply(ctx.Message.Id);
+        var msg_e = new DiscordMessageBuilder().AddEmbed(embed).WithReply(ctx.Message.Id);
         await ctx.Channel.SendMessageAsync(msg_e);
         return false;
     }

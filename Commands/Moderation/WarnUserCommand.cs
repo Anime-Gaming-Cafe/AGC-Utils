@@ -43,14 +43,14 @@ public sealed class WarnUserCommand : BaseCommandModule
             new DiscordButtonComponent(ButtonStyle.Secondary, $"warn_deny_{caseid}", "❌")
         };
         var confirmMessage = new DiscordMessageBuilder()
-            .WithEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
+            .AddEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);
         var interaction = await interactivity.WaitForButtonAsync(confirm, ctx.User, TimeSpan.FromSeconds(60));
         buttons.ForEach(x => x.Disable());
         if (interaction.TimedOut)
         {
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Verwarnung wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
@@ -63,7 +63,7 @@ public sealed class WarnUserCommand : BaseCommandModule
         {
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
-                .WithEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
                     .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Verwarnung wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
@@ -92,7 +92,7 @@ public sealed class WarnUserCommand : BaseCommandModule
                     {
                         var rndm = new Random();
                         var rnd = rndm.Next(1000, 9999);
-                        var imageBytes = await new HttpClient().GetByteArrayAsync(attachment.Url);
+                        var imageBytes = await new HttpClient().GetByteArrayAsync(attachment.Url.ToUri());
                         var fileName = $"{caseid}_{rnd}{Path.GetExtension(attachment.Filename).ToLower()}";
                         urls += $"\n{ImageStoreProvider.SaveModerativeImage(fileName, imageBytes, ImageStoreType.Warn)}";
                     }
@@ -106,7 +106,7 @@ public sealed class WarnUserCommand : BaseCommandModule
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
             var loadingMessage = new DiscordMessageBuilder()
-                .WithEmbed(loadingEmbed).AddComponents(buttons)
+                .AddEmbed(loadingEmbed).AddComponents(buttons)
                 .WithReply(ctx.Message.Id);
             await confirm.ModifyAsync(loadingMessage);
 
@@ -196,7 +196,7 @@ public sealed class WarnUserCommand : BaseCommandModule
                 .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
                 .Build();
             var embedwithoutbuttons = new DiscordMessageBuilder()
-                .WithEmbed(sembed);
+                .AddEmbed(sembed);
             await confirm.ModifyAsync(embedwithoutbuttons);
         }
     }
