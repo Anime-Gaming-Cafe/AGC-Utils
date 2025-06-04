@@ -1,0 +1,16 @@
+{
+  "extends": [
+    "config:recommended"
+  ],
+  "automerge": false,
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "matchManagers": ["nuget"],
+      "enabled": true,
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ]
+}
