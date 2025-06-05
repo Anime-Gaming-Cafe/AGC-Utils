@@ -35,7 +35,7 @@
         <PackageReference Include="DisCatSharp.Common" Version="10.6.7" />
         <PackageReference Include="DisCatSharp.Interactivity" Version="10.6.7" />
         <PackageReference Include="Discord.OAuth2.AspNetCore" Version="3.0.0"/>
-        <PackageReference Include="HtmlAgilityPack" Version="1.11.61"/>
+        <PackageReference Include="HtmlAgilityPack" Version="1.12.1"/>
         <PackageReference Include="ini-parser-new" Version="2.6.2"/>
         <PackageReference Include="KawaiiAPI.NET" Version="1.1.0"/>
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.5-beta1.23225.2">
