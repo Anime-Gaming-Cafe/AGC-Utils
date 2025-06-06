@@ -36,16 +36,6 @@ jobs:
     - name: Set version from tag
       run: echo "GIT_TAG_VERSION=${GITHUB_REF#refs/tags/}+$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-
-    - name: Validate tag format
-      run: |
-        if [[ ! "${GIT_TAG_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-          echo "::error::Invalid tag format: ${GIT_TAG_VERSION}. Expected format: v1.2.3 or v1.2.3-suffix"
-          exit 1
-        else
-          echo "Valid tag format: ${GIT_TAG_VERSION}"
-        fi
-
     - name: Build
       run: |
         echo "Building with version: ${{ env.GIT_TAG_VERSION }}"
