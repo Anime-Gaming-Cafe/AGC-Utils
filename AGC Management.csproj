@@ -5,8 +5,13 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>AGC_Management</RootNamespace>
+
+        <GitHash>$([System.Diagnostics.Process]::Start("git", "rev-parse --short HEAD").StandardOutput.ReadToEnd().Trim())</GitHash>
+        <TimeStamp>$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</TimeStamp>
+        <FallbackVersion>0.0.1-nightly-$(GitHash)-$(TimeStamp)</FallbackVersion>
+
         <Version Condition="'$(GIT_TAG_VERSION)' != ''">$(GIT_TAG_VERSION)</Version>
-        <Version Condition="'$(GIT_TAG_VERSION)' == ''">0.0.1-nightly.$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</Version>
+        <Version Condition="'$(GIT_TAG_VERSION)' == ''">$(FallbackVersion)</Version>
         <InformationalVersion>$(Version)</InformationalVersion>
     </PropertyGroup>
 
