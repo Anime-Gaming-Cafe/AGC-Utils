@@ -32,9 +32,15 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
-
+  
     - name: Set version from tag
-      run: echo "GIT_TAG_VERSION=${GITHUB_REF#refs/tags/}+$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        CLEAN_TAG=${TAG#v}
+        SHORT_HASH=$(git rev-parse --short HEAD)
+        echo "GIT_TAG_VERSION=$CLEAN_TAG+$SHORT_HASH" >> $GITHUB_ENV
+        echo "Building with version: $CLEAN_TAG+$SHORT_HASH"
+
 
     - name: Build
       run: |
