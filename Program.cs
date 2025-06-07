@@ -47,10 +47,12 @@ public class CurrentApplication
     {
         try
         {
-            var version = Assembly.GetEntryAssembly()?
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-                .InformationalVersion;
-
+            var version = typeof(Program)
+                .Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+            Console.Out.WriteLineAsync(version);
+            
             if (!string.IsNullOrEmpty(version))
             {
                 if (version.StartsWith("v"))
