@@ -92,3 +92,11 @@ jobs:
           files: |
             AGC_Management_linux_*.zip
             AGC_Management_win_*.zip
+            
+      - name: "Send Release Notification to Discord"
+        uses: discord-webhook-action/webhook@v1
+        with:
+          url: ${{ secrets.REL_DISCORD_WEBHOOK_URL }}
+          content: |
+            **New Patch Release Created!** :tada:
+            - **Version:** ${{ steps.taggen.outputs.new_tag }}            
