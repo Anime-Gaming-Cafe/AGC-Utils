@@ -37,6 +37,15 @@ jobs:
       - name: Generate next patch version
         id: taggen
         run: |
+          CURRENT_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)
+
+          if [[ -n "$CURRENT_TAG" ]]; then
+            echo "🔁 Commit already has tag: $CURRENT_TAG"
+            echo "new_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
+            echo "skip_tagging=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           BASE=${{ steps.latest_tag.outputs.latest_tag }}
           if [[ "$BASE" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             major="${BASH_REMATCH[1]}"
@@ -44,15 +53,19 @@ jobs:
             patch="${BASH_REMATCH[3]}"
             NEW_TAG="v${major}.${minor}.$((patch + 1))"
             echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+            echo "skip_tagging=false" >> $GITHUB_OUTPUT
           else
             echo "Invalid tag format: $BASE"
             exit 1
           fi
 
+
       - name: Create and push tag
+        if: steps.taggen.outputs.skip_tagging == 'false'
         run: |
           git tag ${{ steps.taggen.outputs.new_tag }}
           git push origin ${{ steps.taggen.outputs.new_tag }}
+
 
       - name: Build and zip for all OS/Arch combos
         run: |
@@ -80,12 +93,12 @@ jobs:
             cd - > /dev/null
           done
 
-      - name: Create Draft GitHub Release with all ZIPs
+      - name: Create GitHub Release with Artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.taggen.outputs.new_tag }}
           name: ${{ steps.taggen.outputs.new_tag }}
-          draft: true
+          draft: false
           generate_release_notes: true
           files: |
             AGC_Management_linux_*.zip
