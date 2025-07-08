@@ -25,7 +25,7 @@
         <PackageReference Include="Blazorise.Bootstrap" Version="1.8.0"/>
         <PackageReference Include="Blazorise.Bootstrap5" Version="1.8.0"/>
         <PackageReference Include="Blazorise.Components" Version="1.7.7"/>
-        <PackageReference Include="Blazorise.Snackbar" Version="1.7.7"/>
+        <PackageReference Include="Blazorise.Snackbar" Version="1.8.0"/>
         <PackageReference Include="DisCatSharp" Version="10.6.7" />
         <PackageReference Include="DisCatSharp.Analyzer.Roselyn" Version="6.2.5">
             <PrivateAssets>all</PrivateAssets>
