@@ -119,7 +119,6 @@ internal class Program : BaseCommandModule
         MainAsync().GetAwaiter().GetResult();
     }
 
-
     private static async Task MainAsync()
     {
         CurrentApplication.HttpClient = new HttpClient();
