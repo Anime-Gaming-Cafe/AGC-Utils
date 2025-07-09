@@ -114,4 +114,12 @@ jobs:
           webhook-url: ${{ secrets.REL_DISCORD_WEBHOOK_URL }}
           content: |
             **New Patch Release Created!** :tada:
-            - **Version:** ${{ steps.taggen.outputs.new_tag }}            
+            - **Version:** ${{ steps.taggen.outputs.new_tag }}         
+
+      - name: Trigger Deploy Workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-deploy
+          client-payload: '{"tag": "${{ steps.taggen.outputs.new_tag }}"}'
+
