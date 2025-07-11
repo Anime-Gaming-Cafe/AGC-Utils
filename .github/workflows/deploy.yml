@@ -34,14 +34,21 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
-  
+
     - name: Set version from tag
       run: |
-        TAG=${GITHUB_REF#refs/tags/}
+        if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+          # Get tag from repository_dispatch payload
+          TAG="${{ github.event.client_payload.tag }}"
+        else
+          # Get tag from git ref (push event)
+          TAG=${GITHUB_REF#refs/tags/}
+        fi
+        
         CLEAN_TAG=${TAG#v}
         SHORT_HASH=$(git rev-parse --short HEAD)
         echo "GIT_TAG_VERSION=$CLEAN_TAG+$SHORT_HASH" >> $GITHUB_ENV
-        echo "Building with version: $CLEAN_TAG+$SHORT_HASH"
+        echo "Building with version: $CLEAN_TAG+$SHORT_HASH from tag $TAG"
 
 
     - name: Build
