@@ -117,7 +117,7 @@ jobs:
             - **Version:** ${{ steps.taggen.outputs.new_tag }}         
 
       - name: Trigger Deploy Workflow
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-deploy
