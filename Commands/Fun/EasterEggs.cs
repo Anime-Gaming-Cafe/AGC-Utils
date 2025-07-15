@@ -12,6 +12,6 @@ public class AGCEasterEggs : BaseCommandModule
     [Command("savas")]
     public async Task Savas(CommandContext ctx)
     {
-        await ctx.Channel.SendMessageAsync("This Command is currently disabled :3");
+        await ctx.Channel.SendMessageAsync("@443114493992763392 https://tenor.com/view/tomato-knife-cutting-cut-tomatoes-gif-6316343756749469417");
     }
 }
