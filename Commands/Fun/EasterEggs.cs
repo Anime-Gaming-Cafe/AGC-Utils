@@ -1,8 +1,6 @@
 ﻿#region
 
 using AGC_Management.Attributes;
-using DisCatSharp.Commands;
-using DisCatSharp.Commands.Attributes;
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
