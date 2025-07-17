@@ -56,7 +56,7 @@ public class AGCEasterEggs : BaseCommandModule
 
         List<string> messages = new();
         messages.Add("### The brain of <@515404778021322773> is not functional... pls try again later.\n[￶](https://tenor.com/view/yuru-yuri-anime-drool-drooling-loading-gif-15638770612162896677)");
-        messages.Add("###<@515404778021322773>a? Fulltime Ladyboy, Glow-Up auf Anschlag.💅 \n Brain? Brain hat gekündigt.\n[￶](https://tenor.com/view/mayu-nekoyashiki-cure-lillian-wonderful-precure-anime-pretty-cure-gif-5404015643805058067)");
+        messages.Add("### <@515404778021322773>a? Fulltime Ladyboy, Glow-Up auf Anschlag.💅 \nBrain? Brain hat gekündigt.\n[￶](https://tenor.com/view/mayu-nekoyashiki-cure-lillian-wonderful-precure-anime-pretty-cure-gif-5404015643805058067)");
 
         int cooldown = _rng.Next(120, 1501);
         _briancooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
