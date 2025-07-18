@@ -73,4 +73,27 @@ public class AGCEasterEggs : BaseCommandModule
 
         await ctx.Channel.SendMessageAsync(msgb);
     }
+
+
+ [AGCEasterEggsEnabled]
+    [Command("nib")]
+    public async Task Nib(CommandContext ctx)
+    {
+        ulong guildId = ctx.Guild?.Id ?? ctx.Channel.Id;
+
+        if (_nibcooldown.TryGetValue(guildId, out var lastUsed))
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now < lastUsed)
+            {
+                await ctx.RespondAsync($"Nib hatte eben erst ein weißes Monster!");
+                return;
+            }
+        }
+
+        int cooldown = _rng.Next(60, 501);
+        _nibcooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
+
+        await ctx.Channel.SendMessageAsync("POV <@322712147345801217>:\n### Lecker weißes Monster\n[￶](https://tenor.com/view/white-monster-wmster-monster-energy-monster-energy-drink-monkey-gif-15628061433413475006)");
+    }
 }
