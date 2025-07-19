@@ -26,15 +26,15 @@
         <PackageReference Include="Blazorise.Bootstrap5" Version="1.8.0"/>
         <PackageReference Include="Blazorise.Components" Version="1.8.0"/>
         <PackageReference Include="Blazorise.Snackbar" Version="1.8.0"/>
-        <PackageReference Include="DisCatSharp" Version="10.6.7" />
+        <PackageReference Include="DisCatSharp" Version="10.7.0-nightly-007" />
         <PackageReference Include="DisCatSharp.Analyzer.Roselyn" Version="6.2.5">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.6.7" />
-        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.6.7" />
-        <PackageReference Include="DisCatSharp.Common" Version="10.6.7" />
-        <PackageReference Include="DisCatSharp.Interactivity" Version="10.6.7" />
+        <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.7.0-nightly-007" />
+        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-007" />
+        <PackageReference Include="DisCatSharp.Common" Version="10.7.0-nightly-007" />
+        <PackageReference Include="DisCatSharp.Interactivity" Version="10.7.0-nightly-007" />
         <PackageReference Include="Discord.OAuth2.AspNetCore" Version="3.0.0"/>
         <PackageReference Include="HtmlAgilityPack" Version="1.12.1"/>
         <PackageReference Include="ini-parser-new" Version="2.6.2"/>
