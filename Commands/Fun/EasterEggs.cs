@@ -34,10 +34,11 @@ public class AGCEasterEggs : BaseCommandModule
         int cooldown = _rng.Next(60, 501);
         _savascooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
 
-        await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder()
-            .WithContent("POV <@443114493992763392>:\n### Ich liebe Tomaten <3\n[￶](https://meow.justabrian.me/-fzQMJB2y4P/Ryuunosuke_Akasaka.webp)")
+        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
-        );
+            .WithContent(
+                "POV <@443114493992763392>:\n### Savaş hatte eine Tomate, aber er hat sie gegessen :3\n[￶](https://meow.justabrian.me/-fzQMJB2y4P/Ryuunosuke_Akasaka.webp)");
+        await ctx.Channel.SendMessageAsync(msgBuilder);
     }
     
     [AGCEasterEggsEnabled]
@@ -67,9 +68,9 @@ public class AGCEasterEggs : BaseCommandModule
         int index = _rng.Next(messages.Count);
         string rndmmsg = messages[index];
 
-        await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder()
-            .WithContent(rndmmsg)
-            .WithAllowedMentions(Mentions.None)
-        );
+        DiscordMessageBuilder msgb = new();
+        msgb.WithAllowedMentions(Mentions.None).WithContent(rndmmsg);
+
+        await ctx.Channel.SendMessageAsync(msgb);
     }
 }
