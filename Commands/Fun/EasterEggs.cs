@@ -13,6 +13,7 @@ public class AGCEasterEggs : BaseCommandModule
 {
     private static readonly ConcurrentDictionary<ulong, DateTime> _savascooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _briancooldown = new();
+    private static readonly ConcurrentDictionary<ulong, DateTime> _nibcooldown = new();
     private static readonly Random _rng = new();
 
     [AGCEasterEggsEnabled]
