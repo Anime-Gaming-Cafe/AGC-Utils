@@ -95,6 +95,11 @@ public class AGCEasterEggs : BaseCommandModule
         int cooldown = _rng.Next(60, 501);
         _nibcooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
 
-        await ctx.Channel.SendMessageAsync("POV <@322712147345801217>:\n### Lecker weißes Monster\n[￶](https://tenor.com/view/white-monster-wmster-monster-energy-monster-energy-drink-monkey-gif-15628061433413475006)");
+        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
+            .WithAllowedMentions(Mentions.None)
+            .WithContent(
+                "POV <@322712147345801217>:\n### Lecker weißes Monster\n[￶](https://tenor.com/view/white-monster-wmster-monster-energy-monster-energy-drink-monkey-gif-15628061433413475006)");
+
+        await ctx.Channel.SendMessageAsync(msgBuilder);
     }
 }
