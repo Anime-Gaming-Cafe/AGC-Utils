@@ -3,6 +3,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using AGC_Management.Controller;
+using AGC_Management.Eventlistener;
 using AGC_Management.Services;
 using AGC_Management.Tasks;
 using AGC_Management.Utils;
@@ -282,6 +283,8 @@ internal class Program : BaseCommandModule
             ShowReleaseNotesInUpdateCheck = false,
             HttpTimeout = TimeSpan.FromSeconds(40)
         });
+
+        discord.MessageCreated += async (s, e) => await new TempVCMessageLogger().MessageCreated(s, e);
 
         try
         {

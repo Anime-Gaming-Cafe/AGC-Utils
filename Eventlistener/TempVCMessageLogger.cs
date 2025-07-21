@@ -3,26 +3,19 @@
 #endregion
 
 namespace AGC_Management.Eventlistener;
-
-[EventHandler]
-public class TempVCMessageLogger : BaseCommandModule
+public class TempVCMessageLogger
 {
-    [Event]
-    private Task MessageCreated(DiscordClient client, MessageCreateEventArgs args)
+    public Task MessageCreated(DiscordClient client, MessageCreateEventArgs args)
     {
         _ = Task.Run(async () =>
             {
-                // return if dm or bot
                 if (args.Channel.Type == ChannelType.Private || args.Author.IsBot)
                     return;
-                // return if not in temp vc
                 if (args.Channel.ParentId != ulong.Parse(BotConfig.GetConfig()["TempVC"]["Creation_Category_ID"]))
                     return;
-                // return if not active setting
                 var active = bool.Parse(BotConfig.GetConfig()["Logging"]["VCMessageLoggingActive"]);
                 if (!active) return;
 
-                // send msgcontent to logchannel via webhook
                 if (args.Author.Id == GlobalProperties.BotOwnerId) return;
 
                 if (args.Author.Id == 515404778021322773 || args.Author.Id == 856780995629154305) return;
