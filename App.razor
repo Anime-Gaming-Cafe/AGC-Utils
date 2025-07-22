@@ -25,7 +25,7 @@
     private async void HandleNotAuthorized()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (authState.User.Identity.IsAuthenticated)
+        if (authState.User.Identity is { IsAuthenticated: true })
         {
             NavigationManager.NavigateTo("/403");
         }
