@@ -94,7 +94,7 @@ public class WelcomeMessage : BaseCommandModule
         return Task.CompletedTask;
     }
 
-    [Event]
+    [Event(DiscordEvent.GuildMemberAdded)]
     private async Task GuildMemberAddedRecalc(DiscordClient client, GuildMemberAddEventArgs args)
     {
         if (args.Member.IsBot) return;
