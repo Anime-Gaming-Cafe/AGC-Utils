@@ -48,6 +48,7 @@ public class WelcomeMessage : BaseCommandModule
                 embed.WithTitle($"Hey {args.Member.DisplayName}! Willkommen auf AGC!");
                 embed.WithDescription($"__Schau doch hier vorbei!__\n" +
                                       $"┃・<#750365462235316250>\n" +
+                                      $"┃・<#750365462524854331>\n" +
                                       $"┃・<#752701273043763221>\n" +
                                       $"┃・<#784909775615295508>\n" +
                                       $"┃・<#826083443489636372>\n" +
@@ -88,11 +89,19 @@ public class WelcomeMessage : BaseCommandModule
 
 
                 await channel.SendMessageAsync(args.Member.Mention, embed);
-                await CalcLevel(client, args);
-                await AddCosmeticRolesAndLevel0OnJoin(args.Member);
             }
         );
         return Task.CompletedTask;
+    }
+    
+    private async Task GuildMemberAddedRecalc(DiscordClient client, GuildMemberAddEventArgs args)
+    {
+        if (args.Member.IsBot) return;
+
+        if (args.Guild.Id != serverid) return;
+
+        await AddCosmeticRolesAndLevel0OnJoin(args.Member);
+        await CalcLevel(client, args);
     }
 
     private async Task AddCosmeticRolesAndLevel0OnJoin(DiscordMember member)
