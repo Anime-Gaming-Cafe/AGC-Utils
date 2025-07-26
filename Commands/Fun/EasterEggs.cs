@@ -14,6 +14,7 @@ public class AGCEasterEggs : BaseCommandModule
     private static readonly ConcurrentDictionary<ulong, DateTime> _savascooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _briancooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _nibcooldown = new();
+    private static readonly ConcurrentDictionary<ulong, DateTime> _kaicooldown = new();
     private static readonly Random _rng = new();
 
     [AGCEasterEggsEnabled]
@@ -102,4 +103,33 @@ public class AGCEasterEggs : BaseCommandModule
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
+    
+     [AGCEasterEggsEnabled]
+    [Command("kai")]
+    public async Task Kai(CommandContext ctx)
+    {
+        ulong guildId = ctx.Guild?.Id ?? ctx.Channel.Id;
+
+        if (_kaicooldown.TryGetValue(guildId, out var lastUsed))
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now < lastUsed)
+            {
+                await ctx.RespondAsync($"chillt Faker ist gerade in League");
+                return;
+            }
+        }
+
+        int cooldown = _rng.Next(60, 501);
+        _kaicooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
+
+        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
+            .WithAllowedMentions(Mentions.None)
+            .WithContent(
+                "<@441273512909471764>:\n### omg Faker\n[￶](https://tenor.com/view/faker-shush-gif-11473756061879643280)");
+
+        await ctx.Channel.SendMessageAsync(msgBuilder);
+    }
 }
+
+
