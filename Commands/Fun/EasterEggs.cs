@@ -14,6 +14,8 @@ public class AGCEasterEggs : BaseCommandModule
     private static readonly ConcurrentDictionary<ulong, DateTime> _savascooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _briancooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _nibcooldown = new();
+
+    private static readonly ConcurrentDictionary<ulong, DateTime> _lyrawrcooldown = new();
     private static readonly Random _rng = new();
 
     [AGCEasterEggsEnabled]
@@ -41,7 +43,7 @@ public class AGCEasterEggs : BaseCommandModule
                 "POV <@443114493992763392>:\n### Ich liebe Tomaten <3\n[￶](https://meow.justabrian.me/-fzQMJB2y4P/Ryuunosuke_Akasaka.webp)");
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
-    
+
     [AGCEasterEggsEnabled]
     [Command("brian")]
     [Aliases("briana", "brain")]
@@ -76,7 +78,7 @@ public class AGCEasterEggs : BaseCommandModule
     }
 
 
- [AGCEasterEggsEnabled]
+    [AGCEasterEggsEnabled]
     [Command("nib")]
     public async Task Nib(CommandContext ctx)
     {
@@ -99,6 +101,34 @@ public class AGCEasterEggs : BaseCommandModule
             .WithAllowedMentions(Mentions.None)
             .WithContent(
                 "POV <@322712147345801217>:\n### Lecker weißes Monster\n[￶](https://tenor.com/view/white-monster-wmster-monster-energy-monster-energy-drink-monkey-gif-15628061433413475006)");
+
+        await ctx.Channel.SendMessageAsync(msgBuilder);
+    }
+
+    [AGCEasterEggsEnabled]
+    [Command("lyrawr")]
+    [Aliases("lyra", "smoll")]
+    public async Task Lyrawr(CommandContext ctx)
+    {
+        ulong guildId = ctx.Guild?.Id ?? ctx.Channel.Id;
+
+        if (_lyrawrcooldown.TryGetValue(guildId, out var lastUsed))
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now < lastUsed)
+            {
+                await ctx.RespondAsync($"Lyrawr hat bereits eine Gehirnerschütterung und is sauer :c\n[￶￶](https://meow.justabrian.me/-UFyYEfwNkS/angry-topsy-cat.gif)");
+                return;
+            }
+        }
+
+        int cooldown = _rng.Next(60, 501);
+        _lyrawrcooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
+
+        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
+            .WithAllowedMentions(Mentions.None)
+            .WithContent(
+                "POV <@374660564707966996>:\n[￶￶](https://meow.justabrian.me/-T4zyWGVriQ/taiga-aisaka-taiga.gif)");
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
