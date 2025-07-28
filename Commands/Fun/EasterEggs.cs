@@ -14,7 +14,7 @@ public class AGCEasterEggs : BaseCommandModule
     private static readonly ConcurrentDictionary<ulong, DateTime> _savascooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _briancooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _nibcooldown = new();
-
+    private static readonly ConcurrentDictionary<ulong, DateTime> _kaicooldown = new();
     private static readonly ConcurrentDictionary<ulong, DateTime> _lyrawrcooldown = new();
     private static readonly Random _rng = new();
 
@@ -129,6 +129,33 @@ public class AGCEasterEggs : BaseCommandModule
             .WithAllowedMentions(Mentions.None)
             .WithContent(
                 "POV <@374660564707966996>:\n[￶￶](https://meow.justabrian.me/-T4zyWGVriQ/taiga-aisaka-taiga.gif)");
+
+        await ctx.Channel.SendMessageAsync(msgBuilder);
+    }
+
+    [AGCEasterEggsEnabled]
+    [Command("kai")]
+    public async Task Kai(CommandContext ctx)
+    {
+        ulong guildId = ctx.Guild?.Id ?? ctx.Channel.Id;
+
+        if (_kaicooldown.TryGetValue(guildId, out var lastUsed))
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now < lastUsed)
+            {
+                await ctx.RespondAsync($"Chillt mal, Faker ist gerade in League");
+                return;
+            }
+        }
+
+        int cooldown = _rng.Next(60, 501);
+        _kaicooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
+
+        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
+            .WithAllowedMentions(Mentions.None)
+            .WithContent(
+                "POV <@441273512909471764>:\n### OMG Faker\n[￶](https://meow.justabrian.me/-fxjptVSADr/faker-shush.gif)");
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
