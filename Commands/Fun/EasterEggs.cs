@@ -29,7 +29,7 @@ public class AGCEasterEggs : BaseCommandModule
             DateTime now = DateTime.UtcNow;
             if (now < lastUsed)
             {
-                await ctx.RespondAsync($"⏳ Savaş hatte eben erst eine Tomate, erinnere ihn gerne später erneut :3");
+                await ctx.RespondAsync($"⏳ Savaş hatte eben erst eine Tomate, erinnere ihn gerne später erneut :3\n[￶](https://imgur.com/a/fJmQX4V)");
                 return;
             }
         }
