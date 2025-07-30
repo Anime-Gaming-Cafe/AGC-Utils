@@ -136,7 +136,7 @@ public class WelcomeMessage : BaseCommandModule
         /*
          * 
          */
-        _ = new Task(async () =>
+        _ = Task.Run(async () =>
         {
             await LevelUtils.RecalculateUserLevel(args.Member.Id);
             if (args.Guild != GlobalProperties.AGCGuild) return;
