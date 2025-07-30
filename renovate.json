@@ -1,19 +1,29 @@
 {
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "automerge": true,
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "dependencyDashboard": true,
   "packageRules": [
     {
-      "matchManagers": ["nuget"],
+      "matchManagers": [
+        "nuget"
+      ],
       "enabled": true,
       "automerge": true,
       "automergeType": "pr"
     },
     {
       "groupName": "DisCatSharp packages",
-      "matchManagers": ["nuget"],
-      "matchPackagePrefixes": ["DisCatSharp."]
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchPackageNames": [
+        "DisCatSharp.{/,}**"
+      ]
     }
   ]
 }
