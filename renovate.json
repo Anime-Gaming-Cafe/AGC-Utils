@@ -12,11 +12,5 @@
       "automerge": true,
       "automergeType": "pr"
     }
-  ],
-  "packageGroups": {
-    "discatsharp": {
-      "matchPackagePrefixes": ["DisCatSharp."],
-      "groupName": "DisCatSharp libraries"
-    }
-  }
+  ]
 }
