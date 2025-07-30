@@ -1,8 +1,6 @@
 {
-  "extends": [
-    "config:recommended"
-  ],
-  "automerge": false,
+  "extends": ["config:recommended"],
+  "automerge": true,
   "labels": ["dependencies"],
   "dependencyDashboard": true,
   "packageRules": [
@@ -11,6 +9,11 @@
       "enabled": true,
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "groupName": "DisCatSharp packages",
+      "matchManagers": ["nuget"],
+      "matchPackagePrefixes": ["DisCatSharp."]
     }
   ]
 }
