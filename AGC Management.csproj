@@ -32,7 +32,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.7.0-nightly-009" />
-        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-009" />
+        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-013" />
         <PackageReference Include="DisCatSharp.Common" Version="10.7.0-nightly-009" />
         <PackageReference Include="DisCatSharp.Interactivity" Version="10.7.0-nightly-009" />
         <PackageReference Include="Discord.OAuth2.AspNetCore" Version="3.0.0"/>
