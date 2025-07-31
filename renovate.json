@@ -22,7 +22,7 @@
         "nuget"
       ],
       "matchPackageNames": [
-        "DisCatSharp.{/,}**"
+        "DisCatSharp{/,}**"
       ]
     }
   ]
