@@ -179,7 +179,7 @@ public class AGCEasterEggs : BaseCommandModule
         }
 
         int cooldown = _rng.Next(60, 501);
-        _kaicooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
+        _loucooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
 
         DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
