@@ -184,7 +184,7 @@ public class AGCEasterEggs : BaseCommandModule
         DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
             .WithContent(
-                "POV <@768988475805401108>:\n[￶](https://meow.justabrian.me/-xL2sGAK7N7/CoeFBrfvxzZ2U.gif)");
+                "POV <@768988475805401108>:\n[￶](https://meow.justabrian.me/-dfnwjW6oJB/tired%20lou.gif)");
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
