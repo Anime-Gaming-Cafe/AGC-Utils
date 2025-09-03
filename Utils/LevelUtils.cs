@@ -2,6 +2,7 @@
 
 using System.Text;
 using AGC_Management.Entities;
+using AGC_Management.Entities.Leveling;
 using AGC_Management.Entities.Web;
 using AGC_Management.Enums.LevelSystem;
 
@@ -236,6 +237,28 @@ public static class LevelUtils
 
     public static async Task<string> GetLevelMultiplier(XpRewardType type)
     {
+        try
+        {
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(type);
+            if (timedMultiplier != null)
+            {
+                var remainingSeconds = timedMultiplier.ExpiryTimestamp - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                if (remainingSeconds > 0)
+                {
+                    var remainingTime = TimeSpan.FromSeconds(remainingSeconds);
+                    var timeStr = remainingTime.TotalHours >= 1 
+                        ? $"{(int)remainingTime.TotalHours}h {remainingTime.Minutes}m"
+                        : $"{remainingTime.Minutes}m {remainingTime.Seconds}s";
+                    return $"{timedMultiplier.Multiplier} (Timed: {timeStr} remaining)";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed multiplier info for {Type}", type);
+        }
+        
         if (type == XpRewardType.Message)
         {
             var multiplier = await GetMessageXpMultiplier();
@@ -264,6 +287,8 @@ public static class LevelUtils
                 return "text";
             case XpRewardType.Voice:
                 return "vc";
+            case XpRewardType.All:
+                return "all"; // Not used in database operations, but for consistency
             default:
                 return "Unbekannt";
         }
@@ -271,6 +296,14 @@ public static class LevelUtils
 
     public static async Task SetMultiplier(XpRewardType rewardType, float multiplicator)
     {
+        // Handle "All" type by setting both Message and Voice multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await SetMultiplier(XpRewardType.Message, multiplicator);
+            await SetMultiplier(XpRewardType.Voice, multiplicator);
+            return;
+        }
+
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         if (multiplicator == 0)
         {
@@ -314,6 +347,19 @@ public static class LevelUtils
         if (multiplicatorItem == MultiplicatorItem.Five) return 5.0f;
 
         return 0;
+    }
+
+    public static long ConvertTimeUnitToSeconds(long duration, TimeUnit timeUnit)
+    {
+        return timeUnit switch
+        {
+            TimeUnit.Minutes => duration * 60,
+            TimeUnit.Hours => duration * 3600,
+            TimeUnit.Days => duration * 86400,
+            TimeUnit.Weeks => duration * 604800,
+            TimeUnit.Months => duration * 2629746, // 30.44 days average
+            _ => throw new ArgumentException($"Unsupported time unit: {timeUnit}")
+        };
     }
 
     public static async Task AddOverrideRole(ulong roleId, float multiplicator)
@@ -745,6 +791,20 @@ public static class LevelUtils
 
     public static async Task<float> GetVcXpMultiplier()
     {
+        try
+        {
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Voice);
+            if (timedMultiplier != null)
+            {
+                return timedMultiplier.Multiplier;
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed voice multiplier, falling back to base multiplier");
+        }
+        
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
 
         await using var cmd = db.CreateCommand("SELECT vc_multi FROM levelingsettings WHERE guildid = @guildid");
@@ -765,6 +825,20 @@ public static class LevelUtils
 
     public static async Task<float> GetMessageXpMultiplier()
     {
+        try
+        {
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Message);
+            if (timedMultiplier != null)
+            {
+                return timedMultiplier.Multiplier;
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed message multiplier, falling back to base multiplier");
+        }
+        
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
 
         await using var cmd = db.CreateCommand("SELECT text_multi FROM levelingsettings WHERE guildid = @guildid");
@@ -1286,5 +1360,160 @@ public static class LevelUtils
         cmd.Parameters.AddWithValue("@xp", xp);
         await RecalculateAndUpdate(user.Id);
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Sets a timed multiplier for the specified XP reward type
+    /// </summary>
+    /// <param name="rewardType">The type of XP reward (Message or Voice)</param>
+    /// <param name="multiplier">The multiplier value to set</param>
+    /// <param name="durationInSeconds">Duration in seconds for how long the multiplier should be active</param>
+    /// <param name="resetValue">The value to reset to after the multiplier expires</param>
+    public static async Task SetTimedMultiplier(XpRewardType rewardType, float multiplier, long durationInSeconds, float resetValue)
+    {
+        if (multiplier <= 0)
+            throw new ArgumentException("Multiplier must be greater than 0", nameof(multiplier));
+        if (durationInSeconds <= 0)
+            throw new ArgumentException("Duration must be greater than 0", nameof(durationInSeconds));
+        if (resetValue < 0)
+            throw new ArgumentException("Reset value cannot be negative", nameof(resetValue));
+
+        // Handle "All" type by setting both Message and Voice timed multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await SetTimedMultiplier(XpRewardType.Message, multiplier, durationInSeconds, resetValue);
+            await SetTimedMultiplier(XpRewardType.Voice, multiplier, durationInSeconds, resetValue);
+            return;
+        }
+            
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var expiryTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + durationInSeconds;
+        
+        // Remove any existing timed multiplier for this type
+        await RemoveTimedMultiplier(rewardType);
+        
+        // Insert new timed multiplier
+        await using var cmd = db.CreateCommand(
+            "INSERT INTO level_timedmultipliers (guildid, type, multiplier, expiry_timestamp, reset_value) VALUES (@guildid, @type, @multiplier, @expiry, @reset)");
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        cmd.Parameters.AddWithValue("@type", (int)rewardType);
+        cmd.Parameters.AddWithValue("@multiplier", multiplier);
+        cmd.Parameters.AddWithValue("@expiry", expiryTimestamp);
+        cmd.Parameters.AddWithValue("@reset", resetValue);
+        await cmd.ExecuteNonQueryAsync();
+        
+        CurrentApplication.Logger.Information($"Set timed multiplier for {rewardType}: {multiplier}x for {durationInSeconds}s, reset to {resetValue}x");
+    }
+
+    /// <summary>
+    /// Removes a timed multiplier for the specified XP reward type
+    /// </summary>
+    /// <param name="rewardType">The type of XP reward (Message or Voice)</param>
+    public static async Task RemoveTimedMultiplier(XpRewardType rewardType)
+    {
+        // Handle "All" type by removing both Message and Voice timed multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await RemoveTimedMultiplier(XpRewardType.Message);
+            await RemoveTimedMultiplier(XpRewardType.Voice);
+            return;
+        }
+
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = db.CreateCommand(
+            "DELETE FROM level_timedmultipliers WHERE guildid = @guildid AND type = @type");
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        cmd.Parameters.AddWithValue("@type", (int)rewardType);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Gets the active timed multiplier for the specified XP reward type, if any
+    /// </summary>
+    /// <param name="rewardType">The type of XP reward (Message or Voice)</param>
+    /// <returns>The timed multiplier if active, null otherwise</returns>
+    public static async Task<TimedMultiplier?> GetActiveTimedMultiplier(XpRewardType rewardType)
+    {
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        
+        await using var cmd = db.CreateCommand(
+            "SELECT multiplier, expiry_timestamp, reset_value FROM level_timedmultipliers WHERE guildid = @guildid AND type = @type AND expiry_timestamp > @current");
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        cmd.Parameters.AddWithValue("@type", (int)rewardType);
+        cmd.Parameters.AddWithValue("@current", currentTimestamp);
+        
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (reader.HasRows)
+        {
+            while (await reader.ReadAsync())
+            {
+                return new TimedMultiplier
+                {
+                    GuildId = levelguildid,
+                    Type = rewardType,
+                    Multiplier = reader.GetFloat(0),
+                    ExpiryTimestamp = reader.GetInt64(1),
+                    ResetValue = reader.GetFloat(2)
+                };
+            }
+        }
+        
+        await reader.CloseAsync();
+        return null;
+    }
+
+    /// <summary>
+    /// Cleans up expired timed multipliers and resets the base multipliers to their reset values
+    /// </summary>
+    public static async Task CleanupExpiredTimedMultipliers()
+    {
+        try
+        {
+            var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+            var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            
+            // Get expired multipliers before deleting them
+            var expiredMultipliers = new List<TimedMultiplier>();
+            await using var selectCmd = db.CreateCommand(
+                "SELECT type, reset_value FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
+            selectCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+            selectCmd.Parameters.AddWithValue("@current", currentTimestamp);
+            
+            await using var reader = await selectCmd.ExecuteReaderAsync();
+            if (reader.HasRows)
+            {
+                while (await reader.ReadAsync())
+                {
+                    var type = (XpRewardType)reader.GetInt32(0);
+                    var resetValue = reader.GetFloat(1);
+                    expiredMultipliers.Add(new TimedMultiplier { Type = type, ResetValue = resetValue });
+                }
+            }
+            await reader.CloseAsync();
+            
+            // Reset base multipliers to their reset values
+            foreach (var expired in expiredMultipliers)
+            {
+                await SetMultiplier(expired.Type, expired.ResetValue);
+                CurrentApplication.Logger.Information($"Timed multiplier for {expired.Type} expired and reset to {expired.ResetValue}x");
+            }
+            
+            // Delete expired multipliers
+            if (expiredMultipliers.Count > 0)
+            {
+                await using var deleteCmd = db.CreateCommand(
+                    "DELETE FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
+                deleteCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+                deleteCmd.Parameters.AddWithValue("@current", currentTimestamp);
+                var deletedCount = await deleteCmd.ExecuteNonQueryAsync();
+                CurrentApplication.Logger.Information($"Cleaned up {deletedCount} expired timed multipliers");
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Error(ex, "Error during timed multiplier cleanup");
+            throw;
+        }
     }
 }

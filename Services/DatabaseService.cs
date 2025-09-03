@@ -233,6 +233,7 @@ public static class DatabaseService
             },
             { "level_excludedchannels", "CREATE TABLE IF NOT EXISTS level_excludedchannels (channelid BIGINT)" },
             { "level_excludedroles", "CREATE TABLE IF NOT EXISTS level_excludedroles (roleid BIGINT)" },
+            { "level_timedmultipliers", "CREATE TABLE IF NOT EXISTS level_timedmultipliers (guildid BIGINT, type INTEGER, multiplier FLOAT, expiry_timestamp BIGINT, reset_value FLOAT)" },
             { "banreasons", "CREATE TABLE IF NOT EXISTS banreasons (reason TEXT, custom_id VARCHAR)" },
             {
                 "flags",
@@ -462,6 +463,17 @@ public static class DatabaseService
                 "level_excludedroles", new Dictionary<string, string>
                 {
                     { "roleid", "ALTER TABLE level_excludedroles ADD COLUMN IF NOT EXISTS roleid BIGINT" }
+                }
+            },
+
+            {
+                "level_timedmultipliers", new Dictionary<string, string>
+                {
+                    { "guildid", "ALTER TABLE level_timedmultipliers ADD COLUMN IF NOT EXISTS guildid BIGINT" },
+                    { "type", "ALTER TABLE level_timedmultipliers ADD COLUMN IF NOT EXISTS type INTEGER" },
+                    { "multiplier", "ALTER TABLE level_timedmultipliers ADD COLUMN IF NOT EXISTS multiplier FLOAT" },
+                    { "expiry_timestamp", "ALTER TABLE level_timedmultipliers ADD COLUMN IF NOT EXISTS expiry_timestamp BIGINT" },
+                    { "reset_value", "ALTER TABLE level_timedmultipliers ADD COLUMN IF NOT EXISTS reset_value FLOAT" }
                 }
             },
 
