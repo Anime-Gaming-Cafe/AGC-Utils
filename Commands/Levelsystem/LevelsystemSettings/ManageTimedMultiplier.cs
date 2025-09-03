@@ -16,11 +16,30 @@ public partial class LevelSystemSettings
     [SlashCommand("manage-timed-leveling", "Verwaltet zeitliche Leveling-Multiplier", (long)Permissions.ManageGuild)]
     public static async Task ManageTimedLevelMultiplier(InteractionContext ctx,
         [Option("leveltype", "Der Leveltyp")] XpRewardType levelType,
-        [Option("multiplier", "Der Multiplier")] MultiplicatorItem multiplier,
+        [Option("multiplier", "Der Multiplier (0.01-100.0)")] double multiplier,
         [Option("duration", "Dauer der Multiplikation")] long duration,
         [Option("time_unit", "Zeiteinheit")] TimeUnit timeUnit,
-        [Option("reset_multiplier", "Multiplier-Wert nach Ablauf")] MultiplicatorItem resetMultiplier)
+        [Option("reset_multiplier", "Multiplier-Wert nach Ablauf (0 = deaktiviert)")] double resetMultiplier)
     {
+        // Validate multiplier values
+        if (multiplier <= 0 || multiplier > 100.0)
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("<:error:1085333484253687808> **Fehler!** Der Multiplier muss zwischen 0.01 und 100.0 liegen!")
+                    .AsEphemeral());
+            return;
+        }
+
+        if (resetMultiplier < 0 || resetMultiplier > 100.0)
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("<:error:1085333484253687808> **Fehler!** Der Reset-Multiplier muss zwischen 0 und 100.0 liegen!")
+                    .AsEphemeral());
+            return;
+        }
+
         // Validate duration based on time unit
         long maxDuration = timeUnit switch
         {
@@ -51,28 +70,8 @@ public partial class LevelSystemSettings
             return;
         }
 
-        if (multiplier == MultiplicatorItem.Disabled)
-        {
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder()
-                    .WithContent("<:error:1085333484253687808> **Fehler!** Der zeitliche Multiplier kann nicht deaktiviert sein!")
-                    .AsEphemeral());
-            return;
-        }
-
-        float multiplierValue = LevelUtils.GetFloatFromMultiplicatorItem(multiplier);
-        float resetValue = resetMultiplier != MultiplicatorItem.Disabled 
-            ? LevelUtils.GetFloatFromMultiplicatorItem(resetMultiplier) 
-            : 0;
-        
-        if (multiplierValue <= 0 || (resetMultiplier != MultiplicatorItem.Disabled && resetValue < 0))
-        {
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                new DiscordInteractionResponseBuilder()
-                    .WithContent("<:error:1085333484253687808> **Fehler!** Ungültige Multiplier-Werte!")
-                    .AsEphemeral());
-            return;
-        }
+        float multiplierValue = (float)multiplier;
+        float resetValue = (float)resetMultiplier;
         
         long durationInSeconds = LevelUtils.ConvertTimeUnitToSeconds(duration, timeUnit);
 
@@ -81,7 +80,7 @@ public partial class LevelSystemSettings
             // Set the timed multiplier
             await LevelUtils.SetTimedMultiplier(levelType, multiplierValue, durationInSeconds, resetValue);
 
-            var resetText = resetMultiplier != MultiplicatorItem.Disabled 
+            var resetText = resetMultiplier > 0 
                 ? $"{resetValue}x" 
                 : "deaktiviert";
 

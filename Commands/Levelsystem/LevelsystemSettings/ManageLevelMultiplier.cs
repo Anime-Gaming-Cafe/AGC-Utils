@@ -16,27 +16,31 @@ public partial class LevelSystemSettings
     [SlashCommand("manage-leveling", "Verwaltet das Levelsystem", (long)Permissions.ManageGuild)]
     public static async Task MangeleLevelMulitplier(InteractionContext ctx,
         [Option("leveltype", "Der Leveltyp")] XpRewardType levelType,
-        [Option("multiplier", "Der Multiplier")]
-        MultiplicatorItem multiplier)
+        [Option("multiplier", "Der Multiplier (0 = deaktiviert, 0.01-100.0 = aktiv)")]
+        double multiplier)
     {
-        float _multiplier;
+        // Validate multiplier value
+        if (multiplier < 0 || multiplier > 100.0)
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("<:error:1085333484253687808> **Fehler!** Der Multiplier muss zwischen 0 und 100.0 liegen!")
+                    .AsEphemeral());
+            return;
+        }
 
-        if (multiplier != MultiplicatorItem.Disabled)
-            _multiplier = LevelUtils.GetFloatFromMultiplicatorItem(multiplier);
-        else
-            _multiplier = 0;
+        float _multiplier = (float)multiplier;
 
-        // set multiplier (if disabled, type_active = false)
+        // set multiplier (if 0, type_active = false)
         await LevelUtils.SetMultiplier(levelType, _multiplier);
 
-
-        if (multiplier != MultiplicatorItem.Disabled)
+        if (multiplier > 0)
         {
             var typeText = levelType == XpRewardType.All ? "Message und Voice" : levelType.ToString();
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
-                        $"<:success:1085333481820790944> **Erfolgreich!** Der Multiplier für ``{typeText}`` wurde auf ``{LevelUtils.GetFloatFromMultiplicatorItem(multiplier)}`` gesetzt!"));
+                        $"<:success:1085333481820790944> **Erfolgreich!** Der Multiplier für ``{typeText}`` wurde auf ``{_multiplier}x`` gesetzt!"));
         }
         else
         {
