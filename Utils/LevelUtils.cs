@@ -237,16 +237,26 @@ public static class LevelUtils
 
     public static async Task<string> GetLevelMultiplier(XpRewardType type)
     {
-        // Check for active timed multiplier first
-        var timedMultiplier = await GetActiveTimedMultiplier(type);
-        if (timedMultiplier != null)
+        try
         {
-            var remainingSeconds = timedMultiplier.ExpiryTimestamp - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var remainingTime = TimeSpan.FromSeconds(remainingSeconds);
-            var timeStr = remainingTime.TotalHours >= 1 
-                ? $"{(int)remainingTime.TotalHours}h {remainingTime.Minutes}m"
-                : $"{remainingTime.Minutes}m {remainingTime.Seconds}s";
-            return $"{timedMultiplier.Multiplier} (Timed: {timeStr} remaining)";
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(type);
+            if (timedMultiplier != null)
+            {
+                var remainingSeconds = timedMultiplier.ExpiryTimestamp - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                if (remainingSeconds > 0)
+                {
+                    var remainingTime = TimeSpan.FromSeconds(remainingSeconds);
+                    var timeStr = remainingTime.TotalHours >= 1 
+                        ? $"{(int)remainingTime.TotalHours}h {remainingTime.Minutes}m"
+                        : $"{remainingTime.Minutes}m {remainingTime.Seconds}s";
+                    return $"{timedMultiplier.Multiplier} (Timed: {timeStr} remaining)";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed multiplier info for {Type}", type);
         }
         
         if (type == XpRewardType.Message)
@@ -758,11 +768,18 @@ public static class LevelUtils
 
     public static async Task<float> GetVcXpMultiplier()
     {
-        // Check for active timed multiplier first
-        var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Voice);
-        if (timedMultiplier != null)
+        try
         {
-            return timedMultiplier.Multiplier;
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Voice);
+            if (timedMultiplier != null)
+            {
+                return timedMultiplier.Multiplier;
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed voice multiplier, falling back to base multiplier");
         }
         
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -785,11 +802,18 @@ public static class LevelUtils
 
     public static async Task<float> GetMessageXpMultiplier()
     {
-        // Check for active timed multiplier first
-        var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Message);
-        if (timedMultiplier != null)
+        try
         {
-            return timedMultiplier.Multiplier;
+            // Check for active timed multiplier first
+            var timedMultiplier = await GetActiveTimedMultiplier(XpRewardType.Message);
+            if (timedMultiplier != null)
+            {
+                return timedMultiplier.Multiplier;
+            }
+        }
+        catch (Exception ex)
+        {
+            CurrentApplication.Logger.Warning(ex, "Error getting timed message multiplier, falling back to base multiplier");
         }
         
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -1324,6 +1348,13 @@ public static class LevelUtils
     /// <param name="resetValue">The value to reset to after the multiplier expires</param>
     public static async Task SetTimedMultiplier(XpRewardType rewardType, float multiplier, long durationInSeconds, float resetValue)
     {
+        if (multiplier <= 0)
+            throw new ArgumentException("Multiplier must be greater than 0", nameof(multiplier));
+        if (durationInSeconds <= 0)
+            throw new ArgumentException("Duration must be greater than 0", nameof(durationInSeconds));
+        if (resetValue < 0)
+            throw new ArgumentException("Reset value cannot be negative", nameof(resetValue));
+            
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var expiryTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + durationInSeconds;
         
@@ -1339,6 +1370,8 @@ public static class LevelUtils
         cmd.Parameters.AddWithValue("@expiry", expiryTimestamp);
         cmd.Parameters.AddWithValue("@reset", resetValue);
         await cmd.ExecuteNonQueryAsync();
+        
+        CurrentApplication.Logger.Information($"Set timed multiplier for {rewardType}: {multiplier}x for {durationInSeconds}s, reset to {resetValue}x");
     }
 
     /// <summary>
@@ -1396,39 +1429,52 @@ public static class LevelUtils
     /// </summary>
     public static async Task CleanupExpiredTimedMultipliers()
     {
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        
-        // Get expired multipliers before deleting them
-        var expiredMultipliers = new List<TimedMultiplier>();
-        await using var selectCmd = db.CreateCommand(
-            "SELECT type, reset_value FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
-        selectCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
-        selectCmd.Parameters.AddWithValue("@current", currentTimestamp);
-        
-        await using var reader = await selectCmd.ExecuteReaderAsync();
-        if (reader.HasRows)
+        try
         {
-            while (await reader.ReadAsync())
+            var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+            var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            
+            // Get expired multipliers before deleting them
+            var expiredMultipliers = new List<TimedMultiplier>();
+            await using var selectCmd = db.CreateCommand(
+                "SELECT type, reset_value FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
+            selectCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+            selectCmd.Parameters.AddWithValue("@current", currentTimestamp);
+            
+            await using var reader = await selectCmd.ExecuteReaderAsync();
+            if (reader.HasRows)
             {
-                var type = (XpRewardType)reader.GetInt32(0);
-                var resetValue = reader.GetFloat(1);
-                expiredMultipliers.Add(new TimedMultiplier { Type = type, ResetValue = resetValue });
+                while (await reader.ReadAsync())
+                {
+                    var type = (XpRewardType)reader.GetInt32(0);
+                    var resetValue = reader.GetFloat(1);
+                    expiredMultipliers.Add(new TimedMultiplier { Type = type, ResetValue = resetValue });
+                }
+            }
+            await reader.CloseAsync();
+            
+            // Reset base multipliers to their reset values
+            foreach (var expired in expiredMultipliers)
+            {
+                await SetMultiplier(expired.Type, expired.ResetValue);
+                CurrentApplication.Logger.Information($"Timed multiplier for {expired.Type} expired and reset to {expired.ResetValue}x");
+            }
+            
+            // Delete expired multipliers
+            if (expiredMultipliers.Count > 0)
+            {
+                await using var deleteCmd = db.CreateCommand(
+                    "DELETE FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
+                deleteCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+                deleteCmd.Parameters.AddWithValue("@current", currentTimestamp);
+                var deletedCount = await deleteCmd.ExecuteNonQueryAsync();
+                CurrentApplication.Logger.Information($"Cleaned up {deletedCount} expired timed multipliers");
             }
         }
-        await reader.CloseAsync();
-        
-        // Reset base multipliers to their reset values
-        foreach (var expired in expiredMultipliers)
+        catch (Exception ex)
         {
-            await SetMultiplier(expired.Type, expired.ResetValue);
+            CurrentApplication.Logger.Error(ex, "Error during timed multiplier cleanup");
+            throw;
         }
-        
-        // Delete expired multipliers
-        await using var deleteCmd = db.CreateCommand(
-            "DELETE FROM level_timedmultipliers WHERE guildid = @guildid AND expiry_timestamp <= @current");
-        deleteCmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
-        deleteCmd.Parameters.AddWithValue("@current", currentTimestamp);
-        await deleteCmd.ExecuteNonQueryAsync();
     }
 }

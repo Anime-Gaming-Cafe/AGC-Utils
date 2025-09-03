@@ -44,6 +44,15 @@ public partial class LevelSystemSettings
             ? LevelUtils.GetFloatFromMultiplicatorItem(resetMultiplier) 
             : 0;
         
+        if (multiplierValue <= 0 || (resetMultiplier != MultiplicatorItem.Disabled && resetValue < 0))
+        {
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("<:error:1085333484253687808> **Fehler!** Ungültige Multiplier-Werte!")
+                    .AsEphemeral());
+            return;
+        }
+        
         long durationInSeconds = durationHours * 3600;
 
         try
@@ -65,9 +74,10 @@ public partial class LevelSystemSettings
         }
         catch (Exception ex)
         {
+            CurrentApplication.Logger.Error(ex, "Error setting timed multiplier");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
-                    .WithContent($"<:error:1085333484253687808> **Fehler!** {ex.Message}")
+                    .WithContent($"<:error:1085333484253687808> **Fehler!** Ein unerwarteter Fehler ist aufgetreten.")
                     .AsEphemeral());
         }
     }
@@ -89,9 +99,10 @@ public partial class LevelSystemSettings
         }
         catch (Exception ex)
         {
+            CurrentApplication.Logger.Error(ex, "Error removing timed multiplier");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
-                    .WithContent($"<:error:1085333484253687808> **Fehler!** {ex.Message}")
+                    .WithContent($"<:error:1085333484253687808> **Fehler!** Ein unerwarteter Fehler ist aufgetreten.")
                     .AsEphemeral());
         }
     }
