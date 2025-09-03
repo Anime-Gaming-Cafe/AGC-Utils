@@ -17,15 +17,36 @@ public partial class LevelSystemSettings
     public static async Task ManageTimedLevelMultiplier(InteractionContext ctx,
         [Option("leveltype", "Der Leveltyp")] XpRewardType levelType,
         [Option("multiplier", "Der Multiplier")] MultiplicatorItem multiplier,
-        [Option("duration_hours", "Dauer in Stunden (1-168)")] long durationHours,
+        [Option("duration", "Dauer der Multiplikation")] long duration,
+        [Option("time_unit", "Zeiteinheit")] TimeUnit timeUnit,
         [Option("reset_multiplier", "Multiplier-Wert nach Ablauf")] MultiplicatorItem resetMultiplier)
     {
-        // Validate input
-        if (durationHours < 1 || durationHours > 168) // Max 7 days
+        // Validate duration based on time unit
+        long maxDuration = timeUnit switch
         {
+            TimeUnit.Minutes => 10080, // 7 days in minutes
+            TimeUnit.Hours => 168,     // 7 days in hours
+            TimeUnit.Days => 7,        // 7 days
+            TimeUnit.Weeks => 1,       // 1 week max
+            TimeUnit.Months => 1,      // 1 month max
+            _ => 168
+        };
+
+        if (duration < 1 || duration > maxDuration)
+        {
+            var timeUnitName = timeUnit switch
+            {
+                TimeUnit.Minutes => "Minuten",
+                TimeUnit.Hours => "Stunden", 
+                TimeUnit.Days => "Tage",
+                TimeUnit.Weeks => "Wochen",
+                TimeUnit.Months => "Monate",
+                _ => "Stunden"
+            };
+
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
-                    .WithContent("<:error:1085333484253687808> **Fehler!** Die Dauer muss zwischen 1 und 168 Stunden (7 Tage) liegen!")
+                    .WithContent($"<:error:1085333484253687808> **Fehler!** Die Dauer muss zwischen 1 und {maxDuration} {timeUnitName} liegen!")
                     .AsEphemeral());
             return;
         }
@@ -53,7 +74,7 @@ public partial class LevelSystemSettings
             return;
         }
         
-        long durationInSeconds = durationHours * 3600;
+        long durationInSeconds = LevelUtils.ConvertTimeUnitToSeconds(duration, timeUnit);
 
         try
         {
@@ -64,12 +85,22 @@ public partial class LevelSystemSettings
                 ? $"{resetValue}x" 
                 : "deaktiviert";
 
+            var timeUnitDisplay = timeUnit switch
+            {
+                TimeUnit.Minutes => "Minuten",
+                TimeUnit.Hours => "Stunden",
+                TimeUnit.Days => "Tage", 
+                TimeUnit.Weeks => "Wochen",
+                TimeUnit.Months => "Monate",
+                _ => "Stunden"
+            };
+
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
                         $"<:success:1085333481820790944> **Erfolgreich!** " +
                         $"Zeitlicher Multiplier für ``{levelType}`` wurde auf ``{multiplierValue}x`` " +
-                        $"für ``{durationHours} Stunden`` gesetzt! " +
+                        $"für ``{duration} {timeUnitDisplay}`` gesetzt! " +
                         $"Nach Ablauf wird er auf ``{resetText}`` zurückgesetzt."));
         }
         catch (Exception ex)

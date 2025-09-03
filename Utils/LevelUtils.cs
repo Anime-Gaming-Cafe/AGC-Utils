@@ -339,6 +339,19 @@ public static class LevelUtils
         return 0;
     }
 
+    public static long ConvertTimeUnitToSeconds(long duration, TimeUnit timeUnit)
+    {
+        return timeUnit switch
+        {
+            TimeUnit.Minutes => duration * 60,
+            TimeUnit.Hours => duration * 3600,
+            TimeUnit.Days => duration * 86400,
+            TimeUnit.Weeks => duration * 604800,
+            TimeUnit.Months => duration * 2629746, // 30.44 days average
+            _ => throw new ArgumentException($"Unsupported time unit: {timeUnit}")
+        };
+    }
+
     public static async Task AddOverrideRole(ulong roleId, float multiplicator)
     {
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
