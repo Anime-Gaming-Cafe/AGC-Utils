@@ -95,11 +95,13 @@ public partial class LevelSystemSettings
                 _ => "Stunden"
             };
 
+            var typeText = levelType == XpRewardType.All ? "Message und Voice" : levelType.ToString();
+
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
                         $"<:success:1085333481820790944> **Erfolgreich!** " +
-                        $"Zeitlicher Multiplier für ``{levelType}`` wurde auf ``{multiplierValue}x`` " +
+                        $"Zeitlicher Multiplier für ``{typeText}`` wurde auf ``{multiplierValue}x`` " +
                         $"für ``{duration} {timeUnitDisplay}`` gesetzt! " +
                         $"Nach Ablauf wird er auf ``{resetText}`` zurückgesetzt."));
         }
@@ -122,11 +124,13 @@ public partial class LevelSystemSettings
         {
             await LevelUtils.RemoveTimedMultiplier(levelType);
 
+            var typeText = levelType == XpRewardType.All ? "Message und Voice" : levelType.ToString();
+
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
                         $"<:success:1085333481820790944> **Erfolgreich!** " +
-                        $"Zeitlicher Multiplier für ``{levelType}`` wurde entfernt!"));
+                        $"Zeitlicher Multiplier für ``{typeText}`` wurde entfernt!"));
         }
         catch (Exception ex)
         {

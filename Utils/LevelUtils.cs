@@ -287,6 +287,8 @@ public static class LevelUtils
                 return "text";
             case XpRewardType.Voice:
                 return "vc";
+            case XpRewardType.All:
+                return "all"; // Not used in database operations, but for consistency
             default:
                 return "Unbekannt";
         }
@@ -294,6 +296,14 @@ public static class LevelUtils
 
     public static async Task SetMultiplier(XpRewardType rewardType, float multiplicator)
     {
+        // Handle "All" type by setting both Message and Voice multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await SetMultiplier(XpRewardType.Message, multiplicator);
+            await SetMultiplier(XpRewardType.Voice, multiplicator);
+            return;
+        }
+
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         if (multiplicator == 0)
         {
@@ -1367,6 +1377,14 @@ public static class LevelUtils
             throw new ArgumentException("Duration must be greater than 0", nameof(durationInSeconds));
         if (resetValue < 0)
             throw new ArgumentException("Reset value cannot be negative", nameof(resetValue));
+
+        // Handle "All" type by setting both Message and Voice timed multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await SetTimedMultiplier(XpRewardType.Message, multiplier, durationInSeconds, resetValue);
+            await SetTimedMultiplier(XpRewardType.Voice, multiplier, durationInSeconds, resetValue);
+            return;
+        }
             
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var expiryTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + durationInSeconds;
@@ -1393,6 +1411,14 @@ public static class LevelUtils
     /// <param name="rewardType">The type of XP reward (Message or Voice)</param>
     public static async Task RemoveTimedMultiplier(XpRewardType rewardType)
     {
+        // Handle "All" type by removing both Message and Voice timed multipliers
+        if (rewardType == XpRewardType.All)
+        {
+            await RemoveTimedMultiplier(XpRewardType.Message);
+            await RemoveTimedMultiplier(XpRewardType.Voice);
+            return;
+        }
+
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = db.CreateCommand(
             "DELETE FROM level_timedmultipliers WHERE guildid = @guildid AND type = @type");

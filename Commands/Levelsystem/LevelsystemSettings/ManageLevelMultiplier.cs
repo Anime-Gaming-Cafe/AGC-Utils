@@ -31,14 +31,20 @@ public partial class LevelSystemSettings
 
 
         if (multiplier != MultiplicatorItem.Disabled)
+        {
+            var typeText = levelType == XpRewardType.All ? "Message und Voice" : levelType.ToString();
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
-                        $"<:success:1085333481820790944> **Erfolgreich!** Der Multiplier für ``{levelType}`` wurde auf ``{LevelUtils.GetFloatFromMultiplicatorItem(multiplier)}`` gesetzt!"));
+                        $"<:success:1085333481820790944> **Erfolgreich!** Der Multiplier für ``{typeText}`` wurde auf ``{LevelUtils.GetFloatFromMultiplicatorItem(multiplier)}`` gesetzt!"));
+        }
         else
+        {
+            var typeText = levelType == XpRewardType.All ? "Message und Voice" : levelType.ToString();
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder()
                     .WithContent(
-                        $"<:success:1085333481820790944> **Erfolgreich!** Leveling für ``{levelType}`` wurde deaktiviert!"));
+                        $"<:success:1085333481820790944> **Erfolgreich!** Leveling für ``{typeText}`` wurde deaktiviert!"));
+        }
     }
 }
