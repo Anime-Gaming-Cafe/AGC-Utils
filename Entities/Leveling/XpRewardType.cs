@@ -3,5 +3,6 @@
 public enum XpRewardType
 {
     Message,
-    Voice
+    Voice,
+    All
 }
