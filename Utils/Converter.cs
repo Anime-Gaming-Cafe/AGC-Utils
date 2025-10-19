@@ -6,7 +6,7 @@ public class Converter
     {
         ids = new List<ulong>();
         reason = "";
-        var parts = ids_and_reason.Split(' ');
+        var parts = ids_and_reason.Split(' ', '\n');
         var isReasonStarted = false;
 
         foreach (var part in parts)
