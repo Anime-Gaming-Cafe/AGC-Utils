@@ -19,6 +19,22 @@ public sealed class BanUserCommand : BaseCommandModule
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
+
+        var staffRole = BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"];
+        var guildMember = await ctx.Guild.GetMemberAsync(user.Id);
+        if (guildMember.Roles.Any(r => r.Id == ulong.Parse(staffRole)))
+        {
+            var errorEmbedBuilder = new DiscordEmbedBuilder()
+            .WithTitle("Fehler beim Bannen des Users")
+                .WithDescription(
+                    "Der User kann nicht gebannt werden, da er ein Teammitglied ist. <:counting_warning:962007085426556989>")
+                .WithColor(DiscordColor.Red)
+                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl);
+            var errorEmbed = errorEmbedBuilder.Build();
+            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(errorEmbed));
+            return;
+        }
+
         reason = await ReasonTemplateResolver.Resolve(reason);
         var caseid = ToolSet.GenerateCaseID();
         var embedBuilder = new DiscordEmbedBuilder()
