@@ -504,13 +504,13 @@ public class TicketManagerHelper
         DiscordInteractionModalBuilder modal = new();
         modal.WithTitle("Weitere Notizen zum Flag");
         modal.CustomId = idstring;
-        modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small, label: "Notiz:"));
+        modal.AddLabelComponent(new("Notiz", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 1, maxLength: 200, placeholder: "Gebe hier deine Notiz ein.")));
         await interaction.CreateInteractionModalResponseAsync(modal);
         var interactivity = client.GetInteractivity();
         var result = await interactivity.WaitForModalAsync(idstring, TimeSpan.FromMinutes(5));
         if (result.TimedOut) return;
 
-        var notes = result.Result.Interaction.Data.Components[0].Value;
+        var notes = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value;
         await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
 
         var ticket_id = await GetTicketIdFromChannel(channel);
@@ -570,7 +570,6 @@ public class TicketManagerHelper
 
             var selector = new DiscordStringSelectComponent(
                 $"Wähle einen Snippet {chunkedSnippets.IndexOf(snippetChunk) + 1}",
-                $"Wähle einen Snippet {chunkedSnippets.IndexOf(snippetChunk) + 1}",
                 options, maxOptions: 1, minOptions: 1,
                 customId: $"snippet_selector_{chunkedSnippets.IndexOf(snippetChunk) + 1}");
             irb.AddComponents(selector).AsEphemeral();
@@ -610,7 +609,7 @@ public class TicketManagerHelper
             options.Add(new DiscordStringSelectComponentOption(user.UsernameWithDiscriminator + " ( " + user.Id + " )",
                 user.Id.ToString()));
 
-        var selector = new DiscordStringSelectComponent("Wähle einen User", "Wähle einen User", options, maxOptions: 1,
+        var selector = new DiscordStringSelectComponent("Wähle einen User", options, maxOptions: 1,
             minOptions: 1, customId: "userinfo_selector");
         var irb = new DiscordInteractionResponseBuilder()
             .WithContent("Wähle ein User aus dessen infos du sehen willst.").AddComponents(selector).AsEphemeral();
