@@ -603,13 +603,13 @@ public class TempVoiceHelper : BaseCommandModule
             DiscordInteractionModalBuilder modal = new();
             modal.WithTitle("Channel Rename");
             modal.CustomId = idstring;
-            modal.AddLabelComponent(new("Kanal umbennenen", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 1, maxLength: 100, placeholder: "Neuer Kanalname")));
+            modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small, label: "Kanal umbenennen:"));
             await interaction.CreateInteractionModalResponseAsync(modal);
             var interactivity = client.GetInteractivity();
             var result = await interactivity.WaitForModalAsync(idstring, TimeSpan.FromMinutes(1));
             if (result.TimedOut) return;
 
-            var name = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value;
+            var name = result.Result.Interaction.Data.Components[0].Value;
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var channel = userChannel;
             long timestampdata = 0;
@@ -678,13 +678,14 @@ public class TempVoiceHelper : BaseCommandModule
             DiscordInteractionModalBuilder modal = new();
             modal.WithTitle("Channel Limit");
             modal.CustomId = idstring;
-            modal.AddLabelComponent(new("Kanal Limit festlegen", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 1, maxLength: 2, placeholder: "Limit zwischen 0 und 99 eingeben")));
+            modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small, label: "Kanal Limit festlegen:",
+                minLength: 1, maxLength: 2, placeholder: "Limit zwischen 0 und 99 eingeben."));
             await interaction.CreateInteractionModalResponseAsync(modal);
             var interactivity = client.GetInteractivity();
             var result = await interactivity.WaitForModalAsync(idstring, TimeSpan.FromMinutes(1));
             if (result.TimedOut) return;
 
-            var limit = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value;
+            var limit = result.Result.Interaction.Data.Components[0].Value;
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var climit = 0;
             try
