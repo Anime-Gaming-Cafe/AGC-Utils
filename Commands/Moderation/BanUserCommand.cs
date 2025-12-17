@@ -15,7 +15,7 @@ public sealed class BanUserCommand : BaseCommandModule
     [RequirePermissions(Permissions.BanMembers)]
     public async Task BanMember(CommandContext ctx, DiscordUser user, [RemainingText] string reason)
     {
-        if (reason == null) reason = await ModerationHelper.BanReasonSelector(ctx);
+        reason ??= await ModerationHelper.BanReasonSelector(ctx);
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
@@ -58,11 +58,11 @@ public sealed class BanUserCommand : BaseCommandModule
                              $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons = new(2)
-        {
-            new DiscordButtonComponent(ButtonStyle.Secondary, $"ban_accept_{caseid}", "✅"),
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Secondary, $"ban_accept_{caseid}", "✅"),
             new DiscordButtonComponent(ButtonStyle.Secondary, $"ban_deny_{caseid}", "❌")
-        };
+        ];
         var confirmMessage = new DiscordMessageBuilder()
             .AddEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);

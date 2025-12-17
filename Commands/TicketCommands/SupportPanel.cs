@@ -26,10 +26,10 @@ public class SupportPanel : BaseCommandModule
             .WithFooter("Troll und absichtlicher Abuse ist zu unterlassen!")
             .Build();
 
-        List<DiscordButtonComponent> buttons = new()
-        {
-            new DiscordButtonComponent(ButtonStyle.Danger, "selectticketcategory", "Ticket öffnen ✉️")
-        };
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Danger, "selectticketcategory", "Ticket öffnen ✉️")
+        ];
         DiscordMessageBuilder msgb = new();
         msgb.AddEmbed(embed).AddComponents(buttons);
         var msg = await ctx.Channel.SendMessageAsync(msgb);
@@ -50,7 +50,7 @@ public class SupportPanelListener : SupportPanel
             var PanelChannelId = ulong.Parse(BotConfig.GetConfig()["TicketConfig"]["SupportPanelChannel"]);
             if (e.Channel.Id == PanelChannelId && e.Interaction.Data.CustomId == "selectticketcategory")
             {
-                List<DiscordButtonComponent> buttons = new();
+                List<DiscordButtonComponent> buttons = [];
 
                 var sup_cats = await SupportComponents.GetSupportCategories();
                 foreach (var cat in sup_cats)

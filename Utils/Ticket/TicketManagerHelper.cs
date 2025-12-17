@@ -55,8 +55,7 @@ public class TicketManagerHelper
     public static string GenerateTicketID(int length = 9)
     {
         const string chars = "0123456789abcdef";
-        return new string(Enumerable.Repeat(chars, length)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return new string([.. Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)])]);
     }
 
     public static async Task<bool> CheckForOpenTicket(long user_id)
@@ -115,10 +114,10 @@ public class TicketManagerHelper
         mb.WithContent(message.Content);
         mb.AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetTicketClaimedActionRow();
-        List<DiscordActionRowComponent> row = new()
-        {
-            new DiscordActionRowComponent(components)
-        };
+        List<DiscordActionRowComponent> row =
+		[
+			new DiscordActionRowComponent(components)
+        ];
         mb.AddComponents(row);
         await message.ModifyAsync(mb);
     }
@@ -152,10 +151,10 @@ public class TicketManagerHelper
         mb.WithContent(pingstring);
         mb.AddEmbed(eb.Build());
         var rowComponents = TicketComponents.GetTicketActionRow();
-        List<DiscordActionRowComponent> row = new()
-        {
-            new DiscordActionRowComponent(rowComponents)
-        };
+        List<DiscordActionRowComponent> row =
+		[
+			new DiscordActionRowComponent(rowComponents)
+        ];
 
         mb.AddComponents(row);
         await ticket_channel.SendMessageAsync(mb);
@@ -181,10 +180,10 @@ public class TicketManagerHelper
                 mb.WithContent(pingstring);
                 mb.AddEmbed(eb.Build());
                 var rowComponents = TicketComponents.GetTicketActionRow();
-                List<DiscordActionRowComponent> row = new()
-                {
-                    new DiscordActionRowComponent(rowComponents)
-                };
+                List<DiscordActionRowComponent> row =
+				[
+					new DiscordActionRowComponent(rowComponents)
+                ];
 
                 mb.AddComponents(row);
                 await ticket_channel.SendMessageAsync(mb);
@@ -207,10 +206,10 @@ public class TicketManagerHelper
                 mb.WithContent(pingstring);
                 mb.AddEmbed(eb.Build());
                 var rowComponents = TicketComponents.GetTicketActionRow();
-                List<DiscordActionRowComponent> row = new()
-                {
-                    new DiscordActionRowComponent(rowComponents)
-                };
+                List<DiscordActionRowComponent> row =
+				[
+					new DiscordActionRowComponent(rowComponents)
+                ];
 
                 mb.AddComponents(row);
                 await ticket_channel.SendMessageAsync(mb);
@@ -220,7 +219,7 @@ public class TicketManagerHelper
 
     private static string GenerateAdditionalNotes()
     {
-        List<string> notes = new();
+        List<string> notes = [];
 
         // Check if it's between 10 pm and 8 am
         var currentHour = DateTime.Now.Hour;
@@ -525,7 +524,7 @@ public class TicketManagerHelper
         var con_pass = BotConfig.GetConfig()["DatabaseCfg"]["Database_Password"];
         var con_user = BotConfig.GetConfig()["DatabaseCfg"]["Database_User"];
         var currentappid = client.CurrentApplication.Id;
-        var caseid = Guid.NewGuid().ToString("N").Substring(0, 8);
+        var caseid = Guid.NewGuid().ToString("N")[..8];
         var constring = $"Host={con_host};Username={con_user};Password={con_pass};Database={con_db}";
         var current_unix_timestamp = DateTimeOffset.Now.ToUnixTimeSeconds();
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -555,7 +554,7 @@ public class TicketManagerHelper
         }
 
         var chunkedSnippets = new List<List<(string snipId, string snippedText)>>();
-        for (var i = 0; i < snippets.Count; i += 25) chunkedSnippets.Add(snippets.Skip(i).Take(25).ToList());
+        for (var i = 0; i < snippets.Count; i += 25) chunkedSnippets.Add([.. snippets.Skip(i).Take(25)]);
 
         var irb = new DiscordInteractionResponseBuilder();
         irb.WithContent("Wähle einen Snippet aus.");
@@ -564,9 +563,9 @@ public class TicketManagerHelper
         {
             var options = new List<DiscordStringSelectComponentOption>();
 
-            foreach (var snippet in snippetChunk)
-                options.Add(new DiscordStringSelectComponentOption(snippet.snipId, snippet.snipId,
-                    snippet.snippedText.Truncate(80)));
+            foreach (var (snipId, snippedText) in snippetChunk)
+                options.Add(new DiscordStringSelectComponentOption(snipId, snipId,
+                    snippedText.Truncate(80)));
 
             var selector = new DiscordStringSelectComponent(
                 $"Wähle einen Snippet {chunkedSnippets.IndexOf(snippetChunk) + 1}",
@@ -655,15 +654,15 @@ public class TicketManagerHelper
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)interaction.Channel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
-        List<DiscordUser> ticket_users_discord = new();
+        List<DiscordUser> ticket_users_discord = [];
         foreach (var user in ticket_users)
         {
             var u = await interaction.Guild.GetMemberAsync((ulong)user);
@@ -679,16 +678,16 @@ public class TicketManagerHelper
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)tchannel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
 
-        List<DiscordUser> ticket_users_discord = new();
+        List<DiscordUser> ticket_users_discord = [];
         foreach (var user in ticket_users)
         {
             var u = await client.GetUserAsync((ulong)user);
@@ -704,16 +703,16 @@ public class TicketManagerHelper
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)tchannel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
 
-        List<DiscordUser> ticket_users_discord = new();
+        List<DiscordUser> ticket_users_discord = [];
         foreach (var user in ticket_users)
         {
             var u = await tchannel.Guild.GetMemberAsync((ulong)user);
@@ -882,7 +881,7 @@ public class TicketManagerHelper
         var query = $"SELECT ticket_id FROM ticketcache WHERE ticket_users @> ARRAY[{(long)user.Id}::bigint]";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<string> ticket_ids = new();
+        List<string> ticket_ids = [];
         while (reader.Read()) ticket_ids.Add(reader.GetString(0));
 
         await reader.CloseAsync();
@@ -909,11 +908,11 @@ public class TicketManagerHelper
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
@@ -1081,9 +1080,11 @@ public class TicketManagerHelper
         psi.Arguments =
             $"export -t \"{BotToken}\" -c {ticket_channel.Id} --media --reuse-media --media-dir data/tickets/transcripts/Assets -o data/tickets/transcripts/{tick}-{id}.html";
         psi.RedirectStandardOutput = true;
-        var process = new Process();
-        process.StartInfo = psi;
-        process.Start();
+		var process = new Process
+		{
+			StartInfo = psi
+		};
+		process.Start();
 
         await process.WaitForExitAsync();
         var baselink = $"https://ticketsystem.animegamingcafe.de/transcripts/" + $"{tick}-{id}.html";
@@ -1134,28 +1135,28 @@ public class TicketManagerHelper
         eb.AddField(new DiscordEmbedField("Ticket Owner", $"<@{ticket_owner}>", true));
         eb.AddField(new DiscordEmbedField("Ticket Name", channel.Name, true));
 
-        List<DiscordUser> users = new();
+        List<DiscordUser> users = [];
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)channel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
         var cusers = new StringBuilder();
         var messages = await channel.GetMessagesAsync();
-        Dictionary<DiscordUser, int> userMessageCounts = new();
+        Dictionary<DiscordUser, int> userMessageCounts = [];
 
         foreach (var message in messages)
         {
             if (message.Author == messages[0].Author) continue;
-            if (userMessageCounts.ContainsKey(message.Author))
-                userMessageCounts[message.Author]++;
+            if (userMessageCounts.TryGetValue(message.Author, out int value))
+                userMessageCounts[message.Author] = ++value;
             else
                 userMessageCounts[message.Author] = 1;
         }
@@ -1184,22 +1185,22 @@ public class TicketManagerHelper
         eb.AddField(new DiscordEmbedField("Ticket Owner", $"<@{ticket_owner}>", true));
         eb.AddField(new DiscordEmbedField("Ticket Name", ctx.Channel.Name, true));
 
-        List<DiscordUser> users = new();
+        List<DiscordUser> users = [];
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ctx.Channel.Id}'";
         await using var cmd = con.CreateCommand(query);
         await using var reader = await cmd.ExecuteReaderAsync();
-        List<long> ticket_users = new();
+        List<long> ticket_users = [];
         while (reader.Read())
         {
             var ticketUsersArray = (long[])reader.GetValue(0);
-            ticket_users = new List<long>(ticketUsersArray);
+            ticket_users = [.. ticketUsersArray];
         }
 
         await reader.CloseAsync();
         var cusers = "";
         var messages = await ctx.Channel.GetMessagesAsync();
-        HashSet<DiscordUser> userSet = new();
+        HashSet<DiscordUser> userSet = [];
         foreach (var message in messages) userSet.Add(message.Author);
 
         foreach (var user in userSet) cusers += $"{user.Mention} ``{user.Id}``\n";

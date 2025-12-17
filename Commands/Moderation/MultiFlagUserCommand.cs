@@ -19,10 +19,8 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
     [RequireTeamCat]
     public async Task MultiFlagUser(CommandContext ctx, [RemainingText] string ids_and_reason)
     {
-        List<ulong> ids;
-        string reason;
-        Converter.SeperateIdsAndReason(ids_and_reason, out ids, out reason);
-        if (await ToolSet.CheckForReason(ctx, reason)) return;
+		Converter.SeperateIdsAndReason(ids_and_reason, out List<ulong> ids, out string reason);
+		if (await ToolSet.CheckForReason(ctx, reason)) return;
         reason = reason.TrimEnd(' ');
         reason = await ReasonTemplateResolver.Resolve(reason);
         var users_to_flag = new List<DiscordUser>();
@@ -78,11 +76,11 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
                              $"```{busers_formatted}```\n__Grund:__```{reason + urls}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons = new(2)
-        {
-            new DiscordButtonComponent(ButtonStyle.Success, $"multiflag_accept_{caseid}", "Bestätigen"),
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Success, $"multiflag_accept_{caseid}", "Bestätigen"),
             new DiscordButtonComponent(ButtonStyle.Danger, $"multiflag_deny_{caseid}", "Abbrechen")
-        };
+        ];
         var messageBuilder = new DiscordMessageBuilder()
             .AddEmbed(embed)
             .WithReply(ctx.Message.Id)
@@ -138,7 +136,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             var for_str = "";
-            List<DiscordUser> users_to_flag_obj = new();
+            List<DiscordUser> users_to_flag_obj = [];
             foreach (var id in setids)
             {
                 var user = await ctx.Client.GetUserAsync(id);
@@ -160,10 +158,10 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
                 await DatabaseService.InsertDataIntoTable("flags", data);
                 var flaglist = new List<dynamic>();
 
-                List<string> selectedFlags = new()
-                {
-                    "*"
-                };
+                List<string> selectedFlags =
+				[
+					"*"
+                ];
 
                 Dictionary<string, object> whereConditions = new()
                 {

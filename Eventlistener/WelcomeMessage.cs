@@ -107,8 +107,8 @@ public class WelcomeMessage : BaseCommandModule
 
     private async Task AddCosmeticRolesAndLevel0OnJoin(DiscordMember member)
     {
-        List<ulong> roles = new() { 767031029068201994, 767056290148384799, 875679019054551050, 767031210055958538, 750450099871547462 };
-        List<DiscordRole> rolesToAdd = new();
+        List<ulong> roles = [767031029068201994, 767056290148384799, 875679019054551050, 767031210055958538, 750450099871547462];
+        List<DiscordRole> rolesToAdd = [];
         foreach (var role in roles)
         {
             var r = await member.Guild.GetRoleAsync(role);

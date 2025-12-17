@@ -13,8 +13,8 @@ public static class LevelUtils
 {
     private static readonly ulong levelguildid = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
 
-    public static List<WebLeaderboardData> _leaderboardData = new();
-    public static List<WebLeaderboardData> cachedLeaderboardData = new();
+    public static List<WebLeaderboardData> _leaderboardData = [];
+    public static List<WebLeaderboardData> cachedLeaderboardData = [];
     public static string? CacheDate = "";
     public static bool LeaderboardDataLoaded;
 
@@ -120,7 +120,7 @@ public static class LevelUtils
             tempLeaderboardData.Add(result);
         }
 
-        cachedLeaderboardData = tempLeaderboardData.ToList();
+        cachedLeaderboardData = [.. tempLeaderboardData];
 
         await Task.CompletedTask;
     }
@@ -258,16 +258,13 @@ public static class LevelUtils
 
     public static string GetLeveltypeString(XpRewardType type)
     {
-        switch (type)
-        {
-            case XpRewardType.Message:
-                return "text";
-            case XpRewardType.Voice:
-                return "vc";
-            default:
-                return "Unbekannt";
-        }
-    }
+		return type switch
+		{
+			XpRewardType.Message => "text",
+			XpRewardType.Voice => "vc",
+			_ => "Unbekannt",
+		};
+	}
 
     public static async Task SetMultiplier(XpRewardType rewardType, float multiplicator)
     {
@@ -691,16 +688,13 @@ public static class LevelUtils
     public static int GetBaseXp(XpRewardType type)
     {
         var rng = new Random();
-        switch (type)
-        {
-            case XpRewardType.Message:
-                return rng.Next(15, 26);
-            case XpRewardType.Voice:
-                return rng.Next(2, 6);
-            default:
-                return 0;
-        }
-    }
+		return type switch
+		{
+			XpRewardType.Message => rng.Next(15, 26),
+			XpRewardType.Voice => rng.Next(2, 6),
+			_ => 0,
+		};
+	}
 
     public static async Task<bool> isVcLevelingEnabled()
     {
@@ -1009,7 +1003,7 @@ public static class LevelUtils
             if (cooldownreader.HasRows)
             {
                 CurrentApplication.Logger.Debug("Cooldown is active for " + user.Username +
-                                                $" RewardType: {type.ToString()}");
+                                                $" RewardType: {type}");
                 return;
             }
 
