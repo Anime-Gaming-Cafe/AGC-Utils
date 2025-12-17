@@ -15,8 +15,10 @@ public sealed class MultiBanCommand : BaseCommandModule
     [RequirePermissions(Permissions.BanMembers)]
     public async Task MultiBan(CommandContext ctx, [RemainingText] string ids_and_reason)
     {
-		Converter.SeperateIdsAndReason(ids_and_reason, out List<ulong> ids, out string reason);
-		if (reason == "") reason = await ModerationHelper.BanReasonSelector(ctx);
+        List<ulong> ids;
+        string reason;
+        Converter.SeperateIdsAndReason(ids_and_reason, out ids, out reason);
+        if (reason == "") reason = await ModerationHelper.BanReasonSelector(ctx);
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
@@ -65,11 +67,11 @@ public sealed class MultiBanCommand : BaseCommandModule
                              $"Dann kannst du eine Entbannung beim [Entbannungsserver]({ModerationHelper.GetUnbanURL()}) beantragen")
             .WithColor(DiscordColor.Red);
         var UserEmbed = embedBuilder.Build();
-        List<DiscordButtonComponent> buttons =
-		[
-			new DiscordButtonComponent(ButtonStyle.Secondary, $"multiban_accept_{caseid}", "✅"),
+        List<DiscordButtonComponent> buttons = new(2)
+        {
+            new DiscordButtonComponent(ButtonStyle.Secondary, $"multiban_accept_{caseid}", "✅"),
             new DiscordButtonComponent(ButtonStyle.Secondary, $"multiban_deny_{caseid}", "❌")
-        ];
+        };
         var builder = new DiscordMessageBuilder()
             .AddEmbed(confirmEmbed)
             .AddComponents(buttons)

@@ -12,9 +12,9 @@ public sealed class TempVoicePanel : TempVoiceHelper
     [RequirePermissions(Permissions.Administrator)]
     public async Task InitVCPanel(CommandContext ctx)
     {
-        List<DiscordButtonComponent> buttons =
-		[
-			new DiscordButtonComponent(ButtonStyle.Secondary, "channel_rename",
+        List<DiscordButtonComponent> buttons = new()
+        {
+            new DiscordButtonComponent(ButtonStyle.Secondary, "channel_rename",
                 emoji: new DiscordComponentEmoji(1085333479732035664)),
             new DiscordButtonComponent(ButtonStyle.Secondary, "channel_limit",
                 emoji: new DiscordComponentEmoji(1085333471838343228)),
@@ -44,18 +44,18 @@ public sealed class TempVoicePanel : TempVoiceHelper
                 emoji: new DiscordComponentEmoji(1085333473893556324)),
             new DiscordButtonComponent(ButtonStyle.Secondary, "channel_unban",
                 emoji: new DiscordComponentEmoji(1085333487587971102))
-        ];
+        };
 
         var buttons1 = buttons.Take(5).ToList();
         var buttons2 = buttons.Skip(5).Take(5).ToList();
         var buttons3 = buttons.Skip(10).ToList();
 
-        List<DiscordActionRowComponent> rowComponents =
-		[
-			new DiscordActionRowComponent(buttons1),
+        List<DiscordActionRowComponent> rowComponents = new()
+        {
+            new DiscordActionRowComponent(buttons1),
             new DiscordActionRowComponent(buttons2),
             new DiscordActionRowComponent(buttons3)
-        ];
+        };
 
         DiscordEmbedBuilder eb = new()
         {

@@ -56,13 +56,16 @@ public class CurrentApplication
             
             if (!string.IsNullOrEmpty(version))
             {
-                if (version.StartsWith('v'))
+                if (version.StartsWith("v"))
                 {
                     return version;
                 }
                 try
                 {
-                    Logger?.Warning($"Version string '{version}' doesn't follow the expected format (should start with 'v')");
+                    if (Logger != null)
+                    {
+                        Logger.Warning($"Version string '{version}' doesn't follow the expected format (should start with 'v')");
+                    }
                 }
                 catch
                 {
@@ -80,7 +83,10 @@ public class CurrentApplication
             {
                 try
                 {
-                    Logger?.Error(ex, "Failed to generate timestamp for version string");
+                    if (Logger != null)
+                    {
+                        Logger.Error(ex, "Failed to generate timestamp for version string");
+                    }
                 }
                 catch
                 {
@@ -93,7 +99,10 @@ public class CurrentApplication
         {
             try
             {
-                Logger?.Error(ex, "Failed to determine version string");
+                if (Logger != null)
+                {
+                    Logger.Error(ex, "Failed to determine version string");
+                }
             }
             catch
             {
@@ -455,21 +464,22 @@ internal class Program : BaseCommandModule
     private static async Task Discord_SlashCommandErrored(ApplicationCommandsExtension sender,
         SlashCommandErrorEventArgs e)
     {
-		if (e.Exception is SlashExecutionChecksFailedException ex)
-		{
-			if (ex.FailedChecks.Any(x => x is ApplicationCommandRequireUserPermissionsAttribute))
-			{
-				var embed = EmbedGenerator.GetErrorEmbed(
-					"You don't have the required permissions to execute this command.");
-				await e.Context.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-					new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
-				e.Handled = true;
-				return;
-			}
+        if (e.Exception is SlashExecutionChecksFailedException)
+        {
+            var ex = (SlashExecutionChecksFailedException)e.Exception;
+            if (ex.FailedChecks.Any(x => x is ApplicationCommandRequireUserPermissionsAttribute))
+            {
+                var embed = EmbedGenerator.GetErrorEmbed(
+                    "You don't have the required permissions to execute this command.");
+                await e.Context.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                    new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
+                e.Handled = true;
+                return;
+            }
 
-			e.Handled = true;
-		}
-	}
+            e.Handled = true;
+        }
+    }
 
 
     private static Task<int> GetPrefix(DiscordMessage message)

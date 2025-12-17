@@ -22,11 +22,9 @@ public class EmojiStealer : ApplicationCommandsModule
         var RoleId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
         if (!ctx.Member.Roles.Any(r => r.Id == RoleId))
         {
-			var ib = new DiscordInteractionResponseBuilder
-			{
-				IsEphemeral = true
-			};
-			ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
+            var ib = new DiscordInteractionResponseBuilder();
+            ib.IsEphemeral = true;
+            ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
             return;
         }
@@ -128,11 +126,9 @@ public class EmojiStealer : ApplicationCommandsModule
         var RoleId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
         if (!ctx.Member.Roles.Any(r => r.Id == RoleId))
         {
-			var ib = new DiscordInteractionResponseBuilder
-			{
-				IsEphemeral = true
-			};
-			ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
+            var ib = new DiscordInteractionResponseBuilder();
+            ib.IsEphemeral = true;
+            ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
             return;
         }

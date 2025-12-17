@@ -15,7 +15,7 @@ public class ChannelModManagement : TempVoiceHelper
     [Command("add")]
     public async Task ChannelModAdd(CommandContext ctx, [RemainingText] DiscordMember user)
     {
-        List<ulong> channelmods = [];
+        List<ulong> channelmods = new();
         var dbChannels = await GetChannelIDFromDB(ctx);
 
         var userChannel = ctx.Member?.VoiceState?.Channel;
@@ -73,7 +73,7 @@ public class ChannelModManagement : TempVoiceHelper
     [Command("remove")]
     public async Task ChannelModRemove(CommandContext ctx, [RemainingText] DiscordMember user)
     {
-        List<ulong> channelmods = [];
+        List<ulong> channelmods = new();
         var dbChannels = await GetChannelIDFromDB(ctx);
 
         var userChannel = ctx.Member?.VoiceState?.Channel;
@@ -105,7 +105,7 @@ public class ChannelModManagement : TempVoiceHelper
     [Command("list")]
     public async Task ChannelModList(CommandContext ctx)
     {
-        List<ulong> channelmods = [];
+        List<ulong> channelmods = new();
         var dbChannels = await GetChannelIDFromDB(ctx);
 
         var userChannel = ctx.Member?.VoiceState?.Channel;

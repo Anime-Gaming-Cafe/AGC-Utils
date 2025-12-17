@@ -15,10 +15,14 @@ namespace AGC_Management.Utils;
 
 public static class ToolSet
 {
-	public static string GetFaviconUrl() 
-        => CurrentApplication.TargetGuild.IconUrl ?? "favicon.png";
+    public static string GetFaviconUrl()
+    {
+        return CurrentApplication.TargetGuild.IconUrl != null
+            ? CurrentApplication.TargetGuild.IconUrl
+            : "favicon.png";
+    }
 
-	public static string GettextfromBase64(string base64)
+    public static string GettextfromBase64(string base64)
     {
         var data = Convert.FromBase64String(base64);
         return Encoding.UTF8.GetString(data);
@@ -64,7 +68,7 @@ public static class ToolSet
         {
             var value = attribute.InformationalVersion;
             var index = value.IndexOf(BuildVersionMetadataPrefix);
-            if (index > 0) return value[(index + BuildVersionMetadataPrefix.Length)..];
+            if (index > 0) return value.Substring(index + BuildVersionMetadataPrefix.Length);
         }
 
         return string.Empty;
@@ -72,7 +76,9 @@ public static class ToolSet
 
     public static string RemoveWhitespace(string input)
     {
-        return new string([.. input.ToCharArray().Where(c => !char.IsWhiteSpace(c))]);
+        return new string(input.ToCharArray()
+            .Where(c => !char.IsWhiteSpace(c))
+            .ToArray());
     }
 
     public static long GetBuildDateToUnixTime(Assembly assembly)
@@ -86,7 +92,7 @@ public static class ToolSet
             var index = value.IndexOf(BuildVersionMetadataPrefix);
             if (index > 0)
             {
-                value = value[(index + BuildVersionMetadataPrefix.Length)..];
+                value = value.Substring(index + BuildVersionMetadataPrefix.Length);
                 if (DateTime.TryParseExact(value, "yyyyMMddHHmmss", CultureInfo.CurrentCulture,
                         DateTimeStyles.AssumeLocal, out var result))
                     return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(result, TimeZoneInfo.Local))
@@ -215,21 +221,21 @@ public static class ToolSet
         {
             var data = await GetBannsystemReports(user);
 
-            return [.. data.Select(warn => new BannSystemReport
+            return data.Select(warn => new BannSystemReport
             {
                 reportId = warn.reportId,
                 authorId = warn.authorId,
                 reason = warn.reason,
                 timestamp = warn.timestamp,
                 active = warn.active
-            })];
+            }).ToList();
         }
         catch (Exception e)
         {
             // ignored
         }
 
-        return [];
+        return new List<BannSystemReport>();
     }
 
     public static async Task<List<BannSystemWarn>> BSWarnToWarn(DiscordUser user)
@@ -238,20 +244,20 @@ public static class ToolSet
         {
             var data = await GetBannsystemWarns(user);
 
-            return [.. data.Select(warn => new BannSystemWarn
+            return data.Select(warn => new BannSystemWarn
             {
                 warnId = warn.warnId,
                 authorId = warn.authorId,
                 reason = warn.reason,
                 timestamp = warn.timestamp
-            })];
+            }).ToList();
         }
         catch (Exception e)
         {
             // ignored
         }
 
-        return [];
+        return new List<BannSystemWarn>();
     }
 
 
@@ -321,7 +327,7 @@ public static class ToolSet
     public static string GenerateCaseID()
     {
         var guid = Guid.NewGuid().ToString("N");
-        var uniqueID = guid[..8];
+        var uniqueID = guid.Substring(0, 8);
         return uniqueID;
     }
 
@@ -377,7 +383,7 @@ public static class ToolSet
     {
         var TicketUrl = "ticketsystem.animegamingcafe.de";
         if (reason == null) return false;
-        if (reason.Contains(TicketUrl, StringComparison.InvariantCultureIgnoreCase))
+        if (reason.ToLower().Contains(TicketUrl.ToLower()))
         {
             Console.WriteLine("Ticket-URL enthalten");
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Ticket-URL enthalten")

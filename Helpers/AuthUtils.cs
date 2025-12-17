@@ -226,7 +226,7 @@ public sealed class AuthUtils
         }
         catch (NotFoundException)
         {
-            return [AccessLevel.NichtImServer.ToString()];
+            return new List<string> { AccessLevel.NichtImServer.ToString() };
         }
 
         var userRoles = new List<string>();

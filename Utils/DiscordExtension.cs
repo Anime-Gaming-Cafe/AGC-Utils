@@ -16,20 +16,16 @@ internal static class DiscordExtension
     internal static List<DiscordOverwriteBuilder> ConvertToBuilderWithNewOverwrites(
         this IReadOnlyList<DiscordOverwrite> overwrites, DiscordMember member, Permissions allowed, Permissions denied)
     {
-        return
-		[
-			.. overwrites.Where(x => x.Id != member.Id)
-						.Select(x => x.Type == OverwriteType.Role
-							? new DiscordOverwriteBuilder(x.GetRoleAsync().Result) { Allowed = x.Allowed, Denied = x.Denied }
-							: new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })
-,
-			new DiscordOverwriteBuilder(member)
-				{
-					Allowed = (overwrites.FirstOrDefault(x => x.Id == member.Id, null)?.Allowed ?? Permissions.None) |
-							  allowed,
-					Denied = (overwrites.FirstOrDefault(x => x.Id == member.Id, null)?.Denied ?? Permissions.None) | denied
-				},
-		];
+        return overwrites.Where(x => x.Id != member.Id)
+            .Select(x => x.Type == OverwriteType.Role
+                ? new DiscordOverwriteBuilder(x.GetRoleAsync().Result) { Allowed = x.Allowed, Denied = x.Denied }
+                : new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })
+            .Append(new DiscordOverwriteBuilder(member)
+            {
+                Allowed = (overwrites.FirstOrDefault(x => x.Id == member.Id, null)?.Allowed ?? Permissions.None) |
+                          allowed,
+                Denied = (overwrites.FirstOrDefault(x => x.Id == member.Id, null)?.Denied ?? Permissions.None) | denied
+            }).ToList();
     }
 
     public static string NameWithRemovedRegionSuffix(this DiscordGuild guild)
@@ -200,28 +196,25 @@ internal static class DiscordExtension
     internal static List<DiscordOverwriteBuilder> ConvertToBuilderWithNewOverwrites(
         this IReadOnlyList<DiscordOverwrite> overwrites, DiscordRole role, Permissions allowed, Permissions denied)
     {
-        return
-		[
-			.. overwrites.Where(x => x.Id != role.Id)
-						.Select(x => x.Type == OverwriteType.Role
-							? new DiscordOverwriteBuilder(x.GetRoleAsync().Result) { Allowed = x.Allowed, Denied = x.Denied }
-							: new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })
-,
-			new DiscordOverwriteBuilder(role)
-				{
-					Allowed =
-						(overwrites.FirstOrDefault(x => x.Id == role.Id, null)?.Allowed ?? Permissions.None) | allowed,
-					Denied = (overwrites.FirstOrDefault(x => x.Id == role.Id, null)?.Denied ?? Permissions.None) | denied
-				},
-		];
+        return overwrites.Where(x => x.Id != role.Id)
+            .Select(x => x.Type == OverwriteType.Role
+                ? new DiscordOverwriteBuilder(x.GetRoleAsync().Result) { Allowed = x.Allowed, Denied = x.Denied }
+                : new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })
+            .Append(new DiscordOverwriteBuilder(role)
+            {
+                Allowed =
+                    (overwrites.FirstOrDefault(x => x.Id == role.Id, null)?.Allowed ?? Permissions.None) | allowed,
+                Denied = (overwrites.FirstOrDefault(x => x.Id == role.Id, null)?.Denied ?? Permissions.None) | denied
+            }).ToList();
     }
 
     internal static List<DiscordOverwriteBuilder> ConvertToBuilder(this IReadOnlyList<DiscordOverwrite> overwrites)
     {
-        return [.. overwrites.Select(x =>
+        return overwrites.Select(x =>
                 x.Type == OverwriteType.Role
                     ? new DiscordOverwriteBuilder(x.GetRoleAsync().Result) { Allowed = x.Allowed, Denied = x.Denied }
-                    : new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })];
+                    : new DiscordOverwriteBuilder(x.GetMemberAsync().Result) { Allowed = x.Allowed, Denied = x.Denied })
+            .ToList();
     }
 
 
@@ -246,7 +239,7 @@ internal static class DiscordExtension
     public static string Truncate(this string value, int maxLength)
     {
         if (string.IsNullOrEmpty(value)) return value; // Return original value if it's null or empty
-        return value.Length <= maxLength ? value : value[..maxLength];
+        return value.Length <= maxLength ? value : value.Substring(0, maxLength);
     }
 
     internal static async Task<DiscordChannel?> TryGetChannelAsync(this DiscordClient client, ulong id,

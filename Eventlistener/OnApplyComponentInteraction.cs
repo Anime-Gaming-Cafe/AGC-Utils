@@ -17,8 +17,8 @@ public sealed class OnApplyComponentInteraction : BaseCommandModule
                 if (cid != "applypanelselector") return;
                 var randomid = new Random();
                 var ncid = randomid.Next(100000, 999999).ToString();
-                var pos = $"{values[0][..1].ToUpper()}{values[0][1..]}";
-                var applicable = await IsApplicable(pos.ToLower());
+                var pos = $"{values[0].Substring(0, 1).ToUpper()}{values[0].Substring(1)}";
+                var applicable = await isApplicable(pos.ToLower());
                 Console.WriteLine(applicable);
                 if (!applicable)
                 {
@@ -65,7 +65,7 @@ public sealed class OnApplyComponentInteraction : BaseCommandModule
     }
 
 
-    private static async Task<bool> IsApplicable(string Position)
+    private static async Task<bool> isApplicable(string Position)
     {
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var command =
