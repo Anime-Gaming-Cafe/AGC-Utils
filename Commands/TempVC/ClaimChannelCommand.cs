@@ -54,11 +54,13 @@ public sealed class ClaimChannelCommand : TempVoiceHelper
                 {
                     await conn.OpenAsync();
                     var sql = "UPDATE tempvoice SET ownerid = @owner WHERE channelid = @channelid";
-					await using NpgsqlCommand command = new(sql, conn);
-					command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
-					command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-					var affected = await command.ExecuteNonQueryAsync();
-				}
+                    await using (NpgsqlCommand command = new(sql, conn))
+                    {
+                        command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
+                        command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+                        var affected = await command.ExecuteNonQueryAsync();
+                    }
+                }
 
                 overwrites = overwrites.Merge(orig_owner, Permissions.None, Permissions.None,
                     Permissions.ManageChannels | Permissions.UseVoice | Permissions.MoveMembers |

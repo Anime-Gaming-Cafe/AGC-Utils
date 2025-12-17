@@ -4,7 +4,7 @@ public class Converter
 {
     public static void SeperateIdsAndReason(string ids_and_reason, out List<ulong> ids, out string reason)
     {
-        ids = [];
+        ids = new List<ulong>();
         reason = "";
         var parts = ids_and_reason.Split(' ', '\n');
         var isReasonStarted = false;
@@ -12,9 +12,9 @@ public class Converter
         foreach (var part in parts)
             if (!isReasonStarted)
             {
-                if (part.StartsWith("<@") && part.EndsWith('>'))
+                if (part.StartsWith("<@") && part.EndsWith(">"))
                 {
-                    var idString = part[2..^1];
+                    var idString = part.Substring(2, part.Length - 3);
                     if (ulong.TryParse(idString, out var id))
                         ids.Add(id);
                     else
@@ -44,12 +44,12 @@ public class Converter
 
     public static List<ulong> ExtractUserIDsFromString(string users)
     {
-        List<ulong> ids = [];
+        List<ulong> ids = new();
         var parts = users.Split(' ');
         foreach (var part in parts)
-            if (part.StartsWith("<@") && part.EndsWith('>'))
+            if (part.StartsWith("<@") && part.EndsWith(">"))
             {
-                var idString = part[2..^1];
+                var idString = part.Substring(2, part.Length - 3);
                 if (ulong.TryParse(idString, out var id))
                     ids.Add(id);
                 else
@@ -60,7 +60,7 @@ public class Converter
                 ids.Add(id);
             }
 
-        ids = [.. ids];
+        ids = ids.ToHashSet().ToList();
         return ids;
     }
 

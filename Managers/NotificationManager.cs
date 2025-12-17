@@ -77,18 +77,26 @@ public class NotificationManager
 
     public static string GetModeString(NotificationMode mode)
     {
-		return mode switch
-		{
-			NotificationMode.Disabled => "Deaktiviert",
-			NotificationMode.OnceMention => "Einmalig Erwähnen",
-			NotificationMode.OnceDM => "Einmalig DM",
-			NotificationMode.OnceBoth => "Einmalig Beides",
-			NotificationMode.AlwaysMention => "Immer Erwähnen",
-			NotificationMode.AlwaysDM => "Immer DM",
-			NotificationMode.AlwaysBoth => "Immer Beides",
-			_ => "Unbekannt",
-		};
-	}
+        switch (mode)
+        {
+            case NotificationMode.Disabled:
+                return "Deaktiviert";
+            case NotificationMode.OnceMention:
+                return "Einmalig Erwähnen";
+            case NotificationMode.OnceDM:
+                return "Einmalig DM";
+            case NotificationMode.OnceBoth:
+                return "Einmalig Beides";
+            case NotificationMode.AlwaysMention:
+                return "Immer Erwähnen";
+            case NotificationMode.AlwaysDM:
+                return "Immer DM";
+            case NotificationMode.AlwaysBoth:
+                return "Immer Beides";
+            default:
+                return "Unbekannt";
+        }
+    }
 
     public static async Task<NotificationMode> GetCurrentMode(ulong channel_id, ulong user_id)
     {

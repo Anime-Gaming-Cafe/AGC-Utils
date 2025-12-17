@@ -33,7 +33,7 @@ public class BlockUserCommand : TempVoiceHelper
                     (userChannel != null && isMod))
                 {
                     var blockedlist = new List<ulong>();
-                    List<ulong> ids = [];
+                    List<ulong> ids = new();
                     ids = Converter.ExtractUserIDsFromString(users);
                     var staffrole = ctx.Guild.GetRole(GlobalProperties.StaffRoleId);
                     var msg = await ctx.RespondAsync(

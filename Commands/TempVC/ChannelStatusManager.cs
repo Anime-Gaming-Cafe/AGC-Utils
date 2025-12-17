@@ -42,10 +42,10 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                     "<a:loading_agc:1084157150747697203> **Lade...** Versuche Channel-Status zu setzen...");
                 var channel = userChannel;
                 long? timestampdata = 0;
-                List<string> Query =
-				[
-					"statuslastedited"
-                ];
+                List<string> Query = new()
+                {
+                    "statuslastedited"
+                };
                 Dictionary<string, object> WhereCondiditons = new()
                 {
                     { "channelid", (long)channel.Id }
@@ -97,11 +97,13 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                 {
                     await conn.OpenAsync();
                     var sql = "UPDATE tempvoice SET statuslastedited = @timestamp WHERE channelid = @channelid";
-					await using NpgsqlCommand command = new(sql, conn);
-					command.Parameters.AddWithValue("@timestamp", current_timestamp);
-					command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-					var affected = await command.ExecuteNonQueryAsync();
-				}
+                    await using (NpgsqlCommand command = new(sql, conn))
+                    {
+                        command.Parameters.AddWithValue("@timestamp", current_timestamp);
+                        command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+                        var affected = await command.ExecuteNonQueryAsync();
+                    }
+                }
 
                 await msg.ModifyAsync(
                     "<:success:1085333481820790944> **Erfolg!** Der Channelstatus wurde erfolgreich geändert.");
@@ -131,10 +133,10 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                     "<a:loading_agc:1084157150747697203> **Lade...** Versuche Channel-Status zu entfernen...");
                 var channel = userChannel;
                 long? timestampdata = 0;
-                List<string> Query =
-				[
-					"statuslastedited"
-                ];
+                List<string> Query = new()
+                {
+                    "statuslastedited"
+                };
                 Dictionary<string, object> WhereCondiditons = new()
                 {
                     { "channelid", (long)channel.Id }
@@ -183,11 +185,13 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                 {
                     await conn.OpenAsync();
                     var sql = "UPDATE tempvoice SET statuslastedited = @timestamp WHERE channelid = @channelid";
-					await using NpgsqlCommand command = new(sql, conn);
-					command.Parameters.AddWithValue("@timestamp", current_timestamp);
-					command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-					var affected = await command.ExecuteNonQueryAsync();
-				}
+                    await using (NpgsqlCommand command = new(sql, conn))
+                    {
+                        command.Parameters.AddWithValue("@timestamp", current_timestamp);
+                        command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+                        var affected = await command.ExecuteNonQueryAsync();
+                    }
+                }
 
                 await msg.ModifyAsync(
                     "<:success:1085333481820790944> **Erfolg!** Der Channelstatus wurde erfolgreich entfernt.");

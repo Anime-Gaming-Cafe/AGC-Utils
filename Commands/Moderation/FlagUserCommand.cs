@@ -52,10 +52,10 @@ public sealed class FlagUserCommand : BaseCommandModule
         await DatabaseService.InsertDataIntoTable("flags", data);
         var flaglist = new List<dynamic>();
 
-        List<string> selectedFlags =
-		[
-			"*"
-        ];
+        List<string> selectedFlags = new()
+        {
+            "*"
+        };
 
         Dictionary<string, object> whereConditions = new()
         {

@@ -165,10 +165,10 @@ public class TicketManager
         var umb = new DiscordMessageBuilder();
         umb.WithContent(message.Content).AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
-        List<DiscordActionRowComponent> row =
-		[
-			new DiscordActionRowComponent(components)
-        ];
+        List<DiscordActionRowComponent> row = new()
+        {
+            new DiscordActionRowComponent(components)
+        };
         umb.AddComponents(row);
         await message.ModifyAsync(umb);
         var ceb = new DiscordEmbedBuilder
@@ -212,12 +212,12 @@ public class TicketManager
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
         await using var cmd3 = con.CreateCommand(query2);
         await using var reader2 = await cmd3.ExecuteReaderAsync();
-        List<List<long>> ticket_usersList = [];
+        List<List<long>> ticket_usersList = new();
 
         while (reader2.Read())
         {
             var ticketUsersArray = (long[])reader2.GetValue(0);
-            List<long> ticket_users = [.. ticketUsersArray];
+            List<long> ticket_users = new(ticketUsersArray);
             ticket_usersList.Add(ticket_users);
         }
 
@@ -259,10 +259,10 @@ public class TicketManager
         var umb = new DiscordMessageBuilder();
         umb.WithContent(message.Content).AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
-        List<DiscordActionRowComponent> row =
-		[
-			new DiscordActionRowComponent(components)
-        ];
+        List<DiscordActionRowComponent> row = new()
+        {
+            new DiscordActionRowComponent(components)
+        };
         umb.AddComponents(row);
         await message.ModifyAsync(umb);
         var ceb = new DiscordEmbedBuilder
@@ -306,12 +306,12 @@ public class TicketManager
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
         await using var cmd3 = con.CreateCommand(query2);
         await using var reader2 = await cmd3.ExecuteReaderAsync();
-        List<List<long>> ticket_usersList = [];
+        List<List<long>> ticket_usersList = new();
 
         while (reader2.Read())
         {
             var ticketUsersArray = (long[])reader2.GetValue(0);
-            List<long> ticket_users = [.. ticketUsersArray];
+            List<long> ticket_users = new(ticketUsersArray);
             ticket_usersList.Add(ticket_users);
         }
 
@@ -364,10 +364,10 @@ public class TicketManager
         umb.WithContent(message.Content);
         umb.AddEmbed(message.Embeds[0]);
         var components = TicketComponents.GetClosedTicketActionRow();
-        List<DiscordActionRowComponent> row =
-		[
-			new DiscordActionRowComponent(components)
-        ];
+        List<DiscordActionRowComponent> row = new()
+        {
+            new DiscordActionRowComponent(components)
+        };
         umb.AddComponents(row);
         await message.ModifyAsync(umb);
         DiscordEmbedBuilder ceb = new()
@@ -411,12 +411,12 @@ public class TicketManager
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
         await using var cmd3 = con.CreateCommand(query2);
         await using var reader2 = await cmd3.ExecuteReaderAsync();
-        List<List<long>> ticket_usersList = [];
+        List<List<long>> ticket_usersList = new();
 
         while (reader2.Read())
         {
             var ticketUsersArray = (long[])reader2.GetValue(0);
-            List<long> ticket_users = [.. ticketUsersArray];
+            List<long> ticket_users = new(ticketUsersArray);
             ticket_usersList.Add(ticket_users);
         }
 

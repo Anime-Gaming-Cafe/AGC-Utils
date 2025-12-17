@@ -70,7 +70,7 @@ public static class DatabaseService
             selectQuery += $" WHERE {whereClause}";
         }
 
-        List<Dictionary<string, object>> results = [];
+        List<Dictionary<string, object>> results = new();
 
         var connection = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
 
@@ -85,7 +85,7 @@ public static class DatabaseService
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            Dictionary<string, object> row = [];
+            Dictionary<string, object> row = new();
 
             for (var i = 0; i < reader.FieldCount; i++)
             {

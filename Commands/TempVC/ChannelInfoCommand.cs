@@ -86,10 +86,10 @@ public sealed class ChannelInfoCommand : TempVoiceHelper
 
             if (channellimit == 0) lreach = "Kein Limit gesetzt";
 
-            List<string> Query =
-			[
-				"userid"
-            ];
+            List<string> Query = new()
+            {
+                "userid"
+            };
             Dictionary<string, object> WhereCondiditons = new()
             {
                 { "userid", (long)channelownerid }

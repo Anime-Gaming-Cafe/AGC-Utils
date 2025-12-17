@@ -19,7 +19,7 @@ public sealed class WarnUserCommand : BaseCommandModule
     [RequireTeamCat]
     public async Task WarnUser(CommandContext ctx, DiscordUser user, [RemainingText] string? reason)
     {
-        reason ??= await ModerationHelper.WarnReasonSelector(ctx);
+        if (reason == null) reason = await ModerationHelper.WarnReasonSelector(ctx);
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
@@ -37,11 +37,11 @@ public sealed class WarnUserCommand : BaseCommandModule
                              $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons =
-		[
-			new DiscordButtonComponent(ButtonStyle.Secondary, $"warn_accept_{caseid}", "✅"),
+        List<DiscordButtonComponent> buttons = new(2)
+        {
+            new DiscordButtonComponent(ButtonStyle.Secondary, $"warn_accept_{caseid}", "✅"),
             new DiscordButtonComponent(ButtonStyle.Secondary, $"warn_deny_{caseid}", "❌")
-        ];
+        };
         var confirmMessage = new DiscordMessageBuilder()
             .AddEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);
@@ -122,10 +122,10 @@ public sealed class WarnUserCommand : BaseCommandModule
 
             var warnlist = new List<dynamic>();
 
-            List<string> selectedWarns =
-			[
-				"*"
-            ];
+            List<string> selectedWarns = new()
+            {
+                "*"
+            };
             Dictionary<string, object> whereConditions = new()
             {
                 { "userid", (long)user.Id }

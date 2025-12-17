@@ -15,10 +15,10 @@ public class DmWarning : BaseCommandModule
                 if (args.Channel.Type == ChannelType.Private && !args.Message.Author.IsBot)
                 {
                     var supportlink = BotConfig.GetConfig()["TicketConfig"]["SupportLink"];
-                    List<DiscordLinkButtonComponent> supportbutton =
-					[
-						new DiscordLinkButtonComponent(supportlink, "Zum Support")
-                    ];
+                    List<DiscordLinkButtonComponent> supportbutton = new(1)
+                    {
+                        new DiscordLinkButtonComponent(supportlink, "Zum Support")
+                    };
                     DiscordEmbed embed = new DiscordEmbedBuilder().WithTitle("AGC Support-System")
                         .WithDescription(
                             "Support wird nicht mehr per DM bearbeitet. \nBitte nutze den untenstehenden Button um zum Support zu gelangen!")

@@ -18,12 +18,12 @@ public sealed class CaseManagement : BaseCommandModule
     [RequireTeamCat]
     public async Task CaseInfo(CommandContext ctx, string caseid)
     {
-        List<dynamic> wlist = [];
-        List<dynamic> flist = [];
-        List<string> selectedWarns =
-		[
-			"*"
-        ];
+        List<dynamic> wlist = new();
+        List<dynamic> flist = new();
+        List<string> selectedWarns = new()
+        {
+            "*"
+        };
 
         Dictionary<string, object> whereConditions = new()
         {
@@ -139,12 +139,12 @@ public sealed class CaseManagement : BaseCommandModule
     [RequireTeamCat]
     public async Task CaseEdit(CommandContext ctx, string caseid, [RemainingText] string newreason)
     {
-        List<dynamic> wlist = [];
-        List<dynamic> flist = [];
-        List<string> selectedWarns =
-		[
-			"*"
-        ];
+        List<dynamic> wlist = new();
+        List<dynamic> flist = new();
+        List<string> selectedWarns = new()
+        {
+            "*"
+        };
 
         Dictionary<string, object> whereConditions = new()
         {
@@ -211,7 +211,7 @@ public sealed class CaseManagement : BaseCommandModule
                 }
             }
             
-            reason += urls;
+            reason = reason + urls;
             
             if (await ToolSet.CheckForReason(ctx, reason)) return;
             sql = "UPDATE warns SET description = @description WHERE caseid = @caseid";
@@ -285,12 +285,12 @@ public sealed class CaseManagement : BaseCommandModule
     [RequireTeamCat]
     public async Task CaseDelete(CommandContext ctx, string caseid, [RemainingText] string deletereason)
     {
-        List<dynamic> wlist = [];
-        List<dynamic> flist = [];
-        List<string> selectedWarns =
-		[
-			"*"
-        ];
+        List<dynamic> wlist = new();
+        List<dynamic> flist = new();
+        List<string> selectedWarns = new()
+        {
+            "*"
+        };
 
         Dictionary<string, object> whereConditions = new()
         {
@@ -337,41 +337,49 @@ public sealed class CaseManagement : BaseCommandModule
         if (wcase)
         {
             if (await ToolSet.CheckForReason(ctx, reason)) return;
-			await using NpgsqlConnection conn = new(DatabaseService.GetConnectionString());
-			await conn.OpenAsync();
-			sql = "DELETE FROM warns WHERE caseid = @caseid";
-			await using NpgsqlCommand command = new(sql, conn);
-			command.Parameters.AddWithValue("@caseid", caseid);
+            await using (NpgsqlConnection conn = new(DatabaseService.GetConnectionString()))
+            {
+                await conn.OpenAsync();
+                sql = "DELETE FROM warns WHERE caseid = @caseid";
+                await using (NpgsqlCommand command = new(sql, conn))
+                {
+                    command.Parameters.AddWithValue("@caseid", caseid);
 
-			var affected = await command.ExecuteNonQueryAsync();
+                    var affected = await command.ExecuteNonQueryAsync();
 
-			var ue = new DiscordEmbedBuilder()
-				.WithTitle("Case Gelöscht").WithDescription(
-					$"Der Case mit der ID ``{caseid}`` wurde gelöscht.\n" +
-					$"Case-Typ: {ctyp}\n").WithColor(BotConfig.GetEmbedColor()).Build();
-			await ctx.RespondAsync(ue);
+                    var ue = new DiscordEmbedBuilder()
+                        .WithTitle("Case Gelöscht").WithDescription(
+                            $"Der Case mit der ID ``{caseid}`` wurde gelöscht.\n" +
+                            $"Case-Typ: {ctyp}\n").WithColor(BotConfig.GetEmbedColor()).Build();
+                    await ctx.RespondAsync(ue);
+                }
+            }
 
-			return;
+            return;
         }
 
         if (fcase)
         {
             if (await ToolSet.CheckForReason(ctx, reason)) return;
-			await using NpgsqlConnection conn = new(DatabaseService.GetConnectionString());
-			await conn.OpenAsync();
-			sql = "DELETE FROM flags WHERE caseid = @caseid";
-			await using NpgsqlCommand command = new(sql, conn);
-			command.Parameters.AddWithValue("@caseid", caseid);
+            await using (NpgsqlConnection conn = new(DatabaseService.GetConnectionString()))
+            {
+                await conn.OpenAsync();
+                sql = "DELETE FROM flags WHERE caseid = @caseid";
+                await using (NpgsqlCommand command = new(sql, conn))
+                {
+                    command.Parameters.AddWithValue("@caseid", caseid);
 
-			var affected = await command.ExecuteNonQueryAsync();
+                    var affected = await command.ExecuteNonQueryAsync();
 
-			var ue = new DiscordEmbedBuilder()
-				.WithTitle("Case Gelöscht").WithDescription(
-					$"Der Case mit der ID ``{caseid}`` wurde gelöscht.\n" +
-					$"Case-Typ: {ctyp}\n").WithColor(BotConfig.GetEmbedColor()).Build();
-			await ctx.RespondAsync(ue);
+                    var ue = new DiscordEmbedBuilder()
+                        .WithTitle("Case Gelöscht").WithDescription(
+                            $"Der Case mit der ID ``{caseid}`` wurde gelöscht.\n" +
+                            $"Case-Typ: {ctyp}\n").WithColor(BotConfig.GetEmbedColor()).Build();
+                    await ctx.RespondAsync(ue);
+                }
+            }
 
-			return;
+            return;
         }
 
         var embed = new DiscordEmbedBuilder()

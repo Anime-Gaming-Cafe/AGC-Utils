@@ -21,11 +21,11 @@ public class TempVCEventHandler : TempVoiceHelper
                 if (e.Guild.Id != ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"])) return;
                 var sessionresult = new List<Dictionary<string, object>>();
                 var usersession = new List<dynamic>();
-                List<string> Query =
-				[
-					"userid", "channelname", "channelbitrate", "channellimit",
+                List<string> Query = new()
+                {
+                    "userid", "channelname", "channelbitrate", "channellimit",
                     "blockedusers", "permitedusers", "locked", "hidden", "sessionskip", "channelmods"
-                ];
+                };
                 Dictionary<string, object> WhereCondiditons = new()
                 {
                     { "userid", (long)e.User.Id }
@@ -71,55 +71,56 @@ public class TempVCEventHandler : TempVoiceHelper
                     if ((e.After?.Channel != null && e.Before?.Channel == null) ||
                         (e.Before?.Channel != null && e.After?.Channel != null))
                     {
-						if (ulong.TryParse(GetVCConfig("Creation_Channel_ID"), out ulong creationChannelId))
-							if (e.After.Channel.Id == creationChannelId)
-							{
-								var m = await e.Guild.GetMemberAsync(e.User.Id);
+                        ulong creationChannelId;
+                        if (ulong.TryParse(GetVCConfig("Creation_Channel_ID"), out creationChannelId))
+                            if (e.After.Channel.Id == creationChannelId)
+                            {
+                                var m = await e.Guild.GetMemberAsync(e.User.Id);
 
-								var defaultVcName = GetVCConfig("Default_VC_Name") ?? $"{m.Username}'s Channel";
-								defaultVcName = string.IsNullOrWhiteSpace(defaultVcName)
-									? $"{m.Username}'s Channel"
-									: defaultVcName;
-								defaultVcName = defaultVcName.Replace("{username}", m.Username)
-									.Replace("{userid}", m.Id.ToString())
-									.Replace("{fullname}", m.UsernameWithDiscriminator);
+                                var defaultVcName = GetVCConfig("Default_VC_Name") ?? $"{m.Username}'s Channel";
+                                defaultVcName = string.IsNullOrWhiteSpace(defaultVcName)
+                                    ? $"{m.Username}'s Channel"
+                                    : defaultVcName;
+                                defaultVcName = defaultVcName.Replace("{username}", m.Username)
+                                    .Replace("{userid}", m.Id.ToString())
+                                    .Replace("{fullname}", m.UsernameWithDiscriminator);
 
 
-								var voice = await e.After?.Guild.CreateVoiceChannelAsync
-								(defaultVcName, e.After.Channel.Parent,
-									96000, 0, qualityMode: VideoQualityMode.Full);
-								var overwrites = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder()).ToList();
-								Dictionary<string, object> data = new()
-								{
-									{ "ownerid", (long)e.User.Id },
-									{ "channelid", (long)voice.Id },
-									{ "lastedited", (long)0 },
-									{ "statuslastedited", (long)0 }
-								};
-								await DatabaseService.InsertDataIntoTable("tempvoice", data);
-								try
-								{
-									await m.ModifyAsync(x => x.VoiceChannel = voice);
-								}
-								catch (Exception)
-								{
-									Dictionary<string, (object value, string comparisonOperator)>
-										DeletewhereConditions = new()
-										{
-											{ "channelid", ((long)voice.Id, "=") }
-										};
-									await voice.DeleteAsync();
-									await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
-									return;
-								}
+                                var voice = await e.After?.Guild.CreateVoiceChannelAsync
+                                (defaultVcName, e.After.Channel.Parent,
+                                    96000, 0, qualityMode: VideoQualityMode.Full);
+                                var overwrites = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder()).ToList();
+                                Dictionary<string, object> data = new()
+                                {
+                                    { "ownerid", (long)e.User.Id },
+                                    { "channelid", (long)voice.Id },
+                                    { "lastedited", (long)0 },
+                                    { "statuslastedited", (long)0 }
+                                };
+                                await DatabaseService.InsertDataIntoTable("tempvoice", data);
+                                try
+                                {
+                                    await m.ModifyAsync(x => x.VoiceChannel = voice);
+                                }
+                                catch (Exception)
+                                {
+                                    Dictionary<string, (object value, string comparisonOperator)>
+                                        DeletewhereConditions = new()
+                                        {
+                                            { "channelid", ((long)voice.Id, "=") }
+                                        };
+                                    await voice.DeleteAsync();
+                                    await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
+                                    return;
+                                }
 
-								overwrites = overwrites.Merge(m,
-									Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
-									Permissions.AccessChannels, Permissions.None);
-								await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
-								await voice.ModifyAsync(async x => { x.PermissionOverwrites = overwrites; });
-							}
-					}
+                                overwrites = overwrites.Merge(m,
+                                    Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
+                                    Permissions.AccessChannels, Permissions.None);
+                                await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
+                                await voice.ModifyAsync(async x => { x.PermissionOverwrites = overwrites; });
+                            }
+                    }
                 }
                 else if (sessionresult.Count == 1)
                 {
@@ -158,199 +159,200 @@ public class TempVCEventHandler : TempVoiceHelper
                     if ((e.After?.Channel != null && e.Before?.Channel == null) ||
                         (e.Before?.Channel != null && e.After?.Channel != null))
                     {
-						if (ulong.TryParse(GetVCConfig("Creation_Channel_ID"), out ulong creationChannelId))
-							if (e.After.Channel.Id == creationChannelId)
-							{
-								var sessionskipActive = false;
-								foreach (var item in sessionresult)
-								{
-									sessionskipActive = (bool)item["sessionskip"];
-									break;
-								}
+                        ulong creationChannelId;
+                        if (ulong.TryParse(GetVCConfig("Creation_Channel_ID"), out creationChannelId))
+                            if (e.After.Channel.Id == creationChannelId)
+                            {
+                                var sessionskipActive = false;
+                                foreach (var item in sessionresult)
+                                {
+                                    sessionskipActive = (bool)item["sessionskip"];
+                                    break;
+                                }
 
-								long userId = 0;
-								var channelName = string.Empty;
-								var channelBitrate = 0;
-								var channelLimit = 0;
-								var blockedusers = string.Empty;
-								var permitedusers = string.Empty;
-								var locked = false;
-								var hidden = false;
-								var channelMods = string.Empty;
-								foreach (var item in sessionresult)
-								{
-									userId = (long)item["userid"];
-									channelName = (string)item["channelname"];
-									channelBitrate = (int)item["channelbitrate"];
-									channelLimit = (int)item["channellimit"];
-									blockedusers = item["blockedusers"] != null
-										? (string)item["blockedusers"]
-										: string.Empty;
-									permitedusers = item["permitedusers"] != null
-										? (string)item["permitedusers"]
-										: string.Empty;
-									locked = (bool)item["locked"];
-									hidden = (bool)item["hidden"];
-									channelMods = item["channelmods"] != null
-										? (string)item["channelmods"]
-										: string.Empty;
-									break;
-								}
+                                long userId = 0;
+                                var channelName = string.Empty;
+                                var channelBitrate = 0;
+                                var channelLimit = 0;
+                                var blockedusers = string.Empty;
+                                var permitedusers = string.Empty;
+                                var locked = false;
+                                var hidden = false;
+                                var channelMods = string.Empty;
+                                foreach (var item in sessionresult)
+                                {
+                                    userId = (long)item["userid"];
+                                    channelName = (string)item["channelname"];
+                                    channelBitrate = (int)item["channelbitrate"];
+                                    channelLimit = (int)item["channellimit"];
+                                    blockedusers = item["blockedusers"] != null
+                                        ? (string)item["blockedusers"]
+                                        : string.Empty;
+                                    permitedusers = item["permitedusers"] != null
+                                        ? (string)item["permitedusers"]
+                                        : string.Empty;
+                                    locked = (bool)item["locked"];
+                                    hidden = (bool)item["hidden"];
+                                    channelMods = item["channelmods"] != null
+                                        ? (string)item["channelmods"]
+                                        : string.Empty;
+                                    break;
+                                }
 
-								var blockeduserslist =
-									blockedusers.Split([", "], StringSplitOptions.None).ToList();
-								var permiteduserslist =
-									permitedusers.Split([", "], StringSplitOptions.None).ToList();
+                                var blockeduserslist =
+                                    blockedusers.Split(new[] { ", " }, StringSplitOptions.None).ToList();
+                                var permiteduserslist =
+                                    permitedusers.Split(new[] { ", " }, StringSplitOptions.None).ToList();
 
-								var m = await e.Guild.GetMemberAsync((ulong)userId);
-								DiscordChannel voice;
-								if (sessionskipActive)
-								{
-									var defaultVcName = GetVCConfig("Default_VC_Name") ?? $"{m.Username}'s Channel";
-									defaultVcName = string.IsNullOrWhiteSpace(defaultVcName)
-										? $"{m.Username}'s Channel"
-										: defaultVcName;
-									defaultVcName = defaultVcName.Replace("{username}", m.Username)
-										.Replace("{userid}", m.Id.ToString())
-										.Replace("{fullname}", m.UsernameWithDiscriminator);
-
-
-									voice = await e.After?.Guild.CreateVoiceChannelAsync
-									(defaultVcName, e.After.Channel.Parent,
-										96000, 0, qualityMode: VideoQualityMode.Full);
-									var overwrites2 = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder())
-										.ToList();
-									Dictionary<string, object> data2 = new()
-									{
-										{ "ownerid", (long)e.User.Id },
-										{ "channelid", (long)voice.Id },
-										{ "lastedited", (long)0 },
-										{ "statuslastedited", (long)0 }
-									};
-									await DatabaseService.InsertDataIntoTable("tempvoice", data2);
-									try
-									{
-										await m.ModifyAsync(x => x.VoiceChannel = voice);
-									}
-									catch (Exception)
-									{
-										Dictionary<string, (object value, string comparisonOperator)>
-											DeletewhereConditions = new()
-											{
-												{ "channelid", ((long)voice.Id, "=") }
-											};
-										await voice.DeleteAsync();
-										await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
-										return;
-									}
-
-									overwrites2 = overwrites2.Merge(m,
-										Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
-										Permissions.AccessChannels, Permissions.None);
-									await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
-									await voice.ModifyAsync(async x => { x.PermissionOverwrites = overwrites2; });
-
-									// write sessionskip false to db
-									var conn = CurrentApplication.ServiceProvider
-										.GetRequiredService<NpgsqlDataSource>();
-									await using var cmd = conn.CreateCommand(
-										"UPDATE tempvoicesession SET sessionskip = @sessionskip WHERE userid = @userid");
-									cmd.Parameters.AddWithValue("sessionskip", false);
-									// execute command
-									await cmd.ExecuteNonQueryAsync();
-									return;
-								}
-
-								voice = await e.After?.Guild.CreateVoiceChannelAsync(channelName,
-									e.After.Channel.Parent, channelBitrate, channelLimit,
-									qualityMode: VideoQualityMode.Full);
-								Dictionary<string, object> data = new()
-								{
-									{ "ownerid", (long)e.User.Id },
-									{ "channelid", (long)voice.Id },
-									{ "lastedited", (long)0 },
-									{ "statuslastedited", (long)0 }
-								};
-								await DatabaseService.InsertDataIntoTable("tempvoice", data);
-								try
-								{
-									await m.ModifyAsync(x => x.VoiceChannel = voice);
-								}
-								catch (Exception)
-								{
-									Dictionary<string, (object value, string comparisonOperator)>
-										DeletewhereConditions = new()
-										{
-											{ "channelid", ((long)voice.Id, "=") }
-										};
-									await voice.DeleteAsync();
-									await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
-									return;
-								}
-
-								var overwrites = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder()).ToList();
-								await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
-								overwrites = overwrites.Merge(m,
-									Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
-									Permissions.AccessChannels, Permissions.None);
-								if (locked)
-									overwrites = overwrites.Merge(voice.Guild.EveryoneRole, Permissions.None,
-										Permissions.UseVoice);
-
-								if (hidden)
-									overwrites = overwrites.Merge(voice.Guild.EveryoneRole, Permissions.None,
-										Permissions.AccessChannels);
+                                var m = await e.Guild.GetMemberAsync((ulong)userId);
+                                DiscordChannel voice;
+                                if (sessionskipActive)
+                                {
+                                    var defaultVcName = GetVCConfig("Default_VC_Name") ?? $"{m.Username}'s Channel";
+                                    defaultVcName = string.IsNullOrWhiteSpace(defaultVcName)
+                                        ? $"{m.Username}'s Channel"
+                                        : defaultVcName;
+                                    defaultVcName = defaultVcName.Replace("{username}", m.Username)
+                                        .Replace("{userid}", m.Id.ToString())
+                                        .Replace("{fullname}", m.UsernameWithDiscriminator);
 
 
-								foreach (var user in blockeduserslist)
-									if (ulong.TryParse(user, out var blockeduser))
-										try
-										{
-											var userid = await e.After.Guild.GetMemberAsync(blockeduser);
+                                    voice = await e.After?.Guild.CreateVoiceChannelAsync
+                                    (defaultVcName, e.After.Channel.Parent,
+                                        96000, 0, qualityMode: VideoQualityMode.Full);
+                                    var overwrites2 = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder())
+                                        .ToList();
+                                    Dictionary<string, object> data2 = new()
+                                    {
+                                        { "ownerid", (long)e.User.Id },
+                                        { "channelid", (long)voice.Id },
+                                        { "lastedited", (long)0 },
+                                        { "statuslastedited", (long)0 }
+                                    };
+                                    await DatabaseService.InsertDataIntoTable("tempvoice", data2);
+                                    try
+                                    {
+                                        await m.ModifyAsync(x => x.VoiceChannel = voice);
+                                    }
+                                    catch (Exception)
+                                    {
+                                        Dictionary<string, (object value, string comparisonOperator)>
+                                            DeletewhereConditions = new()
+                                            {
+                                                { "channelid", ((long)voice.Id, "=") }
+                                            };
+                                        await voice.DeleteAsync();
+                                        await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
+                                        return;
+                                    }
+
+                                    overwrites2 = overwrites2.Merge(m,
+                                        Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
+                                        Permissions.AccessChannels, Permissions.None);
+                                    await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
+                                    await voice.ModifyAsync(async x => { x.PermissionOverwrites = overwrites2; });
+
+                                    // write sessionskip false to db
+                                    var conn = CurrentApplication.ServiceProvider
+                                        .GetRequiredService<NpgsqlDataSource>();
+                                    await using var cmd = conn.CreateCommand(
+                                        "UPDATE tempvoicesession SET sessionskip = @sessionskip WHERE userid = @userid");
+                                    cmd.Parameters.AddWithValue("sessionskip", false);
+                                    // execute command
+                                    await cmd.ExecuteNonQueryAsync();
+                                    return;
+                                }
+
+                                voice = await e.After?.Guild.CreateVoiceChannelAsync(channelName,
+                                    e.After.Channel.Parent, channelBitrate, channelLimit,
+                                    qualityMode: VideoQualityMode.Full);
+                                Dictionary<string, object> data = new()
+                                {
+                                    { "ownerid", (long)e.User.Id },
+                                    { "channelid", (long)voice.Id },
+                                    { "lastedited", (long)0 },
+                                    { "statuslastedited", (long)0 }
+                                };
+                                await DatabaseService.InsertDataIntoTable("tempvoice", data);
+                                try
+                                {
+                                    await m.ModifyAsync(x => x.VoiceChannel = voice);
+                                }
+                                catch (Exception)
+                                {
+                                    Dictionary<string, (object value, string comparisonOperator)>
+                                        DeletewhereConditions = new()
+                                        {
+                                            { "channelid", ((long)voice.Id, "=") }
+                                        };
+                                    await voice.DeleteAsync();
+                                    await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
+                                    return;
+                                }
+
+                                var overwrites = voice.PermissionOverwrites.Select(x => x.ConvertToBuilder()).ToList();
+                                await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
+                                overwrites = overwrites.Merge(m,
+                                    Permissions.ManageChannels | Permissions.MoveMembers | Permissions.UseVoice |
+                                    Permissions.AccessChannels, Permissions.None);
+                                if (locked)
+                                    overwrites = overwrites.Merge(voice.Guild.EveryoneRole, Permissions.None,
+                                        Permissions.UseVoice);
+
+                                if (hidden)
+                                    overwrites = overwrites.Merge(voice.Guild.EveryoneRole, Permissions.None,
+                                        Permissions.AccessChannels);
 
 
-											overwrites = overwrites.Merge(userid, Permissions.None,
-												Permissions.UseVoice);
-										}
-										catch (NotFoundException)
-										{
-										}
-
-								foreach (var user in permiteduserslist)
-									if (ulong.TryParse(user, out var permiteduser))
-										try
-										{
-											var userid = await e.After.Guild.GetMemberAsync(permiteduser);
+                                foreach (var user in blockeduserslist)
+                                    if (ulong.TryParse(user, out var blockeduser))
+                                        try
+                                        {
+                                            var userid = await e.After.Guild.GetMemberAsync(blockeduser);
 
 
-											overwrites = overwrites.Merge(userid,
-												Permissions.UseVoice | Permissions.AccessChannels,
-												Permissions.None);
-										}
-										catch (NotFoundException)
-										{
-										}
+                                            overwrites = overwrites.Merge(userid, Permissions.None,
+                                                Permissions.UseVoice);
+                                        }
+                                        catch (NotFoundException)
+                                        {
+                                        }
 
-								try
-								{
-									var conn = CurrentApplication.ServiceProvider
-										.GetRequiredService<NpgsqlDataSource>();
-									var sql =
-										"UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
-									await using var command = conn.CreateCommand(sql);
-									command.Parameters.AddWithValue("@mods", string.Join(", ", channelMods));
-									command.Parameters.AddWithValue("@channelid", (long)voice.Id);
-									await command.ExecuteNonQueryAsync();
-								}
-								catch (Exception)
-								{
-									// ignored, if it fails, it fails
-								}
+                                foreach (var user in permiteduserslist)
+                                    if (ulong.TryParse(user, out var permiteduser))
+                                        try
+                                        {
+                                            var userid = await e.After.Guild.GetMemberAsync(permiteduser);
 
 
-								await voice.ModifyAsync(x => x.PermissionOverwrites = overwrites);
-							}
-					}
+                                            overwrites = overwrites.Merge(userid,
+                                                Permissions.UseVoice | Permissions.AccessChannels,
+                                                Permissions.None);
+                                        }
+                                        catch (NotFoundException)
+                                        {
+                                        }
+
+                                try
+                                {
+                                    var conn = CurrentApplication.ServiceProvider
+                                        .GetRequiredService<NpgsqlDataSource>();
+                                    var sql =
+                                        "UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
+                                    await using var command = conn.CreateCommand(sql);
+                                    command.Parameters.AddWithValue("@mods", string.Join(", ", channelMods));
+                                    command.Parameters.AddWithValue("@channelid", (long)voice.Id);
+                                    await command.ExecuteNonQueryAsync();
+                                }
+                                catch (Exception)
+                                {
+                                    // ignored, if it fails, it fails
+                                }
+
+
+                                await voice.ModifyAsync(x => x.PermissionOverwrites = overwrites);
+                            }
+                    }
                 }
             }
             catch (NotFoundException)
