@@ -33,7 +33,7 @@ public sealed class UnpermitCommand : TempVoiceHelper
                     (userChannel != null && isMod))
                 {
                     var unpermitlist = new List<ulong>();
-                    List<ulong> ids = new();
+                    List<ulong> ids = [];
                     ids = Converter.ExtractUserIDsFromString(users);
                     var staffrole = ctx.Guild.GetRole(GlobalProperties.StaffRoleId);
                     var msg = await ctx.RespondAsync(

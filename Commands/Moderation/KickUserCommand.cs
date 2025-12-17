@@ -39,11 +39,11 @@ public sealed class KickUserCommand : BaseCommandModule
                              $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons = new(2)
-        {
-            new DiscordButtonComponent(ButtonStyle.Secondary, $"kick_accept_{caseid}", "✅"),
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Secondary, $"kick_accept_{caseid}", "✅"),
             new DiscordButtonComponent(ButtonStyle.Secondary, $"kick_deny_{caseid}", "❌")
-        };
+        ];
         var confirmMessage = new DiscordMessageBuilder()
             .AddEmbed(embed__).AddComponents(buttons).WithReply(ctx.Message.Id);
         var confirm = await ctx.Channel.SendMessageAsync(confirmMessage);

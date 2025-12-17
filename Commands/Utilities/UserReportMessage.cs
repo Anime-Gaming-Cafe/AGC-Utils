@@ -37,7 +37,7 @@ public class UserReportMessage : ApplicationCommandsModule
         var isEventler = false;
 
         foreach (var r in member.Roles)
-            if (r.Name.ToLower().Contains("event manager"))
+            if (r.Name.Contains("event manager", StringComparison.InvariantCultureIgnoreCase))
                 isEventler = true;
 
         if (member.Roles.Contains(role) && guild.Id != serverIdToSkip && isEventler)

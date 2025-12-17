@@ -223,10 +223,10 @@ public static class ModerationHelper
     public static async Task<string?> WarnReasonSelector(CommandContext ctx)
     {
         var caseId = ToolSet.GenerateCaseID();
-        List<string> DBQuery = new()
-        {
-            "*"
-        };
+        List<string> DBQuery =
+		[
+			"*"
+        ];
         var queryResult =
             await DatabaseService.SelectDataFromTable("warnreasons", DBQuery, null);
         var embedBuilder = new DiscordEmbedBuilder()
@@ -236,7 +236,7 @@ public static class ModerationHelper
             .WithFooter(ctx.User.UsernameWithDiscriminator)
             .WithColor(BotConfig.GetEmbedColor());
         var options = new List<DiscordStringSelectComponentOption>();
-        Dictionary<string, string> ReasonMap = new();
+        Dictionary<string, string> ReasonMap = [];
         foreach (var result in queryResult)
         {
             options.Add(new DiscordStringSelectComponentOption(result["reason"].ToString(),
@@ -252,10 +252,10 @@ public static class ModerationHelper
             select
         };
 
-        List<DiscordActionRowComponent> discordActionRowComponents = new()
-        {
-            new DiscordActionRowComponent(selector)
-        };
+        List<DiscordActionRowComponent> discordActionRowComponents =
+		[
+			new DiscordActionRowComponent(selector)
+        ];
         var message = await ctx.RespondAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed)
             .AddComponents(discordActionRowComponents));
         var interactivity = ctx.Client.GetInteractivity();
@@ -289,10 +289,10 @@ public static class ModerationHelper
     public static async Task<string?> BanReasonSelector(CommandContext ctx)
     {
         var caseId = ToolSet.GenerateCaseID();
-        List<string> DBQuery = new()
-        {
-            "*"
-        };
+        List<string> DBQuery =
+		[
+			"*"
+        ];
         var queryResult =
             await DatabaseService.SelectDataFromTable("banreasons", DBQuery, null);
         var embedBuilder = new DiscordEmbedBuilder()
@@ -302,7 +302,7 @@ public static class ModerationHelper
             .WithFooter(ctx.User.UsernameWithDiscriminator)
             .WithColor(BotConfig.GetEmbedColor());
         var options = new List<DiscordStringSelectComponentOption>();
-        Dictionary<string, string> ReasonMap = new();
+        Dictionary<string, string> ReasonMap = [];
         foreach (var result in queryResult)
         {
             options.Add(new DiscordStringSelectComponentOption(result["reason"].ToString(),
@@ -318,10 +318,10 @@ public static class ModerationHelper
             select
         };
 
-        List<DiscordActionRowComponent> discordActionRowComponents = new()
-        {
-            new DiscordActionRowComponent(selector)
-        };
+        List<DiscordActionRowComponent> discordActionRowComponents =
+		[
+			new DiscordActionRowComponent(selector)
+        ];
         var message = await ctx.RespondAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed)
             .AddComponents(discordActionRowComponents));
         var interactivity = ctx.Client.GetInteractivity();

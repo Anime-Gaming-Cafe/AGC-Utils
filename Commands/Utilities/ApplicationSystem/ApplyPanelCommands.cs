@@ -129,7 +129,7 @@ public sealed class ApplyPanelCommands : BaseCommandModule
 
     private static async Task<List<Bewerbung>> GetBewerbungsCategories()
     {
-        List<Bewerbung> bewerbungen = new();
+        List<Bewerbung> bewerbungen = [];
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var command =
             con.CreateCommand("SELECT positionname, positionid, applicable FROM applicationcategories");

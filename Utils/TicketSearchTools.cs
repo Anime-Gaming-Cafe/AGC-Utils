@@ -8,7 +8,7 @@ namespace AGC_Management.Utils;
 
 public static class TicketSearchTools
 {
-    public static List<TicketSearchEntry> SearchTickets = new();
+    public static List<TicketSearchEntry> SearchTickets = [];
     private static readonly string FileEnding = ".html";
     public static bool ScanDone { get; private set; }
 
@@ -115,12 +115,12 @@ public static class TicketSearchTools
         {
             var start = Math.Max(index - maxLength / 2, 0);
             var end = Math.Min(index + maxLength / 2, text.Length);
-            var preview = text.Substring(start, end - start);
+            var preview = text[start..end];
             return HighlightQuery(preview, query);
         }
         else
         {
-            var preview = text.Length > maxLength ? text.Substring(0, maxLength) : text;
+            var preview = text.Length > maxLength ? text[..maxLength] : text;
             return HighlightQuery(preview, query);
         }
     }

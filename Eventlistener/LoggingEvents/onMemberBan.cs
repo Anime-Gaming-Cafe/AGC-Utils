@@ -21,11 +21,10 @@ public class onMemberBan : ApplicationCommandsModule
 
         _ = Task.Run(async () =>
         {
-            var auditLogEntry = args.AuditLogEntry as DiscordAuditLogBanEntry;
+			if (args.AuditLogEntry is not DiscordAuditLogBanEntry auditLogEntry)
+				return;
 
-            if (auditLogEntry == null) return;
-
-            var targetuser = auditLogEntry.Target as DiscordUser;
+			var targetuser = auditLogEntry.Target as DiscordUser;
             var moduser = auditLogEntry.UserResponsible;
             var reason = auditLogEntry.Reason;
             if (string.IsNullOrEmpty(auditLogEntry.Reason)) reason = "Kein Grund angegeben";

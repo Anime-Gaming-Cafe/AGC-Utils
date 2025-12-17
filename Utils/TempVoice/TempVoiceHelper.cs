@@ -99,10 +99,10 @@ public class TempVoiceHelper : BaseCommandModule
     {
         if (channel == null) return false;
 
-        List<string> Query = new()
-        {
-            "channelmods"
-        };
+        List<string> Query =
+		[
+			"channelmods"
+        ];
         Dictionary<string, object> QueryConditions = new()
         {
             { "channelid", (long)channel.Id }
@@ -119,10 +119,10 @@ public class TempVoiceHelper : BaseCommandModule
 
     protected static async Task<List<ulong>> RetrieveChannelMods(DiscordChannel channel)
     {
-        List<string> Query = new()
-        {
-            "channelmods"
-        };
+        List<string> Query =
+		[
+			"channelmods"
+        ];
         Dictionary<string, object> QueryConditions = new()
         {
             { "channelid", (long)channel.Id }
@@ -130,12 +130,12 @@ public class TempVoiceHelper : BaseCommandModule
         var QueryResult =
             await DatabaseService.SelectDataFromTable("tempvoice", Query, QueryConditions);
 
-        List<ulong> channelMods = new();
+        List<ulong> channelMods = [];
         foreach (var result in QueryResult)
             try
             {
                 var mods = result["channelmods"].ToString()
-                    .Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+                    .Split([", "], StringSplitOptions.RemoveEmptyEntries);
                 foreach (var mod in mods)
                     if (ulong.TryParse(mod, out var parsedMod))
                         channelMods.Add(parsedMod);
@@ -157,43 +157,35 @@ public class TempVoiceHelper : BaseCommandModule
 
     protected static async Task ResetChannelMods(DiscordChannel channel)
     {
-        await using (NpgsqlConnection conn = new(DatabaseService.GetConnectionString()))
-        {
-            await conn.OpenAsync();
-            var sql = "UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
-            await using (NpgsqlCommand command = new(sql, conn))
-            {
-                command.Parameters.AddWithValue("@mods", string.Empty);
-                command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                var affected = await command.ExecuteNonQueryAsync();
-            }
-        }
-    }
+		await using NpgsqlConnection conn = new(DatabaseService.GetConnectionString());
+		await conn.OpenAsync();
+		var sql = "UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
+		await using NpgsqlCommand command = new(sql, conn);
+		command.Parameters.AddWithValue("@mods", string.Empty);
+		command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+		var affected = await command.ExecuteNonQueryAsync();
+	}
 
     protected static async Task UpdateChannelMods(DiscordChannel channel, List<ulong> channelMods)
     {
-        await using (NpgsqlConnection conn = new(DatabaseService.GetConnectionString()))
-        {
-            await conn.OpenAsync();
-            var sql = "UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
-            await using (NpgsqlCommand command = new(sql, conn))
-            {
-                command.Parameters.AddWithValue("@mods", string.Join(", ", channelMods));
-                command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                var affected = await command.ExecuteNonQueryAsync();
-            }
-        }
-    }
+		await using NpgsqlConnection conn = new(DatabaseService.GetConnectionString());
+		await conn.OpenAsync();
+		var sql = "UPDATE tempvoice SET channelmods = @mods WHERE channelid = @channelid";
+		await using NpgsqlCommand command = new(sql, conn);
+		command.Parameters.AddWithValue("@mods", string.Join(", ", channelMods));
+		command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+		var affected = await command.ExecuteNonQueryAsync();
+	}
 
 
     private static async Task<List<long>> GetChannelIDFromDB(DiscordInteraction interaction)
     {
-        List<long> dbChannels = new();
+        List<long> dbChannels = [];
 
-        List<string> Query = new()
-        {
-            "channelid"
-        };
+        List<string> Query =
+		[
+			"channelid"
+        ];
         Dictionary<string, object> QueryConditions = new()
         {
             { "ownerid", (long)interaction.User.Id }
@@ -213,12 +205,12 @@ public class TempVoiceHelper : BaseCommandModule
 
     protected static async Task<List<long>> GetChannelIDFromDB(CommandContext ctx)
     {
-        List<long> dbChannels = new();
+        List<long> dbChannels = [];
 
-        List<string> Query = new()
-        {
-            "channelid"
-        };
+        List<string> Query =
+		[
+			"channelid"
+        ];
         Dictionary<string, object> QueryConditions = new()
         {
             { "ownerid", (long)ctx.User.Id }
@@ -237,12 +229,12 @@ public class TempVoiceHelper : BaseCommandModule
 
     protected static async Task<List<long>> GetAllChannelIDsFromDB()
     {
-        List<long> dbChannels = new();
+        List<long> dbChannels = [];
 
-        List<string> Query = new()
-        {
-            "channelid"
-        };
+        List<string> Query =
+		[
+			"channelid"
+        ];
         var QueryResult =
             await DatabaseService.SelectDataFromTable("tempvoice", Query, null);
         foreach (var result in QueryResult)
@@ -260,10 +252,10 @@ public class TempVoiceHelper : BaseCommandModule
         long? channelownerid = null;
         try
         {
-            List<string> query = new()
-            {
-                "ownerid"
-            };
+            List<string> query =
+			[
+				"ownerid"
+            ];
 
             Dictionary<string, object> queryConditions = new()
             {
@@ -293,10 +285,10 @@ public class TempVoiceHelper : BaseCommandModule
         long? channelownerid = null;
         try
         {
-            List<string> query = new()
-            {
-                "ownerid"
-            };
+            List<string> query =
+			[
+				"ownerid"
+            ];
 
             Dictionary<string, object> queryConditions = new()
             {
@@ -327,10 +319,10 @@ public class TempVoiceHelper : BaseCommandModule
         long? channelownerid = null;
         try
         {
-            List<string> query = new()
-            {
-                "ownerid"
-            };
+            List<string> query =
+			[
+				"ownerid"
+            ];
             var discordGuild = interaction.Guild;
             var discordMember = await discordGuild.GetMemberAsync(interaction.User.Id);
             Dictionary<string, object> queryConditions = new()
@@ -361,10 +353,10 @@ public class TempVoiceHelper : BaseCommandModule
         long? channelownerid = null;
         try
         {
-            List<string> query = new()
-            {
-                "ownerid"
-            };
+            List<string> query =
+			[
+				"ownerid"
+            ];
 
             Dictionary<string, object> queryConditions = new()
             {
@@ -399,10 +391,10 @@ public class TempVoiceHelper : BaseCommandModule
     protected static async Task<List<long>> GetAllTempChannels()
     {
         var list = new List<long>();
-        List<string> query = new()
-        {
-            "channelid"
-        };
+        List<string> query =
+		[
+			"channelid"
+        ];
         var result = await DatabaseService.SelectDataFromTable("tempvoice", query, null);
         foreach (var item in result)
         {
@@ -613,10 +605,10 @@ public class TempVoiceHelper : BaseCommandModule
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var channel = userChannel;
             long timestampdata = 0;
-            List<string> Query = new()
-            {
-                "lastedited"
-            };
+            List<string> Query =
+			[
+				"lastedited"
+            ];
             Dictionary<string, object> WhereCondiditons = new()
             {
                 { "channelid", (long)channel.Id }
@@ -643,13 +635,11 @@ public class TempVoiceHelper : BaseCommandModule
             {
                 await conn.OpenAsync();
                 var sql = "UPDATE tempvoice SET lastedited = @timestamp WHERE channelid = @channelid";
-                await using (NpgsqlCommand command = new(sql, conn))
-                {
-                    command.Parameters.AddWithValue("@timestamp", current_timestamp);
-                    command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
+				await using NpgsqlCommand command = new(sql, conn);
+				command.Parameters.AddWithValue("@timestamp", current_timestamp);
+				command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+				await command.ExecuteNonQueryAsync();
+			}
 
             var builder = new DiscordFollowupMessageBuilder();
             builder.WithContent("<:success:1085333481820790944> **Erfolg!** Der Channel wurde erfolgreich umbenannt.");
@@ -866,11 +856,11 @@ public class TempVoiceHelper : BaseCommandModule
         {
             var caseid = ToolSet.GenerateCaseID();
             var channel = interaction.Guild.GetChannel(userChannel.Id);
-            List<DiscordButtonComponent> buttons = new(2)
-            {
-                new DiscordButtonComponent(ButtonStyle.Success, $"chdel_accept_{caseid}", "Ja"),
+            List<DiscordButtonComponent> buttons =
+			[
+				new DiscordButtonComponent(ButtonStyle.Success, $"chdel_accept_{caseid}", "Ja"),
                 new DiscordButtonComponent(ButtonStyle.Danger, $"chdel_deny_{caseid}", "Nein")
-            };
+            ];
             var interactivity = client.GetInteractivity();
             var errorMessage =
                 "<:attention:1085333468688433232> Möchtest du deinen Kanal wirklich löschen?";
@@ -944,11 +934,11 @@ public class TempVoiceHelper : BaseCommandModule
 
             if (interaction.Guild.Id == 750365461945778209)
             {
-                List<DiscordComponent> button = new()
-                {
-                    new DiscordButtonComponent(ButtonStyle.Secondary, "role_permit_button",
+                List<DiscordComponent> button =
+				[
+					new DiscordButtonComponent(ButtonStyle.Secondary, "role_permit_button",
                         "Levelbeschränkung festlegen")
-                };
+                ];
 
 
                 DiscordInteractionResponseBuilder ib = new()
@@ -956,21 +946,21 @@ public class TempVoiceHelper : BaseCommandModule
                     IsEphemeral = true,
                     Content = message
                 };
-                List<DiscordActionRowComponent> rowComponents = new()
-                {
-                    new DiscordActionRowComponent(selector),
+                List<DiscordActionRowComponent> rowComponents =
+				[
+					new DiscordActionRowComponent(selector),
                     new DiscordActionRowComponent(button)
-                };
+                ];
                 await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                     ib.AddComponents(rowComponents));
             }
             else
             {
-                List<DiscordComponent> button = new()
-                {
-                    new DiscordButtonComponent(ButtonStyle.Secondary, "role_permit_button",
+                List<DiscordComponent> button =
+				[
+					new DiscordButtonComponent(ButtonStyle.Secondary, "role_permit_button",
                         "Levelbeschränkung festlegen")
-                };
+                ];
 
 
                 DiscordInteractionResponseBuilder ib = new()
@@ -978,11 +968,11 @@ public class TempVoiceHelper : BaseCommandModule
                     IsEphemeral = true,
                     Content = message
                 };
-                List<DiscordActionRowComponent> rowComponents = new()
-                {
-                    new DiscordActionRowComponent(selector),
+                List<DiscordActionRowComponent> rowComponents =
+				[
+					new DiscordActionRowComponent(selector),
                     new DiscordActionRowComponent(button)
-                };
+                ];
                 await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                     ib.AddComponents(rowComponents));
             }
@@ -1010,7 +1000,7 @@ public class TempVoiceHelper : BaseCommandModule
             var u = e.Values.ToList();
             var users = e.Values.Select(x => ulong.Parse(x));
             var usersList = new List<DiscordMember>();
-            List<ulong> idlist = new();
+            List<ulong> idlist = [];
             var overwrites = channel.PermissionOverwrites.Select(x => x.ConvertToBuilder())
                 .ToList();
             foreach (var id in users)
@@ -1188,7 +1178,7 @@ public class TempVoiceHelper : BaseCommandModule
         if ((userChannel != null && db_channel.Contains((long)userChannel.Id)) || (userChannel != null && isMod))
         {
             var channel = userChannel;
-            List<ulong> permited_users = new();
+            List<ulong> permited_users = [];
             var puserow = userChannel.PermissionOverwrites
                 .Where(x => x.CheckPermission(Permissions.UseVoice) == PermissionLevel.Allowed)
                 .Where(x => x.Id != interaction.User.Id)
@@ -1243,11 +1233,11 @@ public class TempVoiceHelper : BaseCommandModule
 
                 if (role_permitted)
                 {
-                    List<DiscordButtonComponent> buttons = new()
-                    {
-                        new DiscordButtonComponent(ButtonStyle.Primary, "unpermit_levelrole",
+                    List<DiscordButtonComponent> buttons =
+					[
+						new DiscordButtonComponent(ButtonStyle.Primary, "unpermit_levelrole",
                             $"Entferne zugelassene Levelrolle ({roleName})")
-                    };
+                    ];
                     sbuilder.AddComponents(buttons);
                 }
 
@@ -1277,17 +1267,17 @@ public class TempVoiceHelper : BaseCommandModule
                 ("Wähle zu entfernende Mitglieder aus.",
                     options, "unpermit_selector", maxOptions: ul)
             };
-            List<DiscordActionRowComponent> rowComponents = new()
-            {
-                new DiscordActionRowComponent(selector)
-            };
+            List<DiscordActionRowComponent> rowComponents =
+			[
+				new DiscordActionRowComponent(selector)
+            ];
             if (role_permitted)
             {
-                List<DiscordButtonComponent> buttons = new()
-                {
-                    new DiscordButtonComponent(ButtonStyle.Danger, "unpermit_levelrole",
+                List<DiscordButtonComponent> buttons =
+				[
+					new DiscordButtonComponent(ButtonStyle.Danger, "unpermit_levelrole",
                         $"Entferne zugelassene Levelrolle ({roleName})")
-                };
+                ];
                 rowComponents.Add(new DiscordActionRowComponent(buttons));
             }
 
@@ -1371,7 +1361,7 @@ public class TempVoiceHelper : BaseCommandModule
             var u = e.Values.ToList();
             var users = e.Values.Select(x => ulong.Parse(x));
             var usersList = new List<DiscordMember>();
-            List<ulong> idlist = new();
+            List<ulong> idlist = [];
             var overwrites = channel.PermissionOverwrites.Select(x => x.ConvertToBuilder())
                 .ToList();
             foreach (var id in users)
@@ -1459,13 +1449,11 @@ public class TempVoiceHelper : BaseCommandModule
             {
                 await conn.OpenAsync();
                 var sql = "UPDATE tempvoice SET ownerid = @owner WHERE channelid = @channelid";
-                await using (NpgsqlCommand command = new(sql, conn))
-                {
-                    command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
-                    command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                    var affected = await command.ExecuteNonQueryAsync();
-                }
-            }
+				await using NpgsqlCommand command = new(sql, conn);
+				command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
+				command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+				var affected = await command.ExecuteNonQueryAsync();
+			}
 
             overwrites = overwrites.Merge(orig_owner, Permissions.None, Permissions.None,
                 Permissions.ManageChannels | Permissions.UseVoice | Permissions.MoveMembers |
@@ -1508,7 +1496,7 @@ public class TempVoiceHelper : BaseCommandModule
 
         if (userChannel != null && db_channel.Contains((long)userChannel.Id))
         {
-            List<ulong> UsersInChannel = new();
+            List<ulong> UsersInChannel = [];
             foreach (var user in userChannel.Users)
                 if (user.Id != interaction.User.Id)
                     UsersInChannel.Add(user.Id);
@@ -1550,10 +1538,10 @@ public class TempVoiceHelper : BaseCommandModule
                 new DiscordStringSelectComponent("Wähle den Zieluser aus", options, "transfer_selector",
                     maxOptions: 1)
             };
-            List<DiscordActionRowComponent> rowComponents = new()
-            {
-                new DiscordActionRowComponent(selector)
-            };
+            List<DiscordActionRowComponent> rowComponents =
+			[
+				new DiscordActionRowComponent(selector)
+            ];
             var econtent =
                 "<:botpoint:1083853403316297758> Um eine Option auszuwählen, verwende das Menü und klicke darauf:";
             var ssbuilder = new DiscordInteractionResponseBuilder
@@ -1591,13 +1579,11 @@ public class TempVoiceHelper : BaseCommandModule
                 {
                     await conn.OpenAsync();
                     var sql = "UPDATE tempvoice SET ownerid = @owner WHERE channelid = @channelid";
-                    await using (NpgsqlCommand command = new(sql, conn))
-                    {
-                        command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
-                        command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                        var affected = await command.ExecuteNonQueryAsync();
-                    }
-                }
+					await using NpgsqlCommand command = new(sql, conn);
+					command.Parameters.AddWithValue("@owner", (long)new_owner.Id);
+					command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+					var affected = await command.ExecuteNonQueryAsync();
+				}
 
                 await ResetChannelMods(channel);
                 overwrites = overwrites.Merge(orig_owner, Permissions.None, Permissions.None,
@@ -1642,7 +1628,7 @@ public class TempVoiceHelper : BaseCommandModule
 
         if ((userChannel != null && db_channel.Contains((long)userChannel.Id)) || (userChannel != null && isMod))
         {
-            List<ulong> ChUsers = new();
+            List<ulong> ChUsers = [];
             foreach (var chuser in userChannel.Users)
             {
                 var uid = chuser.Id;
@@ -1689,10 +1675,10 @@ public class TempVoiceHelper : BaseCommandModule
                 new DiscordStringSelectComponent("Wähle den Zieluser aus", options, "kick_selector",
                     maxOptions: 1)
             };
-            List<DiscordActionRowComponent> rowComponents = new()
-            {
-                new DiscordActionRowComponent(selector)
-            };
+            List<DiscordActionRowComponent> rowComponents =
+			[
+				new DiscordActionRowComponent(selector)
+            ];
             var econtent =
                 "<:botpoint:1083853403316297758> Um eine Option auszuwählen, verwende das Menü und klicke darauf:";
             var ssbuilder = new DiscordInteractionResponseBuilder
@@ -1769,10 +1755,10 @@ public class TempVoiceHelper : BaseCommandModule
                 IsEphemeral = true,
                 Content = message
             };
-            List<DiscordActionRowComponent> rowComponents = new()
-            {
-                new DiscordActionRowComponent(selector)
-            };
+            List<DiscordActionRowComponent> rowComponents =
+			[
+				new DiscordActionRowComponent(selector)
+            ];
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 ib.AddComponents(rowComponents));
         }
@@ -1799,7 +1785,7 @@ public class TempVoiceHelper : BaseCommandModule
             var u = e.Values.ToList();
             var users = e.Values.Select(x => ulong.Parse(x));
             var usersList = new List<DiscordMember>();
-            List<ulong> idlist = new();
+            List<ulong> idlist = [];
             var overwrites = channel.PermissionOverwrites.Select(x => x.ConvertToBuilder())
                 .ToList();
             var staffrole = interaction.Guild.GetRole(GlobalProperties.StaffRoleId);
@@ -1866,7 +1852,7 @@ public class TempVoiceHelper : BaseCommandModule
         if ((userChannel != null && db_channel.Contains((long)userChannel.Id)) || (userChannel != null && isMod))
         {
             var channel = userChannel;
-            List<ulong> permited_users = new();
+            List<ulong> permited_users = [];
             var puserow = userChannel.PermissionOverwrites
                 .Where(x => x.CheckPermission(Permissions.UseVoice) == PermissionLevel.Denied)
                 .Where(x => x.Id != interaction.User.Id)
@@ -1937,10 +1923,10 @@ public class TempVoiceHelper : BaseCommandModule
                 ("Wähle zu entblockierende Mitglieder aus.",
                     options, "unban_selector", maxOptions: ul)
             };
-            List<DiscordActionRowComponent> rowComponents = new()
-            {
-                new DiscordActionRowComponent(selector)
-            };
+            List<DiscordActionRowComponent> rowComponents =
+			[
+				new DiscordActionRowComponent(selector)
+            ];
 
             var econtent =
                 "<:botpoint:1083853403316297758> Um eine Option auszuwählen, verwende das Menü und klicke darauf:";
@@ -1974,7 +1960,7 @@ public class TempVoiceHelper : BaseCommandModule
             var u = e.Values.ToList();
             var users = e.Values.Select(x => ulong.Parse(x));
             var usersList = new List<DiscordMember>();
-            List<ulong> idlist = new();
+            List<ulong> idlist = [];
             var overwrites = channel.PermissionOverwrites.Select(x => x.ConvertToBuilder())
                 .ToList();
             foreach (var id in users)

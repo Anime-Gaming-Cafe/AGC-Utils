@@ -54,9 +54,9 @@ public sealed class UserInfoCommand : BaseCommandModule
             var clientStatus = member?.Presence?.ClientStatus;
             platform = clientStatus switch
             {
-                { Desktop: { HasValue: true } } => "User verwendet Discord am Computer",
-                { Mobile: { HasValue: true } } => "User verwendet Discord am Handy",
-                { Web: { HasValue: true } } => "User verwendet Discord im Browser",
+                { Desktop.HasValue: true } => "User verwendet Discord am Computer",
+                { Mobile.HasValue: true } => "User verwendet Discord am Handy",
+                { Web.HasValue: true } => "User verwendet Discord im Browser",
                 _ => "Nicht ermittelbar"
             };
         }
@@ -119,10 +119,10 @@ public sealed class UserInfoCommand : BaseCommandModule
             var permawarnlist = new List<dynamic>();
 
             var memberID = member.Id;
-            List<string> WarnQuery = new()
-            {
-                "*"
-            };
+            List<string> WarnQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> warnWhereConditions = new()
             {
                 { "perma", false },
@@ -133,10 +133,10 @@ public sealed class UserInfoCommand : BaseCommandModule
             foreach (var result in WarnResults) warnlist.Add(result);
 
 
-            List<string> FlagQuery = new()
-            {
-                "*"
-            };
+            List<string> FlagQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> flagWhereConditions = new()
             {
                 { "userid", (long)memberID }
@@ -146,10 +146,10 @@ public sealed class UserInfoCommand : BaseCommandModule
             foreach (var result in FlagResults) flaglist.Add(result);
 
 
-            List<string> pWarnQuery = new()
-            {
-                "*"
-            };
+            List<string> pWarnQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> pWarnWhereConditions = new()
             {
                 { "userid", (long)memberID },
@@ -294,10 +294,10 @@ public sealed class UserInfoCommand : BaseCommandModule
             var flaglist = new List<dynamic>();
             var permawarnlist = new List<dynamic>();
             var memberID = user.Id;
-            List<string> WarnQuery = new()
-            {
-                "*"
-            };
+            List<string> WarnQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> warnWhereConditions = new()
             {
                 { "perma", false },
@@ -308,10 +308,10 @@ public sealed class UserInfoCommand : BaseCommandModule
             foreach (var result in WarnResults) warnlist.Add(result);
 
 
-            List<string> FlagQuery = new()
-            {
-                "*"
-            };
+            List<string> FlagQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> flagWhereConditions = new()
             {
                 { "userid", (long)memberID }
@@ -320,10 +320,10 @@ public sealed class UserInfoCommand : BaseCommandModule
                 await DatabaseService.SelectDataFromTable("flags", FlagQuery, flagWhereConditions);
             foreach (var result in FlagResults) flaglist.Add(result);
 
-            List<string> pWarnQuery = new()
-            {
-                "*"
-            };
+            List<string> pWarnQuery =
+			[
+				"*"
+            ];
             Dictionary<string, object> pWarnWhereConditions = new()
             {
                 { "userid", (long)memberID },

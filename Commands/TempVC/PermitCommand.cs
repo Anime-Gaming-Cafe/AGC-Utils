@@ -31,7 +31,7 @@ public sealed class PermitCommand : TempVoiceHelper
                     (userChannel != null && isMod))
                 {
                     var permitusers = new List<ulong>();
-                    List<ulong> ids = new();
+                    List<ulong> ids = [];
                     ids = Converter.ExtractUserIDsFromString(users);
                     var staffrole = ctx.Guild.GetRole(GlobalProperties.StaffRoleId);
                     var msg = await ctx.RespondAsync(
