@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using AGC_Management.Attributes;
 using AGC_Management.Utils;
 using DisCatSharp.Interactivity;
-using DisCatSharp.Interactivity.Entities;
 using DisCatSharp.Interactivity.Enums;
 using DisCatSharp.Interactivity.Extensions;
 

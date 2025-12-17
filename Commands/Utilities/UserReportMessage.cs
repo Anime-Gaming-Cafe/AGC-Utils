@@ -61,7 +61,8 @@ public class UserReportMessage : ApplicationCommandsModule
 
         modal.WithTitle("Nachricht melden");
         modal.CustomId = cid;
-        modal.AddLabelComponent(new("Weiter Infos zur Meldung", component: new DiscordTextInputComponent(TextComponentStyle.Paragraph, minLength: 4, maxLength: 400)));
+        modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Paragraph,
+            label: "Geb uns weitere Infos hierzu", minLength: 4, maxLength: 400));
 
         await ctx.CreateModalResponseAsync(modal);
 
@@ -93,7 +94,7 @@ public class UserReportMessage : ApplicationCommandsModule
         var embed = new DiscordEmbedBuilder()
             .WithTitle("Nachricht gemeldet")
             .WithDescription(
-                $"**Gemeldeter User: {reportedUser.Mention} ({reportedUser.UsernameWithDiscriminator}) **```{reportedUser.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{(result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value}```")
+                $"**Gemeldeter User: {reportedUser.Mention} ({reportedUser.UsernameWithDiscriminator}) **```{reportedUser.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{result.Result.Interaction.Data.Components[0].Value}```")
             .WithColor(DiscordColor.Red)
             .WithFooter($"Gemeldet in #{channel.Name}")
             .Build();

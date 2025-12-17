@@ -245,7 +245,7 @@ public static class ModerationHelper
         }
 
         var discordEmbed = embedBuilder.Build();
-        var select = new DiscordStringSelectComponent("Gründe auswählen", options, caseId,
+        var select = new DiscordStringSelectComponent("warnreason", "Gründe auswählen", options, caseId,
             maxOptions: ReasonMap.Count, minOptions: 1);
         var selector = new List<DiscordComponent>
         {
@@ -311,7 +311,7 @@ public static class ModerationHelper
         }
 
         var discordEmbed = embedBuilder.Build();
-        var select = new DiscordStringSelectComponent("Gründe auswählen auswählen", options, caseId,
+        var select = new DiscordStringSelectComponent("banreason", "Gründe auswählen auswählen", options, caseId,
             maxOptions: ReasonMap.Count, minOptions: 1);
         var selector = new List<DiscordComponent>
         {
