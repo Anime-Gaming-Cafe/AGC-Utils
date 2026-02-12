@@ -27,7 +27,7 @@
         <PackageReference Include="Blazorise.Bootstrap" Version="2.0.0"/>
         <PackageReference Include="Blazorise.Bootstrap5" Version="2.0.0"/>
         <PackageReference Include="Blazorise.Components" Version="1.8.10"/>
-        <PackageReference Include="Blazorise.Snackbar" Version="1.8.10"/>
+        <PackageReference Include="Blazorise.Snackbar" Version="2.0.0"/>
         <PackageReference Include="DisCatSharp" Version="10.7.0-nightly-015" />
         <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.7.0-nightly-015" />
         <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-015" />
