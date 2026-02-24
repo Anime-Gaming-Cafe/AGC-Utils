@@ -23,7 +23,7 @@
     <ItemGroup>
         <PackageReference Include="BCrypt.Net-Next" Version="4.1.0"/>
         <PackageReference Include="Blazor.Bootstrap" Version="3.5.0"/>
-        <PackageReference Include="Blazorise" Version="2.0.0"/>
+        <PackageReference Include="Blazorise" Version="2.0.1"/>
         <PackageReference Include="Blazorise.Bootstrap" Version="2.0.0"/>
         <PackageReference Include="Blazorise.Bootstrap5" Version="2.0.0"/>
         <PackageReference Include="Blazorise.Components" Version="2.0.0"/>
