@@ -260,6 +260,9 @@ internal class Program : BaseCommandModule
             .AddHealthChecks()
                 .AddCheck<BotReadinessHealthCheck>("ready");
 
+        // Give hosted services (Discord bot disconnect etc.) up to 30 s to stop cleanly on SIGTERM
+        builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
+
         var tempProvider = builder.Services.BuildServiceProvider();
         CurrentApplication.ServiceProvider = tempProvider;
 
@@ -280,7 +283,9 @@ internal class Program : BaseCommandModule
         app.MapHealthChecks("/health/ready"); 
 
         _ = RunAspAsync(app);
-        await Task.Delay(-1);
+        // WaitForShutdownAsync handles SIGTERM/SIGINT: stops hosted services then returns,
+        // allowing the process to exit cleanly instead of hanging on Task.Delay(-1).
+        await app.WaitForShutdownAsync();
     }
 
     // Discord bot runtime and command/event handlers are hosted in DiscordBotService (IHostedService).
