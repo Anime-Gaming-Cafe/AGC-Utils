@@ -18,7 +18,7 @@ RUN dotnet publish "AGC Management.csproj" \
       -p:InformationalVer="${GIT_TAG_VERSION}"
 
 # ── Stage 2: download DiscordChatExporter CLI ─────────────────────────────────
-FROM alpine:3.21 AS dce
+FROM alpine:3.23 AS dce
 
 RUN apk add --no-cache curl unzip
 
