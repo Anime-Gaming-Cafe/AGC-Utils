@@ -48,7 +48,7 @@ COPY --from=dce   /dce         ./tools/exporter/
 
 RUN mkdir -p data/tickets/transcripts/Assets
 
-EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8085
+ENV ASPNETCORE_URLS=http://+:8085
 
 ENTRYPOINT ["dotnet", "AGC Management.dll"]

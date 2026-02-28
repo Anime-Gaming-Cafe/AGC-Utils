@@ -7,12 +7,12 @@ services:
     container_name: agc-utils
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8085:8085"
     volumes:
       - ./config.ini:/app/config.ini:ro
       - transcripts:/app/data/tickets/transcripts
     environment:
-      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_URLS=http://+:8085
     depends_on:
       apache:
         condition: service_started

@@ -10,8 +10,8 @@ spec:
     app: agc-utils
   ports:
     - name: web
-      port: 8080
-      targetPort: 8080
+      port: 8085
+      targetPort: 8085
     - name: transcripts
       port: 80
       targetPort: 80

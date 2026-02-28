@@ -24,15 +24,16 @@ spec:
               mountPath: /images
 
       containers:
+        # ── Main application ────────────────────────────────────────────────
         - name: agc-utils
           image: ghcr.io/anime-gaming-cafe/agc-utils
           imagePullPolicy: Always
           ports:
             - name: web
-              containerPort: 8080
+              containerPort: 8085
           env:
             - name: ASPNETCORE_URLS
-              value: "http://+:8080"
+              value: "http://+:8085"
           volumeMounts:
             - name: config
               mountPath: /app/config.ini
@@ -47,25 +48,26 @@ spec:
               subPath: warn_images
           resources:
             requests:
-              cpu:    750m
-              memory: 2Mi
+              cpu:    250m
+              memory: 512Mi
             limits:
-              cpu:    2000m
-              memory: 4Gi
+              cpu:    1000m
+              memory: 1Gi
           livenessProbe:
             httpGet:
-              path: /
-              port: 8080
+              path: /health/live
+              port: 8085
             initialDelaySeconds: 30
             periodSeconds: 30
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /
-              port: 8080
+              path: /health/ready
+              port: 8085
             initialDelaySeconds: 15
             periodSeconds: 10
 
+        # ── Apache sidecar – transcripts (ticketsystem.animegamingcafe.de) ──
         - name: apache-transcripts
           image: httpd:2.4-alpine
           ports:
@@ -98,6 +100,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
 
+        # ── Apache sidecar – images (i.agc-intern.com) ──────────────────────
         - name: apache-images
           image: httpd:2.4-alpine
           ports:
