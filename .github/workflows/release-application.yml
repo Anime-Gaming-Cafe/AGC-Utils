@@ -138,9 +138,10 @@ jobs:
       - name: Build Docker image
         env:
           RAW_IMAGE: ghcr.io/${{ github.repository }}
-          VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
+          RAW_VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
         run: |
           IMAGE="${RAW_IMAGE,,}"
+          VERSION="${RAW_VERSION#v}"   # strip leading 'v' – NuGet rejects it in <Version>
           docker build \
             --build-arg GIT_TAG_VERSION="${VERSION}" \
             -t "${IMAGE}:${VERSION}" \
@@ -150,9 +151,11 @@ jobs:
         if: github.event.inputs.dry_run == 'false'
         env:
           RAW_IMAGE: ghcr.io/${{ github.repository }}
-          VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
+          RAW_VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
         run: |
           IMAGE="${RAW_IMAGE,,}"
+          VERSION="${RAW_VERSION#v}"
+
           docker push "${IMAGE}:${VERSION}"
 
           if [[ "${{ github.event.inputs.nightly }}" == "true" ]]; then
