@@ -1,7 +1,6 @@
 # ── Stage 1: build ────────────────────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
-ARG TARGETARCH
 ARG GIT_TAG_VERSION=dev
 
 WORKDIR /src
@@ -10,14 +9,9 @@ RUN dotnet restore "AGC Management.csproj"
 
 COPY . .
 
-RUN case "${TARGETARCH}" in \
-      "amd64") DOTNET_RID="linux-x64"   ;; \
-      "arm64") DOTNET_RID="linux-arm64" ;; \
-      *)       DOTNET_RID="linux-x64"   ;; \
-    esac && \
-    dotnet publish "AGC Management.csproj" \
+RUN dotnet publish "AGC Management.csproj" \
       -c Release \
-      -r "${DOTNET_RID}" \
+      -r linux-x64 \
       --self-contained false \
       -o /app/publish \
       --no-restore \
@@ -26,17 +20,10 @@ RUN case "${TARGETARCH}" in \
 # ── Stage 2: download DiscordChatExporter CLI ─────────────────────────────────
 FROM alpine:3.21 AS dce
 
-ARG TARGETARCH
-
 RUN apk add --no-cache curl unzip
 
-RUN case "${TARGETARCH}" in \
-      "amd64") DCE_ARCH="x64"   ;; \
-      "arm64") DCE_ARCH="arm64" ;; \
-      *)       DCE_ARCH="x64"   ;; \
-    esac && \
-    curl -fsSL \
-      "https://github.com/Tyrrrz/DiscordChatExporter/releases/latest/download/DiscordChatExporter.Cli.linux-${DCE_ARCH}.zip" \
+RUN curl -fsSL \
+      "https://github.com/Tyrrrz/DiscordChatExporter/releases/latest/download/DiscordChatExporter.Cli.linux-x64.zip" \
       -o /tmp/dce.zip && \
     unzip /tmp/dce.zip -d /dce && \
     chmod +x /dce/DiscordChatExporter.Cli
