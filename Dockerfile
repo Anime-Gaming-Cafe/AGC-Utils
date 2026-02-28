@@ -5,7 +5,7 @@ ARG GIT_TAG_VERSION=dev
 
 WORKDIR /src
 COPY ["AGC Management.csproj", "."]
-RUN dotnet restore "AGC Management.csproj"
+RUN dotnet restore "AGC Management.csproj" -r linux-x64
 
 COPY . .
 
