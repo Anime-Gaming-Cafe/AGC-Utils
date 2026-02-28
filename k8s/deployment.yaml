@@ -15,8 +15,6 @@ spec:
       labels:
         app: agc-utils
     spec:
-      # Create image subdirectories in the PVC before any container starts.
-      # subPath mounts require the directory to already exist inside the volume.
       initContainers:
         - name: init-image-dirs
           image: alpine:3.21
@@ -26,7 +24,6 @@ spec:
               mountPath: /images
 
       containers:
-        # ── Main application ────────────────────────────────────────────────
         - name: agc-utils
           image: ghcr.io/anime-gaming-cafe/agc-utils
           imagePullPolicy: Always
@@ -42,7 +39,6 @@ spec:
               subPath: config.ini
             - name: transcripts
               mountPath: /app/data/tickets/transcripts
-            # Image paths match FlagImagePath / WarnImagePath in config.ini
             - name: images
               mountPath: /app/flag_images
               subPath: flag_images
@@ -70,7 +66,6 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
 
-        # ── Apache sidecar – transcripts (ticketsystem.animegamingcafe.de) ──
         - name: apache-transcripts
           image: httpd:2.4-alpine
           ports:
@@ -103,14 +98,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
 
-        # ── Apache sidecar – images (i.agc-intern.com) ──────────────────────
         - name: apache-images
           image: httpd:2.4-alpine
           ports:
             - name: images
               containerPort: 81
           volumeMounts:
-            # Serve the whole images volume: /flag_images/ and /warn_images/ just work
             - name: images
               mountPath: /usr/local/apache2/htdocs
               readOnly: true
