@@ -50,6 +50,10 @@ public class CurrentApplication
             
             if (!string.IsNullOrEmpty(version))
             {
+                // strip the +build… metadata appended by the csproj (e.g. v2.6.142+build20260228142025 → v2.6.142)
+                if (version.Contains('+'))
+                    version = version[..version.IndexOf('+')];
+
                 if (version.StartsWith("v"))
                 {
                     return version;
@@ -312,8 +316,8 @@ internal class Program : BaseCommandModule
             app.UseHsts();
         }
 
-        // bind to localhost to use a reverse proxy like nginx, apache or iis
-        app.Urls.Add($"http://localhost:{port}");
+        // bind to all interfaces so Kubernetes probes (hitting pod IP) work
+        app.Urls.Add($"http://0.0.0.0:{port}");
 
 
         bool useHttps;
