@@ -56,3 +56,41 @@ data:
     CustomLog /proc/self/fd/1 combined
 
     DirectoryIndex index.html
+
+  httpd-images.conf: |
+    ServerRoot "/usr/local/apache2"
+    Listen 81
+
+    LoadModule mpm_event_module     modules/mod_mpm_event.so
+    LoadModule authz_core_module    modules/mod_authz_core.so
+    LoadModule authz_host_module    modules/mod_authz_host.so
+    LoadModule log_config_module    modules/mod_log_config.so
+    LoadModule unixd_module         modules/mod_unixd.so
+    LoadModule autoindex_module     modules/mod_autoindex.so
+    LoadModule dir_module           modules/mod_dir.so
+    LoadModule mime_module          modules/mod_mime.so
+    LoadModule headers_module       modules/mod_headers.so
+    LoadModule expires_module       modules/mod_expires.so
+
+    ServerTokens Prod
+    ServerSignature Off
+
+    DocumentRoot "/usr/local/apache2/htdocs"
+
+    <Directory "/usr/local/apache2/htdocs">
+        Options +Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+
+        # Long cache for static images – they rarely change
+        ExpiresActive On
+        ExpiresDefault "access plus 7 days"
+        Header set Cache-Control "public, max-age=604800"
+    </Directory>
+
+    TypesConfig conf/mime.types
+
+    ErrorLog  /proc/self/fd/2
+    CustomLog /proc/self/fd/1 combined
+
+    DirectoryIndex index.html

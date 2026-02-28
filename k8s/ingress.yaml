@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agc-utils
+  namespace: agc
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # cert-manager – adjust issuer name/kind to match your cluster setup
+    cert-manager.io/cluster-issuer: "letsencrypt-dns"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ticketsystem.animegamingcafe.de
+      secretName: tls-ticketsystem
+    - hosts:
+        - i.agc-intern.com
+      secretName: tls-images
+    - hosts:
+        - dashboard.animegamingcafe.de   # adjust to your actual dashboard domain
+      secretName: tls-dashboard
+  rules:
+    # ── Transcript viewer ────────────────────────────────────────────────────
+    - host: ticketsystem.animegamingcafe.de
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agc-utils
+                port:
+                  name: transcripts   # → apache-transcripts :80
+
+    # ── Static image host ────────────────────────────────────────────────────
+    - host: i.agc-intern.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agc-utils
+                port:
+                  name: images        # → apache-images :81
+
+    # ── Blazor dashboard ─────────────────────────────────────────────────────
+    - host: dashboard.animegamingcafe.de  # adjust to your actual dashboard domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agc-utils
+                port:
+                  name: web           # → agc-utils :8080

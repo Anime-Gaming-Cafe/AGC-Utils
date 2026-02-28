@@ -5,6 +5,12 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # ── ArgoCD Image Updater ───────────────────────────────────────────────────
+    argocd-image-updater.argoproj.io/image-list: agc-utils=ghcr.io/anime-gaming-cafe/agc-utils:latest
+    argocd-image-updater.argoproj.io/agc-utils.update-strategy: digest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+
 spec:
   project: default
 
@@ -19,7 +25,7 @@ spec:
 
   syncPolicy:
     automated:
-      prune: true      # remove resources that were deleted from git
-      selfHeal: true   # revert manual cluster changes
+      prune: true
+      selfHeal: true
     syncOptions:
       - ServerSideApply=true

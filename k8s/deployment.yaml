@@ -15,14 +15,20 @@ spec:
       labels:
         app: agc-utils
     spec:
-      # If GHCR package visibility is private, add an imagePullSecrets here.
-      # imagePullSecrets:
-      #   - name: ghcr-credentials
+      # Create image subdirectories in the PVC before any container starts.
+      # subPath mounts require the directory to already exist inside the volume.
+      initContainers:
+        - name: init-image-dirs
+          image: alpine:3.21
+          command: ["mkdir", "-p", "/images/flag_images", "/images/warn_images"]
+          volumeMounts:
+            - name: images
+              mountPath: /images
 
       containers:
         # ── Main application ────────────────────────────────────────────────
         - name: agc-utils
-          image: ghcr.io/anime-gaming-cafe/agc-utils:latest
+          image: ghcr.io/anime-gaming-cafe/agc-utils
           imagePullPolicy: Always
           ports:
             - name: web
@@ -36,6 +42,13 @@ spec:
               subPath: config.ini
             - name: transcripts
               mountPath: /app/data/tickets/transcripts
+            # Image paths match FlagImagePath / WarnImagePath in config.ini
+            - name: images
+              mountPath: /app/flag_images
+              subPath: flag_images
+            - name: images
+              mountPath: /app/warn_images
+              subPath: warn_images
           resources:
             requests:
               cpu:    250m
@@ -57,8 +70,8 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
 
-        # ── Apache sidecar – serves transcript HTML files ───────────────────
-        - name: apache
+        # ── Apache sidecar – transcripts (ticketsystem.animegamingcafe.de) ──
+        - name: apache-transcripts
           image: httpd:2.4-alpine
           ports:
             - name: transcripts
@@ -90,6 +103,40 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
 
+        # ── Apache sidecar – images (i.agc-intern.com) ──────────────────────
+        - name: apache-images
+          image: httpd:2.4-alpine
+          ports:
+            - name: images
+              containerPort: 81
+          volumeMounts:
+            # Serve the whole images volume: /flag_images/ and /warn_images/ just work
+            - name: images
+              mountPath: /usr/local/apache2/htdocs
+              readOnly: true
+            - name: apache-config
+              mountPath: /usr/local/apache2/conf/httpd.conf
+              subPath: httpd-images.conf
+          resources:
+            requests:
+              cpu:    50m
+              memory: 64Mi
+            limits:
+              cpu:    200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 81
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 81
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
       volumes:
         - name: config
           secret:
@@ -98,6 +145,10 @@ spec:
         - name: transcripts
           persistentVolumeClaim:
             claimName: agc-transcripts
+
+        - name: images
+          persistentVolumeClaim:
+            claimName: agc-images
 
         - name: apache-config
           configMap:
