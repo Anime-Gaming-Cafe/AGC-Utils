@@ -137,9 +137,10 @@ jobs:
 
       - name: Build Docker image
         env:
-          IMAGE: ghcr.io/${{ github.repository }}
+          RAW_IMAGE: ghcr.io/${{ github.repository }}
           VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
         run: |
+          IMAGE="${RAW_IMAGE,,}"
           docker build \
             --build-arg GIT_TAG_VERSION="${VERSION}" \
             -t "${IMAGE}:${VERSION}" \
@@ -148,9 +149,10 @@ jobs:
       - name: Push Docker image
         if: github.event.inputs.dry_run == 'false'
         env:
-          IMAGE: ghcr.io/${{ github.repository }}
+          RAW_IMAGE: ghcr.io/${{ github.repository }}
           VERSION: ${{ needs.patch-build-release.outputs.new_tag }}
         run: |
+          IMAGE="${RAW_IMAGE,,}"
           docker push "${IMAGE}:${VERSION}"
 
           if [[ "${{ github.event.inputs.nightly }}" == "true" ]]; then
