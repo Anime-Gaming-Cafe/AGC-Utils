@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agc-utils
+  namespace: agc
+  labels:
+    app: agc-utils
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agc-utils
+  template:
+    metadata:
+      labels:
+        app: agc-utils
+    spec:
+      # If GHCR package visibility is private, add an imagePullSecrets here.
+      # imagePullSecrets:
+      #   - name: ghcr-credentials
+
+      containers:
+        # ── Main application ────────────────────────────────────────────────
+        - name: agc-utils
+          image: ghcr.io/anime-gaming-cafe/agc-utils:latest
+          imagePullPolicy: Always
+          ports:
+            - name: web
+              containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.ini
+              subPath: config.ini
+            - name: transcripts
+              mountPath: /app/data/tickets/transcripts
+          resources:
+            requests:
+              cpu:    250m
+              memory: 512Mi
+            limits:
+              cpu:    1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+        # ── Apache sidecar – serves transcript HTML files ───────────────────
+        - name: apache
+          image: httpd:2.4-alpine
+          ports:
+            - name: transcripts
+              containerPort: 80
+          volumeMounts:
+            - name: transcripts
+              mountPath: /usr/local/apache2/htdocs/transcripts
+              readOnly: true
+            - name: apache-config
+              mountPath: /usr/local/apache2/conf/httpd.conf
+              subPath: httpd.conf
+          resources:
+            requests:
+              cpu:    50m
+              memory: 64Mi
+            limits:
+              cpu:    200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /transcripts/
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /transcripts/
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+      volumes:
+        - name: config
+          secret:
+            secretName: agc-utils-config
+
+        - name: transcripts
+          persistentVolumeClaim:
+            claimName: agc-transcripts
+
+        - name: apache-config
+          configMap:
+            name: agc-utils-apache

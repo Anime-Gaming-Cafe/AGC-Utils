@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agc-utils-apache
+  namespace: agc
+data:
+  httpd.conf: |
+    ServerRoot "/usr/local/apache2"
+    Listen 80
+
+    LoadModule mpm_event_module     modules/mod_mpm_event.so
+    LoadModule authz_core_module    modules/mod_authz_core.so
+    LoadModule authz_host_module    modules/mod_authz_host.so
+    LoadModule log_config_module    modules/mod_log_config.so
+    LoadModule unixd_module         modules/mod_unixd.so
+    LoadModule autoindex_module     modules/mod_autoindex.so
+    LoadModule dir_module           modules/mod_dir.so
+    LoadModule mime_module          modules/mod_mime.so
+    LoadModule filter_module        modules/mod_filter.so
+    LoadModule deflate_module       modules/mod_deflate.so
+    LoadModule headers_module       modules/mod_headers.so
+    LoadModule expires_module       modules/mod_expires.so
+    LoadModule setenvif_module      modules/mod_setenvif.so
+
+    ServerAdmin  webmaster@localhost
+    ServerTokens Prod
+    ServerSignature Off
+
+    DocumentRoot "/usr/local/apache2/htdocs"
+
+    # Block access to the document root by default
+    <Directory "/usr/local/apache2/htdocs">
+        Options -Indexes -FollowSymLinks
+        AllowOverride None
+        Require all denied
+    </Directory>
+
+    # Allow browsing and downloading transcripts
+    <Directory "/usr/local/apache2/htdocs/transcripts">
+        Options +Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+
+        # Compression
+        AddOutputFilterByType DEFLATE text/html text/css application/javascript
+
+        # Prevent aggressive caching so fresh transcripts appear immediately
+        <FilesMatch "\.html$">
+            Header set Cache-Control "no-cache, must-revalidate"
+        </FilesMatch>
+    </Directory>
+
+    TypesConfig conf/mime.types
+
+    ErrorLog  /proc/self/fd/2
+    CustomLog /proc/self/fd/1 combined
+
+    DirectoryIndex index.html

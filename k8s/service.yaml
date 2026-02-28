@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agc-utils
+  namespace: agc
+  labels:
+    app: agc-utils
+spec:
+  selector:
+    app: agc-utils
+  ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+    - name: transcripts
+      port: 80
+      targetPort: 80

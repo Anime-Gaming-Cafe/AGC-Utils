@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agc-utils
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/anime-gaming-cafe/agc-utils.git
+    targetRevision: HEAD
+    path: k8s
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: agc
+
+  syncPolicy:
+    automated:
+      prune: true      # remove resources that were deleted from git
+      selfHeal: true   # revert manual cluster changes
+    syncOptions:
+      - ServerSideApply=true

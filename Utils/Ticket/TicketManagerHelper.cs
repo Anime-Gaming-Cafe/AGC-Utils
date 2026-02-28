@@ -1073,17 +1073,21 @@ public class TicketManagerHelper
 
     public static async Task<string> GenerateTranscript(DiscordChannel ticket_channel)
     {
-        var psi = new ProcessStartInfo();
         var BotToken = BotConfig.GetConfig()["MainConfig"]["Discord_API_Token"];
         var tick = await GetTicketIdFromChannel(ticket_channel);
         var id = GenerateTicketID(5);
-        psi.FileName = "tools/exporter/DiscordChatExporter.Cli";
-        
-        psi.Arguments =
-            $"export -t \"{BotToken}\" -c {ticket_channel.Id} --media --reuse-media --media-dir data/tickets/transcripts/Assets -o data/tickets/transcripts/{tick}-{id}.html";
-        psi.RedirectStandardOutput = true;
-        var process = new Process();
-        process.StartInfo = psi;
+
+        var baseDir = AppContext.BaseDirectory;
+        var psi = new ProcessStartInfo
+        {
+            FileName = Path.Combine(baseDir, "tools", "exporter", "DiscordChatExporter.Cli"),
+            Arguments =
+                $"export -t \"{BotToken}\" -c {ticket_channel.Id} --media --reuse-media --media-dir data/tickets/transcripts/Assets -o data/tickets/transcripts/{tick}-{id}.html",
+            WorkingDirectory = baseDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        var process = new Process { StartInfo = psi };
         process.Start();
 
         await process.WaitForExitAsync();

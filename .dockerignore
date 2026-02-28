@@ -1,0 +1,17 @@
+.git
+.github
+obj/
+bin/
+publish/
+data/
+logs/
+errors/
+botcache/
+tools/
+node_modules/
+config.ini
+*.user
+*.log
+*.zip
+*.suo
+.vs/

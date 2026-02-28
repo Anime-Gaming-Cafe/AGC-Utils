@@ -1,0 +1,31 @@
+services:
+  agc-utils:
+    image: ghcr.io/anime-gaming-cafe/agc-utils:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agc-utils
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.ini:/app/config.ini:ro
+      - transcripts:/app/data/tickets/transcripts
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      apache:
+        condition: service_started
+
+  apache:
+    image: httpd:2.4-alpine
+    container_name: agc-transcripts
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - transcripts:/usr/local/apache2/htdocs/transcripts:ro
+    # No extra httpd.conf needed – default config serves the mounted dir fine
+
+volumes:
+  transcripts:
