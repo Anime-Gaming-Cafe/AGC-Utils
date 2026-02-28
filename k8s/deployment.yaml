@@ -45,10 +45,10 @@ spec:
           resources:
             requests:
               cpu:    750m
-              memory: 1Gi
+              memory: 1500Mi
             limits:
               cpu:    2000m
-              memory: 2Gi
+              memory: 4Gi
           livenessProbe:
             httpGet:
               path: /health/live
