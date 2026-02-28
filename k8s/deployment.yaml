@@ -112,8 +112,10 @@ spec:
             - name: apache-config
               mountPath: /usr/local/apache2/conf/httpd.conf
               subPath: httpd-images.conf
+            # robots.txt must live outside htdocs because htdocs is a read-only PVC mount;
+            # Apache serves it via Alias (see httpd-images.conf)
             - name: apache-config
-              mountPath: /usr/local/apache2/htdocs/robots.txt
+              mountPath: /usr/local/apache2/robots.txt
               subPath: robots.txt
           resources:
             requests:

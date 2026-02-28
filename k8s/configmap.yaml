@@ -76,6 +76,7 @@ data:
     LoadModule log_config_module    modules/mod_log_config.so
     LoadModule unixd_module         modules/mod_unixd.so
     LoadModule autoindex_module     modules/mod_autoindex.so
+    LoadModule alias_module         modules/mod_alias.so
     LoadModule dir_module           modules/mod_dir.so
     LoadModule mime_module          modules/mod_mime.so
     LoadModule headers_module       modules/mod_headers.so
@@ -85,6 +86,12 @@ data:
     ServerSignature Off
 
     DocumentRoot "/usr/local/apache2/htdocs"
+
+    # robots.txt is mounted outside htdocs (htdocs is a read-only PVC)
+    Alias /robots.txt /usr/local/apache2/robots.txt
+    <Files "robots.txt">
+        Require all granted
+    </Files>
 
     <Directory "/usr/local/apache2/htdocs">
         Options +Indexes +FollowSymLinks
