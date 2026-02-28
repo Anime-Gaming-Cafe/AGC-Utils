@@ -1,0 +1,175 @@
+name: Create Release & Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      nightly:
+        description: 'Nightly?'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry Run? (No tags, no releases, no docker push)'
+        type: boolean
+        default: false
+      skip_docker:
+        description: 'Skip Docker building/pushing?'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as Pre-release?'
+        type: boolean
+        default: false
+      major_update:
+        description: 'Major/Minor Update? (Increments middle number, e.g., v1.0.9 -> v1.1.0)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch-build-release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci-skip')"
+    outputs:
+      new_tag: ${{ steps.taggen.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get latest tag
+        id: latest_tag
+        run: |
+          LATEST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          echo "latest_tag=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Generate next patch version
+        id: taggen
+        run: |
+          if [[ "${{ github.event.inputs.nightly }}" == "true" ]]; then
+            echo "new_tag=nightly" >> $GITHUB_OUTPUT
+            echo "skip_tagging=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          CURRENT_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          if [[ -n "$CURRENT_TAG" ]]; then
+            echo "new_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
+            echo "skip_tagging=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          BASE=${{ steps.latest_tag.outputs.latest_tag }}
+          if [[ "$BASE" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+            if [[ "${{ github.event.inputs.major_update }}" == "true" ]]; then
+              NEW_TAG="v${major}.$((minor + 1)).0"
+            else
+              NEW_TAG="v${major}.${minor}.$((patch + 1))"
+            fi
+            echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+            echo "skip_tagging=false" >> $GITHUB_OUTPUT
+          else
+            echo "Invalid tag format: $BASE"
+            exit 1
+          fi
+
+      - name: Create and push tag
+        if: github.event.inputs.dry_run == 'false' && github.event.inputs.nightly == 'false' && steps.taggen.outputs.skip_tagging == 'false'
+        run: |
+          git tag ${{ steps.taggen.outputs.new_tag }}
+          git push origin ${{ steps.taggen.outputs.new_tag }}
+
+      - name: Build and zip for all OS/Arch combos
+        if: github.event.inputs.nightly == 'false'
+        run: |
+          VERSION=${{ steps.taggen.outputs.new_tag }}
+          PLATFORMS=("linux-x64" "win-x64")
+          for RID in "${PLATFORMS[@]}"; do
+            dotnet publish -c Release -r "$RID" -o "publish/$RID" --self-contained false -p:InformationalVer="$VERSION"
+            OS=$(echo $RID | cut -d'-' -f1)
+            ARCH=$(echo $RID | cut -d'-' -f2)
+            cd "publish/$RID" && zip -r "../../AGC_Entbannung_${OS}_${ARCH}_${VERSION}.zip" . && cd - > /dev/null
+          done
+
+      - name: Create GitHub Release
+        if: github.event.inputs.dry_run == 'false' && github.event.inputs.nightly == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.taggen.outputs.new_tag }}
+          name: ${{ steps.taggen.outputs.new_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: AGC_Entbannung_*.zip
+
+  push_to_registry:
+    name: Build and Push Docker image
+    needs: patch-build-release
+    runs-on: ubuntu-latest
+    if: always() && needs.patch-build-release.result == 'success' && github.event.inputs.skip_docker == 'false'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.event.inputs.nightly == 'false' && github.event.inputs.prerelease == 'false' }}
+            type=raw,value=beta,enable=${{ github.event.inputs.nightly == 'false' && github.event.inputs.prerelease == 'true' }}
+            type=raw,value=edge,enable=${{ github.event.inputs.nightly == 'false' && github.event.inputs.prerelease == 'true' }}
+            type=raw,value=release,enable=${{ github.event.inputs.nightly == 'false' }}
+            type=raw,value=${{ needs.patch-build-release.outputs.new_tag }},enable=${{ github.event.inputs.nightly == 'false' }}
+            type=raw,value=nightly,enable=${{ github.event.inputs.nightly == 'true' }}
+            type=sha,format=long
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event.inputs.dry_run == 'false' }}
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      #- name: Update Kubernetes Manifest
+      #  if: github.event.inputs.dry_run == 'false' && github.event.inputs.nightly == 'false'
+      #  run: |
+      #    VERSION=${{ needs.patch-build-release.outputs.new_tag }}
+      #    sed -i "s|image: .*|image: ghcr.io/${{ github.repository }}:$VERSION|g" deploy/base/deployment.yaml
+      #    git config user.name "github-actions[bot]"
+      #    git config user.email "github-actions[bot]@users.noreply.github.com"
+      #    git add deploy/base/deployment.yaml
+      #    git commit -m "chore(gitops): update image tag to $VERSION [skip ci]" || echo "No changes to commit"
+      #    git push origin main

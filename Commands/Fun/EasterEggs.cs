@@ -118,7 +118,7 @@ public class AGCEasterEggs : BaseCommandModule
             DateTime now = DateTime.UtcNow;
             if (now < lastUsed)
             {
-                await ctx.RespondAsync($"Lyrawr hat bereits eine Gehirnerschütterung und is sauer :c\n[￶￶](https://meow.justabrian.me/-UFyYEfwNkS/angry-topsy-cat.gif)");
+                await ctx.RespondAsync($"Lyrawr hat bereits eine Gehirnerschütterung und is sauer :c\n[￶￶](https://c.tenor.com/-WFJHerCya4AAAAd/tenor.gif)");
                 return;
             }
         }
@@ -129,7 +129,7 @@ public class AGCEasterEggs : BaseCommandModule
         DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
             .WithContent(
-                "POV <@374660564707966996>:\n[￶￶](https://meow.justabrian.me/-T4zyWGVriQ/taiga-aisaka-taiga.gif)");
+                "POV <@374660564707966996>:\n[￶￶](https://c.tenor.com/81O_XXwA4PAAAAAd/tenor.gif)");
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
@@ -184,7 +184,7 @@ public class AGCEasterEggs : BaseCommandModule
         DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
             .WithContent(
-                "POV <@768988475805401108>:\n[￶](https://meow.justabrian.me/-dfnwjW6oJB/tired%20lou.gif)");
+                "POV <@768988475805401108>:\n[￶](https://c.tenor.com/UDBZFppJqk8AAAAC/tenor.gif)");
 
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
