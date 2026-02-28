@@ -130,10 +130,10 @@ kubectl delete pod -n agc migrate-transcripts
 
 ---
 
-## 2. Images (flag\_images + warn\_images)
+## 2. Images (flag + warn)
 
-**Source:** `/srv/DiscordBots/AGCUtilsV2/flag_images/` and `…/warn_images/`
-**Target PVC:** `agc-images` (5 Gi) → subdirs `flag_images/` and `warn_images/`
+**Source:** `/srv/DiscordBots/AGCUtilsV2/data/images/flag/` and `…/warn/`
+**Target PVC:** `agc-images` (5 Gi) → subdirs `flag/` and `warn/`
 
 > The init container in the Deployment creates these subdirs automatically on first pod start.
 > Run the migration pod below **before** starting the Deployment so the PVC is pre-populated.
@@ -178,7 +178,7 @@ kubectl cp ~/.ssh/id_ed25519 agc/migrate-images:/tmp/id_ed25519
 MSYS_NO_PATHCONV=1 kubectl exec -n agc migrate-images -- sh -c "
   chmod 600 /tmp/id_ed25519 &&
   ssh -i /tmp/id_ed25519 -o StrictHostKeyChecking=no root@main.diamondforge.me \
-    'tar -czf - -C /srv/DiscordBots/AGCUtilsV2 flag_images warn_images' \
+    'tar -czf - -C /srv/DiscordBots/AGCUtilsV2/data/images flag warn' \
     | tar -xzf - -C /images &&
   rm -f /tmp/id_ed25519 &&
   echo 'Transfer done'
@@ -189,8 +189,8 @@ MSYS_NO_PATHCONV=1 kubectl exec -n agc migrate-images -- sh -c "
 
 ```bash
 MSYS_NO_PATHCONV=1 kubectl exec -n agc migrate-images -- sh -c "
-  echo 'flag_images:' && ls /images/flag_images | wc -l
-  echo 'warn_images:' && ls /images/warn_images | wc -l
+  echo 'flag:' && ls /images/flag | wc -l
+  echo 'warn:' && ls /images/warn | wc -l
 "
 ```
 

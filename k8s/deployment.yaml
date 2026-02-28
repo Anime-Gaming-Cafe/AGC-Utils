@@ -18,7 +18,7 @@ spec:
       initContainers:
         - name: init-image-dirs
           image: alpine:3.21
-          command: ["mkdir", "-p", "/images/flag_images", "/images/warn_images"]
+          command: ["mkdir", "-p", "/images/flag", "/images/warn"]
           volumeMounts:
             - name: images
               mountPath: /images
@@ -41,11 +41,7 @@ spec:
             - name: transcripts
               mountPath: /app/data/tickets/transcripts
             - name: images
-              mountPath: /app/flag_images
-              subPath: flag_images
-            - name: images
-              mountPath: /app/warn_images
-              subPath: warn_images
+              mountPath: /app/data/images
           resources:
             requests:
               cpu:    250m
@@ -80,6 +76,9 @@ spec:
             - name: apache-config
               mountPath: /usr/local/apache2/conf/httpd.conf
               subPath: httpd.conf
+            - name: apache-config
+              mountPath: /usr/local/apache2/htdocs/robots.txt
+              subPath: robots.txt
           resources:
             requests:
               cpu:    50m
@@ -113,6 +112,9 @@ spec:
             - name: apache-config
               mountPath: /usr/local/apache2/conf/httpd.conf
               subPath: httpd-images.conf
+            - name: apache-config
+              mountPath: /usr/local/apache2/htdocs/robots.txt
+              subPath: robots.txt
           resources:
             requests:
               cpu:    50m

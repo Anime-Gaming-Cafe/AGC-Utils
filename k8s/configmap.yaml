@@ -35,6 +35,11 @@ data:
         Require all denied
     </Directory>
 
+    # Allow robots.txt at the root
+    <Files "robots.txt">
+        Require all granted
+    </Files>
+
     # Allow browsing and downloading transcripts
     <Directory "/usr/local/apache2/htdocs/transcripts">
         Options +Indexes +FollowSymLinks
@@ -56,6 +61,10 @@ data:
     CustomLog /proc/self/fd/1 combined
 
     DirectoryIndex index.html
+
+  robots.txt: |
+    User-agent: *
+    Disallow: /
 
   httpd-images.conf: |
     ServerRoot "/usr/local/apache2"
