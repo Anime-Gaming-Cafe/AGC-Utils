@@ -31,11 +31,11 @@
         <PackageReference Include="Blazorise.Bootstrap5" Version="2.0.1"/>
         <PackageReference Include="Blazorise.Components" Version="2.0.1"/>
         <PackageReference Include="Blazorise.Snackbar" Version="2.0.1"/>
-        <PackageReference Include="DisCatSharp" Version="10.7.0-nightly-015" />
-        <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.7.0-nightly-015" />
-        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-015" />
-        <PackageReference Include="DisCatSharp.Common" Version="10.7.0-nightly-015" />
-        <PackageReference Include="DisCatSharp.Interactivity" Version="10.7.0-nightly-015" />
+        <PackageReference Include="DisCatSharp" Version="10.7.0-nightly-068" />
+        <PackageReference Include="DisCatSharp.ApplicationCommands" Version="10.7.0-nightly-068" />
+        <PackageReference Include="DisCatSharp.CommandsNext" Version="10.7.0-nightly-068" />
+        <PackageReference Include="DisCatSharp.Common" Version="10.7.0-nightly-068" />
+        <PackageReference Include="DisCatSharp.Interactivity" Version="10.7.0-nightly-068" />
         <PackageReference Include="Discord.OAuth2.AspNetCore" Version="3.0.0"/>
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4"/>
         <PackageReference Include="ini-parser-new" Version="2.6.2"/>
