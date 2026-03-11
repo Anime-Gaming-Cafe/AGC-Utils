@@ -40,7 +40,7 @@
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4"/>
         <PackageReference Include="ini-parser-new" Version="2.6.2"/>
         <PackageReference Include="KawaiiAPI.NET" Version="1.1.0"/>
-        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="4.14.0">
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
