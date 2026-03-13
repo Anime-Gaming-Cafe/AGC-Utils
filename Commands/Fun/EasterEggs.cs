@@ -41,7 +41,7 @@ public class AGCEasterEggs : BaseCommandModule
         DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
             .WithAllowedMentions(Mentions.None)
             .WithContent(
-                "POV <@443114493992763392>:\n### Ich liebe Tomaten <3\n[￶](https://meow.justabrian.me/-fzQMJB2y4P/Ryuunosuke_Akasaka.webp)");
+                "POV <@443114493992763392>:\n### Ich liebe Tomaten <3\n[￶](https://i.imgur.com/YIwkLm5.gif)");
         await ctx.Channel.SendMessageAsync(msgBuilder);
     }
 
