@@ -251,7 +251,12 @@ public static class DatabaseService
             {
                 "warns",
                 "CREATE TABLE IF NOT EXISTS warns (userid BIGINT, punisherid BIGINT, datum BIGINT, description VARCHAR, perma BOOLEAN, caseid VARCHAR)"
-            }
+            },
+            { "counting", "CREATE TABLE IF NOT EXISTS counting (lastnumber BIGINT, lastuser BIGINT)" },
+            { "countcounter", "CREATE TABLE IF NOT EXISTS countcounter (userid BIGINT, counter BIGINT, timestamps BIGINT)" },
+            { "countingfails", "CREATE TABLE IF NOT EXISTS countingfails (userid BIGINT, counter BIGINT)" },
+            { "countinghighscore", "CREATE TABLE IF NOT EXISTS countinghighscore (number BIGINT, userid BIGINT, timestamps BIGINT)" },
+            { "countsave", "CREATE TABLE IF NOT EXISTS countsave (userid BIGINT, saves NUMERIC)" }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
 
