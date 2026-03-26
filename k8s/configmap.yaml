@@ -94,7 +94,7 @@ data:
     </Files>
 
     <Directory "/usr/local/apache2/htdocs">
-        Options +Indexes +FollowSymLinks
+        Options -Indexes +FollowSymLinks
         AllowOverride None
         Require all granted
 
