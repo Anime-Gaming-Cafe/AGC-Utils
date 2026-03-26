@@ -346,6 +346,7 @@ internal class Program : BaseCommandModule
         }
 
         app.UseStaticFiles();
+        app.MapStaticAssets();
         app.UseRouting();
         app.Use((ctx, next) =>
         {
