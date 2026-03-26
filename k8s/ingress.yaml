@@ -6,6 +6,7 @@ metadata:
   annotations:
     nginx.org/proxy-read-timeout: "3600"
     nginx.org/proxy-send-timeout: "3600"
+    nginx.org/websocket-services: "agc-utils"
     cert-manager.io/cluster-issuer: "letsencrypt-dns"
 spec:
   ingressClassName: nginx-ic
