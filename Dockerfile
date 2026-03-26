@@ -17,6 +17,14 @@ RUN dotnet publish "AGC Management.csproj" \
       --no-restore \
       -p:InformationalVer="${GIT_TAG_VERSION}"
 
+# blazor.server.js is part of Microsoft.AspNetCore.App.Internal.Assets but
+# the MSBuild target doesn't copy it into the publish output for legacy
+# Blazor Server projects. Copy it manually from the NuGet cache.
+RUN mkdir -p /app/publish/wwwroot/_framework && \
+    find /root/.nuget/packages/microsoft.aspnetcore.app.internal.assets \
+         -name "blazor.server.js" \
+         -exec cp {} /app/publish/wwwroot/_framework/ \;
+
 # ── Stage 2: download DiscordChatExporter CLI ─────────────────────────────────
 FROM alpine:3.23 AS dce
 
