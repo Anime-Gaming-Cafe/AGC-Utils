@@ -4,12 +4,11 @@ metadata:
   name: agc-utils
   namespace: agc
   annotations:
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    # cert-manager – adjust issuer name/kind to match your cluster setup
+    nginx.org/proxy-read-timeout: "3600"
+    nginx.org/proxy-send-timeout: "3600"
     cert-manager.io/cluster-issuer: "letsencrypt-dns"
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx-ic
   tls:
     - hosts:
         - ticketsystem.animegamingcafe.de
