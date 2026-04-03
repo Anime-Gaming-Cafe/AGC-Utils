@@ -991,6 +991,8 @@ public static class LevelUtils
     {
         _ = Task.Run(async () =>
         {
+            try
+            {
             if (!await IsLevelingActive(type)) return;
 
             if (await UserHasBlockedRole(await user.ConvertToMember(CurrentApplication.TargetGuild))) return;
@@ -1048,6 +1050,11 @@ public static class LevelUtils
 
             CurrentApplication.Logger.Debug("Gave " + xpToGive + " xp to " + user.Username);
             if (newLevel > currentLevel) await SendLevelUpMessageAndReward(user, newLevel);
+            }
+            catch (Exception ex)
+            {
+                await ErrorReporting.SendErrorToDev(CurrentApplication.DiscordClient, null, ex);
+            }
         });
         await Task.CompletedTask;
     }
