@@ -458,7 +458,15 @@ public sealed class UserInfoCommand : BaseCommandModule
             embedbuilder.WithThumbnail(user.AvatarUrl);
             embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
                 ctx.User.AvatarUrl);
-            await ctx.RespondAsync(embedbuilder.Build());
+            await EmbedPaginator.SendPaginatedEmbed(
+                ctx,
+                embedbuilder.Title,
+                embedbuilder.Description,
+                embedbuilder.Color.HasValue ? embedbuilder.Color.Value : BotConfig.GetEmbedColor(),
+                embedbuilder.Thumbnail?.Url,
+                $"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
+                ctx.User.AvatarUrl
+            );
         }
     }
 
