@@ -1,37 +1,73 @@
 using DisCatSharp;
 using DisCatSharp.Entities;
-using DisCatSharp.Exceptions;
 using DisCatSharp.Interactivity.Extensions;
 using DisCatSharp.Interactivity.Enums;
 
+namespace AGC_Management.Utils;
+
 public static class EmbedPaginator
 {
-    public static async Task SendPaginatedEmbed(CommandContext ctx, string title, string description, DiscordColor color, string thumbnailUrl = null, string footerText = null, string footerIcon = null)
+    public static async Task SendPaginatedEmbed(CommandContext ctx, string title, string description,
+        DiscordColor color, string thumbnailUrl = null, string footerText = null, string footerIcon = null)
     {
         const int MAX_LENGTH = 4000;
+        description ??= string.Empty;
+
         var chunks = new List<string>();
-        for (int i = 0; i < description.Length; i += MAX_LENGTH)
+        var current = new System.Text.StringBuilder();
+
+        foreach (var line in description.Split('\n'))
         {
-            chunks.Add(description.Substring(i, Math.Min(MAX_LENGTH, description.Length - i)));
+            // Wenn die aktuelle Zeile den Chunk überlaufen würde, Chunk abschließen
+            if (current.Length > 0 && current.Length + line.Length + 1 > MAX_LENGTH)
+            {
+                chunks.Add(current.ToString().TrimEnd('\n'));
+                current.Clear();
+            }
+
+            // Einzelne Zeilen die selbst zu lang sind, hart aufteilen
+            if (line.Length > MAX_LENGTH)
+            {
+                var rest = line;
+                while (rest.Length > MAX_LENGTH)
+                {
+                    chunks.Add(rest[..MAX_LENGTH]);
+                    rest = rest[MAX_LENGTH..];
+                }
+                current.Append(rest).Append('\n');
+            }
+            else
+            {
+                current.Append(line).Append('\n');
+            }
         }
 
-        var embeds = chunks.Select((chunk, i) =>
+        if (current.Length > 0)
+            chunks.Add(current.ToString().TrimEnd('\n'));
+
+        if (chunks.Count == 0)
+            chunks.Add(string.Empty);
+
+        var totalPages = chunks.Count;
+        var pages = chunks.Select((chunk, i) =>
         {
             var embed = new DiscordEmbedBuilder()
-            .WithTitle(title)
-            .WithDescription(chunk)
-            .WithColor(color);
+                .WithTitle(title)
+                .WithDescription(chunk)
+                .WithColor(color);
 
             if (!string.IsNullOrEmpty(thumbnailUrl))
                 embed.WithThumbnail(thumbnailUrl);
 
-            if (!string.IsNullOrEmpty(footerText))
-                embed.WithFooter($"{footerText} | Seite {i + 1}/{chunks.Count}", footerIcon);
+            var footer = totalPages > 1 && !string.IsNullOrEmpty(footerText)
+                ? $"{footerText} | Seite {i + 1}/{totalPages}"
+                : footerText;
 
-            return embed;
+            if (!string.IsNullOrEmpty(footer))
+                embed.WithFooter(footer, footerIcon);
+
+            return new DisCatSharp.Interactivity.Page(embed: embed);
         }).ToList();
-
-        var pages = embeds.Select(e => new DisCatSharp.Interactivity.Page(embed: e)).ToList();
 
         if (pages.Count == 1)
         {
