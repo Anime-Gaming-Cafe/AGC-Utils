@@ -279,21 +279,19 @@ public sealed class UserInfoCommand : BaseCommandModule
             var embedbuilder = new DiscordEmbedBuilder();
             embedbuilder.WithTitle(
                 $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied");
-            embedbuilder.WithDescription($"Ich konnte folgende Informationen über {userindicator} finden.\n\n" +
-                                         userinfostring);
             embedbuilder.WithColor(bs_status ? DiscordColor.Red : BotConfig.GetEmbedColor());
             embedbuilder.WithThumbnail(member.AvatarUrl);
             embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
                 ctx.User.AvatarUrl);
+            var description = $"Ich konnte folgende Informationen über {userindicator} finden.\n\n" + userinfostring;
             await EmbedPaginator.SendPaginatedEmbed(
                 ctx,
                 embedbuilder.Title,
-                embedbuilder.Description,
+                description,
                 embedbuilder.Color.HasValue ? embedbuilder.Color.Value : BotConfig.GetEmbedColor(),
                 embedbuilder.Thumbnail?.Url,
                 $"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
                 ctx.User.AvatarUrl
-
             );
         }
 
@@ -452,16 +450,15 @@ public sealed class UserInfoCommand : BaseCommandModule
             var embedbuilder = new DiscordEmbedBuilder();
             embedbuilder.WithTitle(
                 $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied");
-            embedbuilder.WithDescription("Ich konnte folgende Informationen über den User finden.\n\n" +
-                                         userinfostring);
             embedbuilder.WithColor(bs_status ? DiscordColor.Red : BotConfig.GetEmbedColor());
             embedbuilder.WithThumbnail(user.AvatarUrl);
             embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
                 ctx.User.AvatarUrl);
+            var description = "Ich konnte folgende Informationen über den User finden.\n\n" + userinfostring;
             await EmbedPaginator.SendPaginatedEmbed(
                 ctx,
                 embedbuilder.Title,
-                embedbuilder.Description,
+                description,
                 embedbuilder.Color.HasValue ? embedbuilder.Color.Value : BotConfig.GetEmbedColor(),
                 embedbuilder.Thumbnail?.Url,
                 $"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
