@@ -21,8 +21,10 @@ public sealed class BanUserCommand : BaseCommandModule
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
 
         var staffRole = BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"];
-        var guildMember = await ctx.Guild.GetMemberAsync(user.Id);
-        if (guildMember.Roles.Any(r => r.Id == ulong.Parse(staffRole)))
+        DiscordMember? guildMember = null;
+        try { guildMember = await ctx.Guild.GetMemberAsync(user.Id); }
+        catch (NotFoundException) { }
+        if (guildMember != null && guildMember.Roles.Any(r => r.Id == ulong.Parse(staffRole)))
         {
             var errorEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Fehler beim Bannen des Users")
