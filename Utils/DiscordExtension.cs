@@ -260,6 +260,10 @@ internal static class DiscordExtension
         {
             return null;
         }
+        catch (AggregateException ae) when (ae.InnerExceptions.Any(e => e is NotFoundException))
+        {
+            return null;
+        }
     }
 
 
