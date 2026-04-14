@@ -121,7 +121,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             var staffWithBanPerms =
                 staffmembers.Where(x => x.Permissions.HasPermission(Permissions.BanMembers)).ToList();
             var onlineStaffWithBanPerms = staffWithBanPerms
-                .Where(member => (member.Presence?.Status ?? UserStatus.Offline) != UserStatus.Offline)
+                .Where(member => ctx.Guild.Presences.TryGetValue(member.Id, out var p) && p.Status != UserStatus.Offline)
                 .Where(member => member.Id != 441192596325531648)
                 .ToList();
             var embedBuilder = new DiscordEmbedBuilder()

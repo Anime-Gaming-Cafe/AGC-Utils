@@ -30,7 +30,7 @@ public sealed class BanRequestCommand : BaseCommandModule
             .ToList();
         var staffWithBanPerms = staffmembers.Where(x => x.Permissions.HasPermission(Permissions.BanMembers)).ToList();
         var onlineStaffWithBanPerms = staffWithBanPerms
-            .Where(member => (member.Presence?.Status ?? UserStatus.Offline) != UserStatus.Offline).ToList();
+            .Where(member => ctx.Guild.Presences.TryGetValue(member.Id, out var p) && p.Status != UserStatus.Offline).ToList();
         var embedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Bannanfrage")
             .WithDescription($"Ban-Anfrage für Benutzer: ``{user.UsernameWithDiscriminator}`` ``({user.Id})``\n" +

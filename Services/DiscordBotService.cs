@@ -50,16 +50,41 @@ public class DiscordBotService : IHostedService
         {
             Token = dcApiToken,
             TokenType = TokenType.Bot,
-            AutoReconnect = true,
-            MinimumLogLevel = Microsoft.Extensions.Logging.LogLevel.Debug,
             Intents = DiscordIntents.All,
-            LogTimestampFormat = "MMM dd yyyy - HH:mm:ss tt",
-            DeveloperUserId = GlobalProperties.BotOwnerId,
-            Locale = "de",
             ServiceProvider = _serviceProvider,
-            MessageCacheSize = 10000,
-            ShowReleaseNotesInUpdateCheck = false,
-            HttpTimeout = TimeSpan.FromSeconds(40)
+            Gateway = new()
+            {
+                AutoReconnect = true,
+            },
+            Logging = new()
+            {
+                MinimumLogLevel = Microsoft.Extensions.Logging.LogLevel.Debug,
+                LogTimestampFormat = "MMM dd yyyy - HH:mm:ss tt"
+            },
+            Telemetry = new()
+            {
+                DeveloperUserId = GlobalProperties.BotOwnerId
+            },
+            Api = new()
+            {
+                Locale = "de"
+            },
+            Cache = new()
+            {
+                MessageCacheSize = 10000,
+                AlwaysCacheMembers = true
+            },
+            Diagnostics = new()
+            {
+                UpdateChecks = new()
+                {
+                    ShowReleaseNotes = false
+                }
+            },
+            Rest = new()
+            {
+                RequestTimeout = TimeSpan.FromSeconds(40)
+            }
         });
 
         discord.MessageCreated += async (s, e) => await new TempVCMessageLogger().MessageCreated(s, e);
@@ -116,7 +141,6 @@ public class DiscordBotService : IHostedService
 
         CurrentApplication.TargetGuild =
             await discord.GetGuildAsync(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
-        await CurrentApplication.TargetGuild.GetAllMembersAsync();
 
         IsReady = true;
     }
