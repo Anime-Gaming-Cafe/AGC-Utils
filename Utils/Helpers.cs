@@ -348,13 +348,13 @@ public static class ToolSet
         return false;
     }
 
-    public static async Task<int> GenerateBannDeleteMessageDays(ulong UserId)
+    public static async Task<int> GenerateBanDeleteMessageSeconds(ulong UserId)
     {
         var hasOpenTicket = await UserHasOpenTicket(UserId);
         var hasClosedPendingTicket = await UserHasClosedPendingTicket(UserId);
         if (hasOpenTicket) return 0;
 
-        return hasClosedPendingTicket ? 0 : 7;
+        return hasClosedPendingTicket ? 0 : 604800; // 7 Tage in Sekunden
     }
 
 

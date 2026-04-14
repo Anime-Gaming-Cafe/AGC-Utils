@@ -116,6 +116,7 @@ public class DiscordBotService : IHostedService
 
         CurrentApplication.TargetGuild =
             await discord.GetGuildAsync(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
+        await CurrentApplication.TargetGuild.GetAllMembersAsync();
 
         IsReady = true;
     }
@@ -215,8 +216,10 @@ public class DiscordBotService : IHostedService
                         ActivityType.Custom));
                     await Task.Delay(TimeSpan.FromSeconds(30));
 
-                    var guild = await discord.GetGuildAsync(
-                        ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
+                    var guildId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
+                    var guild = discord.Guilds.TryGetValue(guildId, out var cachedGuild)
+                        ? cachedGuild
+                        : await discord.GetGuildAsync(guildId);
                     await discord.UpdateStatusAsync(new DiscordActivity($"Servermitglieder: {guild.MemberCount}",
                         ActivityType.Custom));
                     await Task.Delay(TimeSpan.FromSeconds(30));

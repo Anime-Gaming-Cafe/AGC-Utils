@@ -166,7 +166,7 @@ public sealed class WarnUserCommand : BaseCommandModule
                 {
                     if (BanEnabled)
                     {
-                        await ctx.Guild.BanMemberAsync(user, await ToolSet.GenerateBannDeleteMessageDays(user.Id),
+                        await ctx.Guild.BanMemberAsync(user, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                             reasonString);
                         uAction = "Gebannt";
                     }

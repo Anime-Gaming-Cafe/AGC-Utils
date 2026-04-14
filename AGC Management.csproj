@@ -33,7 +33,7 @@
         <PackageReference Include="Blazorise.Components" Version="2.0.4"/>
         <PackageReference Include="Blazorise.Snackbar" Version="2.0.4"/>
         <PackageReference Include="DisCatSharp" Version="10.7.1-nightly-008" />
-        <PackageReference Include="DisCatSharp.Analyzer" Version="1.0.0">
+        <PackageReference Include="DisCatSharp.Analyzer" Version="1.0.6">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
