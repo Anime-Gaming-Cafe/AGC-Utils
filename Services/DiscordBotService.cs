@@ -195,7 +195,7 @@ public class DiscordBotService : IHostedService
         _ = MST.StartRemovingWarnsPeriodically(discord);
 
         TempVoiceTasks TVT = new();
-        _ = TVT.StartRemoveEmptyTempVoices(discord);
+        // _ = TVT.StartRemoveEmptyTempVoices(discord);
 
         _ = StatusUpdateTask(discord);
         _ = ExtendedModerationSystemLoop.LaunchLoops();
@@ -222,24 +222,6 @@ public class DiscordBotService : IHostedService
                     await Task.Delay(TimeSpan.FromSeconds(30));
 
                     await discord.UpdateStatusAsync(new DiscordActivity(await TicketString(), ActivityType.Custom));
-                    await Task.Delay(TimeSpan.FromSeconds(30));
-
-                    int tempvcCount = 0;
-                    var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-                    string query = "SELECT channelid FROM tempvoice";
-                    await using var cmd = con.CreateCommand(query);
-                    await using NpgsqlDataReader reader = await cmd.ExecuteReaderAsync();
-                    while (reader.Read())
-                    {
-                        ulong channelid = (ulong)reader.GetInt64(0);
-                        var channel = await discord.TryGetChannelAsync(channelid);
-                        if (channel != null)
-                            tempvcCount++;
-                    }
-
-                    await discord.UpdateStatusAsync(new DiscordActivity($" Offene Temp-VCs: {tempvcCount}",
-                        ActivityType.Custom));
                     await Task.Delay(TimeSpan.FromSeconds(30));
 
                     var guildId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
