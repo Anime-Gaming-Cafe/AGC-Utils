@@ -66,7 +66,7 @@ public static class EmbedPaginator
             if (!string.IsNullOrEmpty(footer))
                 embed.WithFooter(footer, footerIcon);
 
-            return new DisCatSharp.Interactivity.Page(embed: embed);
+            return new DisCatSharp.Interactivity.Entities.Page().WithEmbed(embed);
         }).ToList();
 
         if (pages.Count == 1)
