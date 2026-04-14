@@ -26,7 +26,7 @@ public class WarnChannelAcknowledgedButtonListener : BaseCommandModule
                     }
                     else if (c_user.Id == a_user.Id)
                     {
-                        var embed = args.Message.Embeds.First();
+                        var embed = args.Message.Embeds[0];
                         var component = args.Message.Components.First();
                         var mb = new DiscordMessageBuilder();
                         mb.AddEmbed(embed);

@@ -21,12 +21,12 @@ public sealed class SessionManagement : TempVoiceHelper
     {
         _ = Task.Run(async () =>
         {
-            List<ulong> blockedusers = new();
-            List<ulong> permittedusers = new();
+            List<ulong> blockedusers = [];
+            List<ulong> permittedusers = [];
             var dbChannels = await GetChannelIDFromDB(ctx);
             var hidden = false;
             var locked = false;
-            List<ulong> channelmods = new();
+            List<ulong> channelmods = [];
             var userChannel = ctx.Member?.VoiceState?.Channel;
 
             if (userChannel == null || !dbChannels.Contains((long)userChannel?.Id))
@@ -39,10 +39,10 @@ public sealed class SessionManagement : TempVoiceHelper
             {
                 var msg = await ctx.RespondAsync(
                     "<a:loading_agc:1084157150747697203> **Lade...** Versuche Channel zu speichern...");
-                List<string> Query = new()
-                {
-                    "userid"
-                };
+                List<string> Query =
+				[
+					"userid"
+                ];
                 Dictionary<string, object> WhereCondiditons = new()
                 {
                     { "userid", (long)ctx.User.Id }
@@ -129,10 +129,10 @@ public sealed class SessionManagement : TempVoiceHelper
         {
             var msg = await ctx.RespondAsync(
                 "<a:loading_agc:1084157150747697203> **Lade...** Versuche Kanaleinstellungen zu löschen...");
-            List<string> Query = new()
-            {
-                "userid"
-            };
+            List<string> Query =
+			[
+				"userid"
+            ];
             Dictionary<string, object> WhereCondiditons = new()
             {
                 { "userid", (long)ctx.User.Id }
@@ -172,10 +172,10 @@ public sealed class SessionManagement : TempVoiceHelper
         {
             var msg = await ctx.RespondAsync(
                 "<a:loading_agc:1084157150747697203> **Lade...** Versuche Sessionskip zu bearbeiten...");
-            List<string> Query = new()
-            {
-                "userid"
-            };
+            List<string> Query =
+			[
+				"userid"
+            ];
 
             Dictionary<string, object> WhereCondiditons_ = new()
             {
@@ -193,10 +193,10 @@ public sealed class SessionManagement : TempVoiceHelper
                 return;
             }
 
-            List<string> dataQuery = new()
-            {
-                "*"
-            };
+            List<string> dataQuery =
+			[
+				"*"
+            ];
 
             Dictionary<string, object> WhereCondiditons = new()
             {
@@ -242,10 +242,10 @@ public sealed class SessionManagement : TempVoiceHelper
         {
             var msg = await ctx.RespondAsync(
                 "<a:loading_agc:1084157150747697203> **Lade...** Versuche Kanaleinstellungen zu lesen...");
-            List<string> Query = new()
-            {
-                "userid"
-            };
+            List<string> Query =
+			[
+				"userid"
+            ];
 
             Dictionary<string, object> WhereCondiditons_ = new()
             {
@@ -263,10 +263,10 @@ public sealed class SessionManagement : TempVoiceHelper
                 return;
             }
 
-            List<string> dataQuery = new()
-            {
-                "*"
-            };
+            List<string> dataQuery =
+			[
+				"*"
+            ];
 
             Dictionary<string, object> WhereCondiditons = new()
             {
@@ -342,7 +342,7 @@ public sealed class SessionManagement : TempVoiceHelper
         });
     }
 
-    private string IdToMention(string ids)
+    private static string IdToMention(string ids)
     {
         if (string.IsNullOrEmpty(ids)) return "Keine";
 

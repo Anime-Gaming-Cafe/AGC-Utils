@@ -24,10 +24,10 @@ public class TempVoiceTasks
     {
         _ = Task.Run(async () =>
         {
-            List<string> Query = new()
-            {
-                "channelid"
-            };
+            List<string> Query =
+			[
+				"channelid"
+            ];
             var all_channels =
                 await DatabaseService.SelectDataFromTable("tempvoice", Query, null);
             foreach (var listed_channel in all_channels)

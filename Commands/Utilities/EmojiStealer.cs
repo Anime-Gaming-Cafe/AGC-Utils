@@ -1,9 +1,11 @@
 ﻿#region
 
 using AGC_Management.Attributes;
+
 using DisCatSharp.ApplicationCommands;
 using DisCatSharp.ApplicationCommands.Attributes;
 using DisCatSharp.ApplicationCommands.Context;
+using DisCatSharp.Interactivity;
 using DisCatSharp.Interactivity.Extensions;
 
 #endregion
@@ -20,9 +22,11 @@ public class EmojiStealer : ApplicationCommandsModule
         var RoleId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
         if (!ctx.Member.Roles.Any(r => r.Id == RoleId))
         {
-            var ib = new DiscordInteractionResponseBuilder();
-            ib.IsEphemeral = true;
-            ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
+			var ib = new DiscordInteractionResponseBuilder
+			{
+				IsEphemeral = true
+			};
+			ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
             return;
         }
@@ -72,10 +76,8 @@ public class EmojiStealer : ApplicationCommandsModule
             DiscordInteractionModalBuilder modal = new();
             modal.WithTitle("Emoji Stealer");
             modal.CustomId = cid;
-            modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small,
-                label: "Neuer Name für den Emoji:", minLength: 2, maxLength: 49));
-
-            await ctx.CreateModalResponseAsync(modal);
+            modal.AddLabelComponent(new("Emoji name", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 2, maxLength: 49)));
+			await ctx.CreateModalResponseAsync(modal);
 
             var interactivity = ctx.Client.GetInteractivity();
             var result = await interactivity.WaitForModalAsync(cid, TimeSpan.FromMinutes(2));
@@ -97,8 +99,7 @@ public class EmojiStealer : ApplicationCommandsModule
 
             if (result.TimedOut) return;
 
-            var emojiName = result.Result.Interaction.Data.Components[0].Value;
-
+            var emojiName = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)!.Value;
 
             await result.Result.Interaction.CreateResponseAsync(
                 InteractionResponseType.DeferredChannelMessageWithSource,
@@ -127,9 +128,11 @@ public class EmojiStealer : ApplicationCommandsModule
         var RoleId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
         if (!ctx.Member.Roles.Any(r => r.Id == RoleId))
         {
-            var ib = new DiscordInteractionResponseBuilder();
-            ib.IsEphemeral = true;
-            ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
+			var ib = new DiscordInteractionResponseBuilder
+			{
+				IsEphemeral = true
+			};
+			ib.WithContent("Du hast nicht die benötigten Rechte um diesen Command auszuführen!");
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
             return;
         }
@@ -148,10 +151,8 @@ public class EmojiStealer : ApplicationCommandsModule
             DiscordInteractionModalBuilder modal = new();
             modal.WithTitle("Sticker Stealer");
             modal.CustomId = cid;
-            modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small,
-                label: "Neuer Name für den Sticker:", minLength: 2, maxLength: 49));
-            modal.AddTextComponent(new DiscordTextComponent(TextComponentStyle.Small,
-                label: "Beschreibung für den Sticker:", minLength: 2, maxLength: 100));
+            modal.AddLabelComponent(new("Neuer Name", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 2, maxLength: 49)));
+            modal.AddLabelComponent(new("Beschreibung", component: new DiscordTextInputComponent(TextComponentStyle.Small, minLength: 2, maxLength: 100)));
 
             await ctx.CreateModalResponseAsync(modal);
 
@@ -165,8 +166,8 @@ public class EmojiStealer : ApplicationCommandsModule
 
 
             var stickerStream = new MemoryStream(stickerBytes);
-            var stickerdescription = result.Result.Interaction.Data.Components[1].Value;
-            var StickerName = result.Result.Interaction.Data.Components[0].Value;
+            var stickerdescription = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().ElementAt(1).Component as DiscordTextInputComponent)!.Value;
+            var StickerName = (result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)!.Value;
             await result.Result.Interaction.CreateResponseAsync(
                 InteractionResponseType.DeferredChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder().AsEphemeral());

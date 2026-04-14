@@ -21,10 +21,8 @@ public sealed class MultiWarnCommand : BaseCommandModule
     [RequireTeamCat]
     public async Task MultiWarnUser(CommandContext ctx, [RemainingText] string ids_and_reason)
     {
-        List<ulong> ids;
-        string reason;
-        Converter.SeperateIdsAndReason(ids_and_reason, out ids, out reason);
-        if (await ToolSet.CheckForReason(ctx, reason)) return;
+		Converter.SeperateIdsAndReason(ids_and_reason, out List<ulong> ids, out string reason);
+		if (await ToolSet.CheckForReason(ctx, reason)) return;
         reason = reason.TrimEnd(' ');
         reason = await ReasonTemplateResolver.Resolve(reason);
         var users_to_warn = new List<DiscordUser>();
@@ -60,11 +58,11 @@ public sealed class MultiWarnCommand : BaseCommandModule
                              $"```{busers_formatted}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons = new(2)
-        {
-            new DiscordButtonComponent(ButtonStyle.Success, $"multiwarn_accept_{caseid}", "Bestätigen"),
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Success, $"multiwarn_accept_{caseid}", "Bestätigen"),
             new DiscordButtonComponent(ButtonStyle.Danger, $"multiwarn_deny_{caseid}", "Abbrechen")
-        };
+        ];
         var messageBuilder = new DiscordMessageBuilder()
             .AddEmbed(embed)
             .WithReply(ctx.Message.Id)
@@ -120,7 +118,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             var for_str = "";
-            List<DiscordUser> users_to_warn_obj = new();
+            List<DiscordUser> users_to_warn_obj = [];
             foreach (var id in setids)
             {
                 var user = await ctx.Client.GetUserAsync(id);
@@ -170,10 +168,10 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 await DatabaseService.InsertDataIntoTable("warns", data);
                 var warnlist = new List<dynamic>();
 
-                List<string> selectedWarns = new()
-                {
-                    "*"
-                };
+                List<string> selectedWarns =
+				[
+					"*"
+                ];
                 Dictionary<string, object> whereConditions = new()
                 {
                     { "userid", (long)user.Id }

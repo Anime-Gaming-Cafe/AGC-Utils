@@ -17,10 +17,8 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
     [RequireStaffRole]
     public async Task MultiBanRequest(CommandContext ctx, [RemainingText] string ids_and_reason)
     {
-        List<ulong> ids;
-        string reason;
-        Converter.SeperateIdsAndReason(ids_and_reason, out ids, out reason);
-        if (reason == null) reason = await ModerationHelper.BanReasonSelector(ctx);
+		Converter.SeperateIdsAndReason(ids_and_reason, out List<ulong> ids, out string reason);
+		reason ??= await ModerationHelper.BanReasonSelector(ctx);
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
@@ -59,11 +57,11 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                              $"```{busers_formatted}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed = confirmEmbedBuilder.Build();
-        List<DiscordButtonComponent> buttons = new(2)
-        {
-            new DiscordButtonComponent(ButtonStyle.Success, $"multibanrequest_accept_{caseid}", "Bestätigen"),
+        List<DiscordButtonComponent> buttons =
+		[
+			new DiscordButtonComponent(ButtonStyle.Success, $"multibanrequest_accept_{caseid}", "Bestätigen"),
             new DiscordButtonComponent(ButtonStyle.Danger, $"multibanrequest_deny_{caseid}", "Abbrechen")
-        };
+        ];
         var messageBuilder = new DiscordMessageBuilder()
             .AddEmbed(embed)
             .WithReply(ctx.Message.Id)

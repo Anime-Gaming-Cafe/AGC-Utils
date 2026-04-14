@@ -78,11 +78,11 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                 ebb.WithDescription(
                     $"{ctx.Member.UsernameWithDiscriminator} {ctx.Member.Mention} möchte gerne deinem Channel beitreten. Möchtest du die Beitrittsanfage annehmen?\n Du hast 300 Sekunden Zeit");
                 ebb.WithFooter($"{ctx.Member.UsernameWithDiscriminator}", ctx.Member.AvatarUrl);
-                List<DiscordButtonComponent> buttons = new(2)
-                {
-                    new DiscordButtonComponent(ButtonStyle.Success, $"jr_accept_{caseid}", "Ja"),
+                List<DiscordButtonComponent> buttons =
+				[
+					new DiscordButtonComponent(ButtonStyle.Success, $"jr_accept_{caseid}", "Ja"),
                     new DiscordButtonComponent(ButtonStyle.Danger, $"jr_deny_{caseid}", "Nein")
-                };
+                ];
                 ebb.WithColor(BotConfig.GetEmbedColor());
                 var eb = ebb.Build();
                 DiscordMessageBuilder mb = new();
@@ -151,8 +151,8 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                         Permissions.None);
                     var channellimit = userchannel.UserLimit;
 
-                    if (channellimit != 0 && channellimit <= userchannel.Users.Count())
-                        channellimit = userchannel.Users.Count() + 1;
+                    if (channellimit != 0 && channellimit <= userchannel.Users.Count)
+                        channellimit = userchannel.Users.Count + 1;
 
                     await userchannel.ModifyAsync(x =>
                     {
@@ -165,10 +165,10 @@ public sealed class JoinRequestCommand : TempVoiceHelper
                     eb_.WithFooter($"{ctx.Member.UsernameWithDiscriminator}", ctx.Member.AvatarUrl);
                     eb_.WithColor(BotConfig.GetEmbedColor());
                     eb_.Build();
-                    List<DiscordLinkButtonComponent> urlb = new(1)
-                    {
-                        new DiscordLinkButtonComponent(invite.ToString(), "Kanal betreten")
-                    };
+                    List<DiscordLinkButtonComponent> urlb =
+					[
+						new DiscordLinkButtonComponent(invite.ToString(), "Kanal betreten")
+                    ];
                     DiscordMessageBuilder msgb = new();
                     msgb.AddComponents(urlb);
                     msgb.AddEmbed(eb_);

@@ -49,7 +49,7 @@ public static class BotConfig
         try
         {
             var colorConfig = GetConfig()["EmbedConfig"]["DefaultEmbedColor"];
-            if (colorConfig.StartsWith("#")) colorConfig = colorConfig.Remove(0, 1);
+            if (colorConfig.StartsWith('#')) colorConfig = colorConfig[1..];
 
             if (string.IsNullOrEmpty(colorConfig) || !HexCheck.IsHexColor(colorConfig))
             {

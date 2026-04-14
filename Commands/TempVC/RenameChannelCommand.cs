@@ -41,10 +41,10 @@ public sealed class RenameChannelCommand : TempVoiceHelper
                     "<a:loading_agc:1084157150747697203> **Lade...** Versuche Channel umzubenennen...");
                 var channel = ctx.Member.VoiceState.Channel;
                 long timestampdata = 0;
-                List<string> Query = new()
-                {
-                    "lastedited"
-                };
+                List<string> Query =
+				[
+					"lastedited"
+                ];
                 Dictionary<string, object> WhereCondiditons = new()
                 {
                     { "channelid", (long)channel.Id }
@@ -68,13 +68,11 @@ public sealed class RenameChannelCommand : TempVoiceHelper
                 {
                     await conn.OpenAsync();
                     var sql = "UPDATE tempvoice SET lastedited = @timestamp WHERE channelid = @channelid";
-                    await using (NpgsqlCommand command = new(sql, conn))
-                    {
-                        command.Parameters.AddWithValue("@timestamp", current_timestamp);
-                        command.Parameters.AddWithValue("@channelid", (long)channel.Id);
-                        var affected = await command.ExecuteNonQueryAsync();
-                    }
-                }
+					await using NpgsqlCommand command = new(sql, conn);
+					command.Parameters.AddWithValue("@timestamp", current_timestamp);
+					command.Parameters.AddWithValue("@channelid", (long)channel.Id);
+					var affected = await command.ExecuteNonQueryAsync();
+				}
 
                 await msg.ModifyAsync(
                     "<:success:1085333481820790944> **Erfolg!** Der Channel wurde erfolgreich umbenannt.");

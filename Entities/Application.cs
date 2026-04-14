@@ -14,5 +14,5 @@ public class Application
     public int Status { get; set; } = 0;
     public long Timestamp { get; set; }
     public string Bewerbungstext { get; set; } = "";
-    public List<long> SeenBy { get; set; } = new();
+    public List<long> SeenBy { get; set; } = [];
 }

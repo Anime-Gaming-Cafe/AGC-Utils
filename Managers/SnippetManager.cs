@@ -49,7 +49,7 @@ public class SnippetListener
                     .WithTitle("Hinweis").WithFooter("AGC Support-System", e.Message.Guild.IconUrl);
                 var users_in_ticket = await TicketManagerHelper.GetTicketUsers(e.Message.Channel);
                 var ping = "";
-                foreach (var user in users_in_ticket) ping = ping + $" {user.Mention}";
+                foreach (var user in users_in_ticket) ping += $" {user.Mention}";
 
                 DiscordMessageBuilder mb = new();
                 mb.WithContent(ping).AddEmbed(eb);

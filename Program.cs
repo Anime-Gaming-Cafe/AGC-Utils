@@ -54,16 +54,13 @@ public class CurrentApplication
                 if (version.Contains('+'))
                     version = version[..version.IndexOf('+')];
 
-                if (version.StartsWith("v"))
+                if (version.StartsWith('v'))
                 {
                     return version;
                 }
                 try
                 {
-                    if (Logger != null)
-                    {
-                        Logger.Warning($"Version string '{version}' doesn't follow the expected format (should start with 'v')");
-                    }
+                    Logger?.Warning($"Version string '{version}' doesn't follow the expected format (should start with 'v')");
                 }
                 catch
                 {
@@ -81,10 +78,7 @@ public class CurrentApplication
             {
                 try
                 {
-                    if (Logger != null)
-                    {
-                        Logger.Error(ex, "Failed to generate timestamp for version string");
-                    }
+                    Logger?.Error(ex, "Failed to generate timestamp for version string");
                 }
                 catch
                 {
@@ -97,10 +91,7 @@ public class CurrentApplication
         {
             try
             {
-                if (Logger != null)
-                {
-                    Logger.Error(ex, "Failed to determine version string");
-                }
+                Logger?.Error(ex, "Failed to determine version string");
             }
             catch
             {

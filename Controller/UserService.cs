@@ -10,7 +10,7 @@ namespace AGC_Management.Controller;
 
 public class UserService
 {
-    private static HttpClient client = new();
+    private static readonly HttpClient client = new();
 
     public bool IsAuthenticated(HttpContext httpContext)
     {

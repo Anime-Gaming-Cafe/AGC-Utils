@@ -98,8 +98,7 @@ public sealed class ApplyPanelCommands : BaseCommandModule
                 MessageFormatter.BoolToEmoji(category.IsApplicable) + " Diese Position ist " +
                 (category.IsApplicable ? "bewerbbar" : "nicht bewerbbar")));
 
-        var selector = new DiscordStringSelectComponent("select_apply_category",
-            "Wähle die gewünschte Bewerbungsposition aus", selectorlist, "applypanelselector");
+        var selector = new DiscordStringSelectComponent("Wähle die gewünschte Bewerbungsposition aus", selectorlist, "applypanelselector");
 
         var dbdata =
             await CachingService.GetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache,
@@ -130,7 +129,7 @@ public sealed class ApplyPanelCommands : BaseCommandModule
 
     private static async Task<List<Bewerbung>> GetBewerbungsCategories()
     {
-        List<Bewerbung> bewerbungen = new();
+        List<Bewerbung> bewerbungen = [];
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var command =
             con.CreateCommand("SELECT positionname, positionid, applicable FROM applicationcategories");

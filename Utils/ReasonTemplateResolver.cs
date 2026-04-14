@@ -44,14 +44,12 @@ public static class ReasonTemplateResolver
                 if (exists > 0) return false;
             }
 
-            await using (var cmd = conn.CreateCommand("INSERT INTO reasonmap (key, text) VALUES (@key, @text)"))
-            {
-                cmd.Parameters.AddWithValue("key", key);
-                cmd.Parameters.AddWithValue("text", text);
-                await cmd.ExecuteNonQueryAsync();
-            }
+			await using var cmd = conn.CreateCommand("INSERT INTO reasonmap (key, text) VALUES (@key, @text)");
+			cmd.Parameters.AddWithValue("key", key);
+			cmd.Parameters.AddWithValue("text", text);
+			await cmd.ExecuteNonQueryAsync();
 
-            return true;
+			return true;
         }
         catch (NpgsqlException ex)
         {

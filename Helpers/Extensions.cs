@@ -39,8 +39,10 @@ internal static class DiscordExtension
     {
         // if migrated
         if (member.IsMigrated) return member.Username;
-        // if not migrated
+		// if not migrated
 
-        return member.Username + "#" + member.Discriminator;
-    }
+#pragma warning disable DCS0102 // [Discord] Deprecated
+		return member.Username + "#" + member.Discriminator;
+#pragma warning restore DCS0102 // [Discord] Deprecated
+	}
 }
