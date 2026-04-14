@@ -72,7 +72,9 @@ public class DiscordBotService : IHostedService
             Cache = new()
             {
                 MessageCacheSize = 10000,
-                AlwaysCacheMembers = true
+                AlwaysCacheMembers = true,
+                AutoRefreshChannelCache = true,
+
             },
             Diagnostics = new()
             {
