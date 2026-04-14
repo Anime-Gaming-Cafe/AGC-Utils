@@ -10,6 +10,7 @@ namespace AGC_Management.Eventlistener.LoggingEvents;
 [EventHandler]
 public class onMemberBan : ApplicationCommandsModule
 {
+    /*
     [Event]
     private Task GuildAuditLogEntryCreated(DiscordClient client, GuildAuditLogEntryCreateEventArgs args)
     {
@@ -38,4 +39,5 @@ public class onMemberBan : ApplicationCommandsModule
         });
         return Task.CompletedTask;
     }
+        */
 }
