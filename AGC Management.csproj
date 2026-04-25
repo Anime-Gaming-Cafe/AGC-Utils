@@ -30,7 +30,7 @@
         <PackageReference Include="Blazorise" Version="2.1.1"/>
         <PackageReference Include="Blazorise.Bootstrap" Version="2.1.1"/>
         <PackageReference Include="Blazorise.Bootstrap5" Version="2.1.1"/>
-        <PackageReference Include="Blazorise.Components" Version="2.1.0"/>
+        <PackageReference Include="Blazorise.Components" Version="2.1.1"/>
         <PackageReference Include="Blazorise.Snackbar" Version="2.1.1"/>
         <PackageReference Include="DisCatSharp" Version="10.7.1-nightly-013" />
         <PackageReference Include="DisCatSharp.Analyzer" Version="1.0.6.1">
