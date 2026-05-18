@@ -42,7 +42,7 @@ data:
 
     # Allow browsing and downloading transcripts
     <Directory "/usr/local/apache2/htdocs/transcripts">
-        Options +Indexes +FollowSymLinks
+        Options -Indexes -FollowSymLinks
         AllowOverride None
         Require all granted
 
