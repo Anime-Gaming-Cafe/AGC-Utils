@@ -90,13 +90,13 @@ spec:
               memory: 128Mi
           livenessProbe:
             httpGet:
-              path: /transcripts/
+              path: /robots.txt
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /transcripts/
+              path: /robots.txt
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
