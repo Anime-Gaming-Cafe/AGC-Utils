@@ -1,5 +1,7 @@
 ﻿#region
 
+using AGC_Management.Services;
+
 #endregion
 
 namespace AGC_Management.Commands.Antiraid;
@@ -14,14 +16,14 @@ public class DateKickEventhandler : BaseCommandModule
         {
             if (eventArgs.Guild?.Id != ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"])) return;
 
+            var isDateKickActive = await RuntimeSettings.GetBoolAsync("AntiRaid", "DateKickActive", false);
+            if (!isDateKickActive) return;
+
             var member = eventArgs.Member;
             var createdate = member.CreationTimestamp.Date;
             var age = (DateTime.Now - createdate).Days;
-            var isDateKickActive = false;
-            isDateKickActive = bool.Parse(BotConfig.GetConfig()["AntiRaid"]["DateKickActive"]);
-            if (!isDateKickActive) return;
 
-            var minAge = int.Parse(BotConfig.GetConfig()["AntiRaid"]["DateKickDays"]);
+            var minAge = await RuntimeSettings.GetIntAsync("AntiRaid", "DateKickDays", 14);
             if (age < minAge)
             {
                 await DateKickUtils.NotifyUser(member, minAge);
@@ -37,23 +39,23 @@ public class DateKickCommands : BaseCommandModule
     [Command("datekick")]
     public async Task DateKickCommand(CommandContext ctx, int minAge)
     {
+        await RuntimeSettings.SetAsync("AntiRaid", "DateKickDays", minAge.ToString());
         var embed = new DiscordEmbedBuilder();
         embed.WithTitle("DateKick-System");
         embed.WithDescription($"Das DateKick-System wurde auf ``{minAge} Tage`` eingestellt!");
         embed.WithColor(DiscordColor.Green);
         await ctx.RespondAsync(embed);
-        BotConfig.SetConfig("AntiRaid", "DateKickDays", minAge.ToString());
     }
 
     [Command("datekick")]
     public async Task DateKickCommand(CommandContext ctx, bool active)
     {
+        await RuntimeSettings.SetAsync("AntiRaid", "DateKickActive", active.ToString());
         var embed = new DiscordEmbedBuilder();
         embed.WithTitle("DateKick-System");
         embed.WithDescription($"Das DateKick-System wurde auf ``{active}`` eingestellt!");
         embed.WithColor(DiscordColor.Green);
         await ctx.RespondAsync(embed);
-        BotConfig.SetConfig("AntiRaid", "DateKickActive", active.ToString());
     }
 }
 

@@ -256,7 +256,11 @@ public static class DatabaseService
             { "countcounter", "CREATE TABLE IF NOT EXISTS countcounter (userid BIGINT, counter BIGINT, timestamps BIGINT)" },
             { "countingfails", "CREATE TABLE IF NOT EXISTS countingfails (userid BIGINT, counter BIGINT)" },
             { "countinghighscore", "CREATE TABLE IF NOT EXISTS countinghighscore (number BIGINT, userid BIGINT, timestamps BIGINT)" },
-            { "countsave", "CREATE TABLE IF NOT EXISTS countsave (userid BIGINT, saves NUMERIC)" }
+            { "countsave", "CREATE TABLE IF NOT EXISTS countsave (userid BIGINT, saves NUMERIC)" },
+            {
+                "botsettings",
+                "CREATE TABLE IF NOT EXISTS botsettings (section TEXT, key TEXT, value TEXT, PRIMARY KEY (section, key))"
+            }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
 
@@ -573,9 +577,29 @@ public static class DatabaseService
         }
 
         await InitLeveling();
+        await InitBotSettings();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
+    private static async Task InitBotSettings()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var defaults = new (string section, string key, string value)[]
+        {
+            ("AntiRaid", "DateKickActive", "false"),
+            ("AntiRaid", "DateKickDays", "14")
+        };
+
+        foreach (var (section, key, value) in defaults)
+        {
+            await using var cmd = con.CreateCommand(
+                "INSERT INTO botsettings (section, key, value) VALUES (@section, @key, @value) ON CONFLICT (section, key) DO NOTHING");
+            cmd.Parameters.AddWithValue("section", section);
+            cmd.Parameters.AddWithValue("key", key);
+            cmd.Parameters.AddWithValue("value", value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
 
     private static async Task InitLeveling()
     {
