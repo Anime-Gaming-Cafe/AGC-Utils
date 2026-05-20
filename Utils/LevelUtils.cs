@@ -83,11 +83,10 @@ public static class LevelUtils
             var isCached = await ToolSet.IsUserInCache(x.UserId);
             string avatarUrl, username;
 
-            if (isOnServer)
+            if (isOnServer && CurrentApplication.TargetGuild.Members.TryGetValue(x.UserId, out var member))
             {
-                var user = await CurrentApplication.DiscordClient.GetUserAsync(x.UserId);
-                avatarUrl = user.AvatarUrl;
-                username = user.Username;
+                avatarUrl = member.AvatarUrl;
+                username = member.Username;
             }
             else if (isCached)
             {
