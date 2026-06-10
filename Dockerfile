@@ -29,7 +29,7 @@ RUN mkdir -p /app/publish/wwwroot/_framework && \
         || { echo "ERROR: blazor.server.js not found in any expected location"; exit 1; }
 
 # ── Stage 2: download DiscordChatExporter CLI ─────────────────────────────────
-FROM alpine:3.23 AS dce
+FROM alpine:3.24 AS dce
 
 RUN apk add --no-cache curl unzip
 
