@@ -317,10 +317,31 @@ public class DiscordBotService : IHostedService
 
                 GlobalProperties.AGCGuild = guild;
 
-                CurrentApplication.Logger.Information("Starting member download...");
-                var members = await guild.GetAllMembersAsync();
-                CurrentApplication.Logger.Information(
-                    $"Member download complete: received {members.Count} members, cache now holds {guild.Members.Count}.");
+                var expected = guild.MemberCount;
+                CurrentApplication.Logger.Information($"Starting member download ({expected} members expected)...");
+
+                var received = 0;
+
+                Task ProgressHandler(DiscordClient s, GuildMembersChunkEventArgs e)
+                {
+                    if (e.Guild.Id != guild.Id) return Task.CompletedTask;
+                    var total = Interlocked.Add(ref received, e.Members.Count);
+                    CurrentApplication.Logger.Information(
+                        $"Member download progress: chunk {e.ChunkIndex + 1}/{e.ChunkCount}, {total}/{expected} members.");
+                    return Task.CompletedTask;
+                }
+
+                client.GuildMembersChunked += ProgressHandler;
+                try
+                {
+                    var members = await guild.GetAllMembersAsync();
+                    CurrentApplication.Logger.Information(
+                        $"Member download complete: received {members.Count} members, cache now holds {guild.Members.Count}.");
+                }
+                finally
+                {
+                    client.GuildMembersChunked -= ProgressHandler;
+                }
             }
             catch (Exception ex)
             {
