@@ -317,6 +317,7 @@ public class DiscordBotService : IHostedService
 
                 GlobalProperties.AGCGuild = guild;
 
+                CurrentApplication.Logger.Information("Starting member download...");
                 var members = await guild.GetAllMembersAsync();
                 CurrentApplication.Logger.Information(
                     $"Member download complete: received {members.Count} members, cache now holds {guild.Members.Count}.");
