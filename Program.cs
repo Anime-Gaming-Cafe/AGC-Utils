@@ -152,7 +152,7 @@ internal class Program : BaseCommandModule
             DebugMode = false;
         }
 
-        if (!DebugMode)
+        if (!DebugMode && !string.IsNullOrEmpty(BotConfig.GetConfig()["MainConfig"]["SentryDSN"]))
         {
             SentrySdk.Init(o =>
             {
@@ -303,7 +303,14 @@ internal class Program : BaseCommandModule
             return;
         }
 
-        port = 8085;
+        try
+        {
+            port = int.Parse(BotConfig.GetConfig()["WebUI"]["Port"]);
+        }
+        catch
+        {
+            port = 8085;
+        }
 
 
         if (!app.Environment.IsDevelopment())
@@ -336,12 +343,24 @@ internal class Program : BaseCommandModule
             dashboardUrl = "localhost";
         }
 
+        // Build the public host used for OAuth redirect_uri (scheme + host + /signin-discord).
+        // If DashboardURL already carries a port (e.g. "localhost:8095") we keep it as-is.
+        // Otherwise, for local/http setups we append the listening port so the redirect points
+        // back at us. Behind an HTTPS reverse proxy (port 443) the port stays implicit.
+        HostString dashboardHost;
+        if (dashboardUrl.Contains(':'))
+            dashboardHost = new HostString(dashboardUrl);
+        else if (!useHttps)
+            dashboardHost = new HostString(dashboardUrl, port);
+        else
+            dashboardHost = new HostString(dashboardUrl);
+
         app.UseStaticFiles();
         app.MapStaticAssets();
         app.UseRouting();
         app.Use((ctx, next) =>
         {
-            ctx.Request.Host = new HostString(dashboardUrl);
+            ctx.Request.Host = dashboardHost;
             ctx.Request.Scheme = useHttps ? "https" : "http";
             return next();
         });
