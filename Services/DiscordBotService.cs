@@ -306,12 +306,26 @@ public class DiscordBotService : IHostedService
     private static async Task UpdateGuild(DiscordClient client)
     {
         await Task.Delay(TimeSpan.FromSeconds(5));
+        var guildId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
         while (true)
         {
-            GlobalProperties.AGCGuild =
-                await client.GetGuildAsync(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
-            // pull the full member list over the gateway so AGCGuild.Members is fully populated
-            await GlobalProperties.AGCGuild.GetAllMembersAsync();
+            try
+            {
+                var guild = client.Guilds.TryGetValue(guildId, out var cached)
+                    ? cached
+                    : await client.GetGuildAsync(guildId);
+
+                GlobalProperties.AGCGuild = guild;
+
+                var members = await guild.GetAllMembersAsync();
+                CurrentApplication.Logger.Information(
+                    $"Member download complete: received {members.Count} members, cache now holds {guild.Members.Count}.");
+            }
+            catch (Exception ex)
+            {
+                CurrentApplication.Logger.Error(ex, "Member download failed");
+            }
+
             await Task.Delay(TimeSpan.FromMinutes(30));
         }
     }
