@@ -4,6 +4,7 @@
     private readonly char _progressCharacter;
     private readonly int _startCursorTop;
     private readonly int _total;
+    private readonly bool _enabled;
     private int _current;
 
     public ConsoleProgressBar(int total, int barSize = 50, char progressCharacter = '#')
@@ -12,13 +13,32 @@
         _current = 0;
         _barSize = barSize;
         _progressCharacter = progressCharacter;
-        _startCursorTop = Console.CursorTop;
+
+        // When stdout is redirected or there is no real console buffer (container, systemd,
+        // nohup, piped output) the cursor APIs throw "IOException: The handle is invalid".
+        // In that case we disable the visual bar so startup does not crash.
+        try
+        {
+            if (Console.IsOutputRedirected)
+            {
+                _enabled = false;
+                return;
+            }
+
+            _startCursorTop = Console.CursorTop;
+            _enabled = true;
+        }
+        catch (IOException)
+        {
+            _enabled = false;
+        }
     }
 
     public void Increment()
     {
         _current++;
-        Draw();
+        if (_enabled)
+            Draw();
     }
 
     private void Draw()
