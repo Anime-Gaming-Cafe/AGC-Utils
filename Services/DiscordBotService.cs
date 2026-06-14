@@ -310,7 +310,9 @@ public class DiscordBotService : IHostedService
         {
             GlobalProperties.AGCGuild =
                 await client.GetGuildAsync(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
-            await Task.Delay(TimeSpan.FromMinutes(5));
+            // pull the full member list over the gateway so AGCGuild.Members is fully populated
+            await GlobalProperties.AGCGuild.GetAllMembersAsync();
+            await Task.Delay(TimeSpan.FromMinutes(30));
         }
     }
 
