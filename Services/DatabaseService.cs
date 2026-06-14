@@ -587,7 +587,14 @@ public static class DatabaseService
         var defaults = new (string section, string key, string value)[]
         {
             ("AntiRaid", "DateKickActive", "false"),
-            ("AntiRaid", "DateKickDays", "14")
+            ("AntiRaid", "DateKickDays", "14"),
+            ("BoosterColors", "Enabled", "false"),
+            ("BoosterColors", "PanelChannelId", "0"),
+            ("BoosterColors", "PanelMessageId", "0"),
+            ("BoosterColors", "BypassEligibility", "false"),
+            ("BoosterColors", "EmbedTitle", "Booster Farben"),
+            ("BoosterColors", "EmbedDescription",
+                "Hier kannst du dir deine Booster Farbe auswählen. Sie ist jederzeit anpassbar. Deine Farbe wird automatisch wieder entfernt, sobald dein Boost ausläuft.")
         };
 
         foreach (var (section, key, value) in defaults)

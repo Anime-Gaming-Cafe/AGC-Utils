@@ -204,6 +204,7 @@ public class DiscordBotService : IHostedService
         _ = GetVoiceMetrics.LaunchLoops();
         _ = LevelUtils.RunLeaderboardUpdate();
         _ = TicketSearchTools.LoadTicketsIntoCache();
+        _ = BoosterColorCleanupTask.LaunchLoops();
 
         return Task.CompletedTask;
     }

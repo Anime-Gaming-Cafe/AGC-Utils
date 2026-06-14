@@ -1,0 +1,446 @@
+@page "/konfiguration/boostercolors"
+@using AGC_Management.Services
+@using AGC_Management.BoosterColors
+@using DisCatSharp.Enums
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+
+<h1>Booster Farben verwalten</h1>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+    }
+
+    @if (boundariesMissing)
+    {
+        <div class="alert alert-warning-glass mt-2" role="alert">
+            <h4 class="alert-heading">Boundary-Rollen fehlen</h4>
+            <hr>
+            <p>
+                Es wurden keine Rollen mit den Namen <code>BEGIN_BOOSTERCOLOR</code> und <code>END_BOOSTERCOLOR</code>
+                gefunden. Lege diese beiden Rollen an. Alle Farbrollen dazwischen werden automatisch als Booster Farben
+                erkannt.
+            </p>
+        </div>
+    }
+
+    <!-- Einstellungen -->
+    <div class="glass-card mt-4 p-3">
+        <h3>Einstellungen</h3>
+
+        <div class="mb-3">
+            <label class="form-label">Panel-Channel</label>
+            <select class="form-select glassy-input" @bind="panelChannelId">
+                <option value="0">-- Channel wählen --</option>
+                @foreach (var channel in textChannels)
+                {
+                    <option value="@channel.Id">#@channel.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Embed-Titel</label>
+            <input class="form-control glassy-input" @bind="embedTitle"/>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Embed-Beschreibung</label>
+            <textarea class="form-control glassy-input" rows="3" @bind="embedDescription"></textarea>
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="enabledCheck" @bind="enabled"/>
+            <label class="form-check-label" for="enabledCheck">Feature aktiviert</label>
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="bypassCheck" @bind="bypassEligibility"/>
+            <label class="form-check-label" for="bypassCheck">
+                Dev: Boost-Check umgehen (jeder gilt als Booster, Teammitglieder ausgenommen)
+            </label>
+        </div>
+
+        <button class="btn btn-primary-glass" @onclick="SaveSettings">Einstellungen speichern</button>
+        <button class="btn btn-primary-glass" @onclick="SendPanel">Panel senden</button>
+        <button class="btn btn-primary-glass" @onclick="RefreshPanel">Panel aktualisieren</button>
+    </div>
+
+    <!-- Farbrollen -->
+    <div class="glass-card mt-4 p-3">
+        <h3>Farbrollen</h3>
+        <p class="text-muted">Diese Rollen liegen zwischen den Boundary-Rollen und werden im Auswahl-Dropdown angezeigt.</p>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Vorschau</th>
+                <th>Name</th>
+                <th>Farbe</th>
+                <th>Gradient</th>
+                <th>Mitglieder</th>
+                <th>Aktionen</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var role in colorRoles)
+            {
+                <tr>
+                    <td>
+                        <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:@PreviewBackground(role);"></span>
+                    </td>
+                    <td>
+                        <input class="form-control glassy-input" @bind="role.Name"/>
+                    </td>
+                    <td>
+                        <input type="color" class="form-control form-control-color" @bind="role.Hex"/>
+                    </td>
+                    <td>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="role.Gradient"/>
+                        </div>
+                        @if (role.Gradient)
+                        {
+                            <input type="color" class="form-control form-control-color" @bind="role.SecondaryHex"/>
+                        }
+                    </td>
+                    <td>@role.MemberCount</td>
+                    <td>
+                        <button class="btn btn-primary-glass btn-sm" @onclick="() => SaveRole(role)">Speichern</button>
+                        <button class="btn btn-danger-glass btn-sm" @onclick="() => DeleteRole(role)">Löschen</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        <h4 class="mt-4">Neue Farbrolle anlegen</h4>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">Name</label>
+                <input class="form-control glassy-input" @bind="newRoleName" placeholder="z.B. Blood Red"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Farbe</label>
+                <input type="color" class="form-control form-control-color" @bind="newRoleHex"/>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="newGradient" @bind="newRoleGradient"/>
+                    <label class="form-check-label" for="newGradient">Gradient</label>
+                </div>
+                @if (newRoleGradient)
+                {
+                    <input type="color" class="form-control form-control-color" @bind="newRoleSecondaryHex"/>
+                }
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary-glass mt-4" @onclick="CreateRole" disabled="@boundariesMissing">Anlegen</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private bool boundariesMissing;
+    private string statusMessage = "";
+
+    private List<ColorRoleVm> colorRoles = new();
+    private List<DiscordChannel> textChannels = new();
+
+    private ulong panelChannelId;
+    private string embedTitle = "";
+    private string embedDescription = "";
+    private bool enabled;
+    private bool bypassEligibility;
+
+    private string newRoleName = "";
+    private string newRoleHex = "#9f00ff";
+    private bool newRoleGradient;
+    private string newRoleSecondaryHex = "#00b3ff";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        var guild = CurrentApplication.TargetGuild;
+
+        boundariesMissing = BoosterColorService.GetBoundaries(guild) == null;
+
+        textChannels = guild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+
+        panelChannelId = await BoosterColorService.GetPanelChannelIdAsync();
+        embedTitle = await BoosterColorService.GetEmbedTitleAsync();
+        embedDescription = await BoosterColorService.GetEmbedDescriptionAsync();
+        enabled = await BoosterColorService.GetEnabledAsync();
+        bypassEligibility = await BoosterColorService.GetBypassEligibilityAsync();
+
+        LoadColorRoles(guild);
+    }
+
+    private void LoadColorRoles(DiscordGuild guild)
+    {
+        colorRoles = BoosterColorService.GetColorRoles(guild)
+            .Select(r =>
+            {
+                var secondary = r.Colors?.SecondaryColor;
+                return new ColorRoleVm
+                {
+                    Id = r.Id,
+                    Name = r.Name,
+                    Hex = HexOf(r.Color),
+                    Gradient = secondary.HasValue,
+                    SecondaryHex = secondary.HasValue ? HexOf(secondary.Value) : "#00b3ff",
+                    MemberCount = guild.Members.Values.Count(m => m.Roles.Any(mr => mr.Id == r.Id))
+                };
+            })
+            .ToList();
+    }
+
+    private async Task SaveSettings()
+    {
+        await BoosterColorService.SetEmbedTitleAsync(embedTitle);
+        await BoosterColorService.SetEmbedDescriptionAsync(embedDescription);
+        await BoosterColorService.SetEnabledAsync(enabled);
+        await BoosterColorService.SetBypassEligibilityAsync(bypassEligibility);
+        BoosterColorPanelCommands.QueueRefreshPanel();
+        statusMessage = "Einstellungen gespeichert.";
+    }
+
+    private async Task SendPanel()
+    {
+        if (panelChannelId == 0)
+        {
+            statusMessage = "Bitte zuerst einen Panel-Channel wählen.";
+            return;
+        }
+
+        try
+        {
+            await BoosterColorPanelCommands.SendPanelToChannelAsync(panelChannelId);
+            statusMessage = "Panel wurde gesendet.";
+        }
+        catch (Exception e)
+        {
+            statusMessage = $"Fehler beim Senden des Panels: {e.Message}";
+        }
+    }
+
+    private async Task RefreshPanel()
+    {
+        await BoosterColorPanelCommands.RefreshPanel();
+        statusMessage = "Panel wird aktualisiert.";
+    }
+
+    private async Task CreateRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRoleName))
+        {
+            statusMessage = "Bitte einen Namen angeben.";
+            return;
+        }
+
+        var guild = CurrentApplication.TargetGuild;
+
+        // Step 1: create the role.
+        DiscordRole role;
+        try
+        {
+            var color = new DiscordColor(newRoleHex.TrimStart('#'));
+            role = await guild.CreateRoleAsync(newRoleName.Trim(), color: color, mentionable: false,
+                reason: "Booster color role created via WebUI");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to create role");
+            statusMessage = $"Fehler beim Anlegen der Rolle: {DescribeError(e)}";
+            return;
+        }
+
+        // Step 1b: optionally apply a gradient (two color blend). Requires the guild to support enhanced role colors.
+        var colorWarning = "";
+        if (newRoleGradient)
+        {
+            try
+            {
+                await ApplyColorsAsync(role, newRoleHex, true, newRoleSecondaryHex);
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e, "BoosterColors: failed to apply gradient");
+                colorWarning =
+                    $" Gradient konnte nicht gesetzt werden ({DescribeError(e)}). Gradients brauchen ein ausreichendes Server-Boost-Level.";
+            }
+        }
+
+        // Step 2: position it between the boundaries (separate so a hierarchy issue does not look like a create failure).
+        var positionWarning = "";
+        var boundaries = BoosterColorService.GetBoundaries(guild);
+        if (boundaries != null)
+        {
+            try
+            {
+                var low = Math.Min(boundaries.Value.begin.Position, boundaries.Value.end.Position);
+                var botTop = guild.CurrentMember.Roles.Any()
+                    ? guild.CurrentMember.Roles.Max(r => r.Position)
+                    : 0;
+                var targetPosition = low + 1;
+
+                // The bot can never move a role to or above its own highest role.
+                if (botTop > 0 && targetPosition >= botTop)
+                    positionWarning =
+                        " Achtung: Die Bot-Rolle steht nicht über den Boundary-Rollen, daher konnte die Rolle nicht korrekt einsortiert werden. Verschiebe die Bot-Rolle über BEGIN_BOOSTERCOLOR.";
+                else
+                    await role.ModifyPositionAsync(targetPosition, "Place booster color between boundaries");
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e, "BoosterColors: failed to position role");
+                positionWarning = $" Positionierung fehlgeschlagen: {DescribeError(e)}";
+            }
+        }
+        else
+        {
+            positionWarning = " Boundary-Rollen fehlen, die Rolle wurde nicht einsortiert.";
+        }
+
+        await BoosterColorService.SyncEmojiAsync(role);
+        BoosterColorPanelCommands.QueueRefreshPanel();
+
+        newRoleName = "";
+        newRoleHex = "#9f00ff";
+        newRoleGradient = false;
+        newRoleSecondaryHex = "#00b3ff";
+        statusMessage = $"Farbrolle '{role.Name}' wurde angelegt.{positionWarning}{colorWarning}";
+        LoadColorRoles(guild);
+    }
+
+    /// <summary>
+    ///     Applies a solid or gradient color to a role. Gradient sets a secondary color (blend), solid clears it.
+    /// </summary>
+    private static async Task ApplyColorsAsync(DiscordRole role, string primaryHex, bool gradient, string secondaryHex)
+    {
+        var primary = new DiscordColor(primaryHex.TrimStart('#'));
+        if (gradient)
+        {
+            var secondary = new DiscordColor(secondaryHex.TrimStart('#'));
+            await role.ModifyAsync(m =>
+            {
+                m.Colors = new DiscordRoleColors
+                {
+                    PrimaryColor = primary,
+                    SecondaryColor = secondary
+                };
+            });
+        }
+        else
+        {
+            await role.ModifyAsync(m =>
+            {
+                m.Colors = new DiscordRoleColors
+                {
+                    PrimaryColor = primary,
+                    SecondaryColor = null
+                };
+            });
+        }
+    }
+
+    private static string PreviewBackground(ColorRoleVm role)
+    {
+        return role.Gradient
+            ? $"linear-gradient(90deg, {role.Hex}, {role.SecondaryHex})"
+            : role.Hex;
+    }
+
+    private static string DescribeError(Exception e)
+    {
+        switch (e)
+        {
+            case DisCatSharp.Exceptions.BadRequestException bre:
+                return $"BadRequest (Code {bre.Code}): {bre.JsonMessage} {bre.Errors}".Trim();
+            case DisCatSharp.Exceptions.UnauthorizedException ue:
+                return
+                    $"Keine Berechtigung: {ue.JsonMessage}. Der Bot braucht 'Rollen verwalten' und muss in der Rollen-Hierarchie über den Boundary-Rollen stehen.";
+            default:
+                return e.Message;
+        }
+    }
+
+    private async Task SaveRole(ColorRoleVm vm)
+    {
+        var guild = CurrentApplication.TargetGuild;
+        try
+        {
+            var role = guild.GetRole(vm.Id);
+            if (role == null)
+            {
+                statusMessage = "Rolle nicht gefunden.";
+                return;
+            }
+
+            await role.ModifyAsync(name: vm.Name, reason: "Booster color role edited via WebUI");
+            await ApplyColorsAsync(role, vm.Hex, vm.Gradient, vm.SecondaryHex);
+            await BoosterColorService.SyncEmojiAsync(guild.GetRole(vm.Id));
+            BoosterColorPanelCommands.QueueRefreshPanel();
+            statusMessage = $"Farbrolle '{vm.Name}' wurde gespeichert.";
+            LoadColorRoles(guild);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to save role");
+            statusMessage = $"Fehler beim Speichern: {DescribeError(e)}";
+        }
+    }
+
+    private async Task DeleteRole(ColorRoleVm vm)
+    {
+        var guild = CurrentApplication.TargetGuild;
+        try
+        {
+            var role = guild.GetRole(vm.Id);
+            if (role != null)
+                await role.DeleteAsync("Booster color role deleted via WebUI");
+            await BoosterColorService.DeleteEmojiAsync(vm.Id);
+            BoosterColorPanelCommands.QueueRefreshPanel();
+            statusMessage = $"Farbrolle '{vm.Name}' wurde gelöscht.";
+            LoadColorRoles(guild);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete role");
+            statusMessage = $"Fehler beim Löschen: {DescribeError(e)}";
+        }
+    }
+
+    private static string HexOf(DiscordColor c)
+    {
+        return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+    }
+
+    private sealed class ColorRoleVm
+    {
+        public ulong Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Hex { get; set; } = "#000000";
+        public bool Gradient { get; set; }
+        public string SecondaryHex { get; set; } = "#00b3ff";
+        public int MemberCount { get; set; }
+    }
+}
