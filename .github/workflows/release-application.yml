@@ -41,7 +41,7 @@ jobs:
       new_tag: ${{ steps.taggen.outputs.new_tag }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -126,7 +126,7 @@ jobs:
     if: always() && needs.patch-build-release.result == 'success' && github.event.inputs.skip_docker == 'false'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
