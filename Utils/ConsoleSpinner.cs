@@ -1,11 +1,13 @@
 ﻿public class ConsoleSpinner
 {
     private readonly Task _task;
+    private readonly bool _enabled;
     private bool _active;
     private int _counter;
 
     public ConsoleSpinner()
     {
+        _enabled = !Console.IsOutputRedirected;
         _task = Task.Run(() => Spin());
     }
 
@@ -23,6 +25,9 @@
 
     private void Spin()
     {
+        if (!_enabled)
+            return;
+
         while (_active)
         {
             switch (_counter % 4)
