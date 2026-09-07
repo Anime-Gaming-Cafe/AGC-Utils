@@ -1,4 +1,4 @@
-#region
+﻿#region
 
 using System.Globalization;
 using System.Reflection;
@@ -155,10 +155,16 @@ public static class ToolSet
         return member.Username;
     }
 
-    public static ulong GetUserIdFromHttpContext(HttpContext context)
+    public static ulong GetUserIdFromHttpContext(HttpContext? context)
+        => GetUserIdFromPrincipal(context?.User);
+
+    /// <summary>
+    ///     Variant for Blazor components: the HttpContext is null there outside of the prerender,
+    ///     the ClaimsPrincipal comes from the cascading AuthenticationState instead.
+    /// </summary>
+    public static ulong GetUserIdFromPrincipal(ClaimsPrincipal? principal)
     {
-        var claimsIdentity = context.User.Identity as ClaimsIdentity;
-        var userId = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return Convert.ToUInt64(userId);
     }
 

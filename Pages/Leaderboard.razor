@@ -2,17 +2,15 @@
 @using AGC_Management.Entities.Web
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
-@inject IHttpContextAccessor HttpContextAccessor
-
 @if (LevelUtils.LeaderboardDataLoaded)
 {
     <div class="leaderboard-container">
         <h3>Leaderboard</h3>
         <div class="leaderboard">
             @* Add a separate card for the current user at the top of the leaderboard *@
-            @if (LevelUtils.cachedLeaderboardData.Any(item => item.UserId == ToolSet.GetUserIdFromHttpContext(HttpContextAccessor.HttpContext)))
+            @if (LevelUtils.cachedLeaderboardData.Any(item => item.UserId == ToolSet.GetUserIdFromPrincipal(_principal)))
             {
-                var currentUser = LevelUtils.cachedLeaderboardData.First(item => item.UserId == ToolSet.GetUserIdFromHttpContext(HttpContextAccessor.HttpContext));
+                var currentUser = LevelUtils.cachedLeaderboardData.First(item => item.UserId == ToolSet.GetUserIdFromPrincipal(_principal));
                 <div class="leaderboard-item selfyou">
                     <div class="rank">
                         <span class="rank-number">@currentUser.Rank</span>
@@ -78,6 +76,9 @@ else
 
 @code {
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+
     private List<WebLeaderboardData> currentPageData = new();
     private const int ItemsPerPage = 25;
     private int currentPage = 1;
@@ -87,6 +88,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _principal = AuthState is null ? null : (await AuthState).User;
+
         await LoadPage(currentPage);
     }
 
@@ -121,7 +124,7 @@ else
 
     private bool IsCurrentUser(ulong userId)
     {
-        return userId == ToolSet.GetUserIdFromHttpContext(HttpContextAccessor.HttpContext);
+        return userId == ToolSet.GetUserIdFromPrincipal(_principal);
     }
 
 

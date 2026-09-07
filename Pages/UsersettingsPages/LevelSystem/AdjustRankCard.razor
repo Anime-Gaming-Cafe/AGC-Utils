@@ -4,7 +4,6 @@
 @using AGC_Management.Utils
 @using SkiaSharp
 @inject UserService UserService
-@inject IHttpContextAccessor httpContextAccessor
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
 @if (loaded)
@@ -82,6 +81,9 @@ else
 
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+
     private bool loaded;
 
     private string imageToInstall = "";
@@ -174,7 +176,7 @@ else
 
     private async Task ResetCard()
     {
-        var userId = ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString());
+        var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand();
         cmd.CommandText = @"DELETE FROM userrankcardsettings WHERE userid = @userid";
@@ -186,7 +188,7 @@ else
 
     private async Task SaveSettings()
     {
-        var userId = ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString());
+        var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         if (!string.IsNullOrWhiteSpace(imageToInstall) && hasImageChanged)
         {
             bool isActivated = false;
@@ -295,6 +297,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _principal = AuthState is null ? null : (await AuthState).User;
+
         await RetrieveCurrentSettings();
         await RenderPage();
         loaded = true;
@@ -326,8 +330,7 @@ else
     {
         if (hasPreviewData)
         {
-            var context = httpContextAccessor.HttpContext;
-            var currentuserid = UserService.GetUserId(context);
+            var currentuserid = UserService.GetUserId(_principal);
             var user = await CurrentApplication.DiscordClient.GetUserAsync(ulong.Parse(currentuserid.ToString()));
             var rank = await LevelUtils.GetRank(user.Id);
             var level = rank[user.Id].Level;
@@ -402,8 +405,7 @@ else
 
     private async Task<string> RetrieveRankCardForCurrentUser()
     {
-        var context = httpContextAccessor.HttpContext;
-        var currentuserid = UserService.GetUserId(context);
+        var currentuserid = UserService.GetUserId(_principal);
         var user = await CurrentApplication.DiscordClient.GetUserAsync(ulong.Parse(currentuserid.ToString()));
         var rank = await LevelUtils.GetRank(user.Id);
         var level = rank[user.Id].Level;
@@ -425,7 +427,7 @@ else
 
     private async Task<string> RetrieveCurrentImageforCurrentUser()
     {
-        var userId = ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString());
+        var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         var i = await ImageUtils.HasCustomRankCardSettings(userId);
         if (i)
         {
@@ -445,9 +447,9 @@ else
 
     private async Task RetrieveCurrentSettings()
     {
-        bool hs = await ImageUtils.HasCustomRankCardSettings(ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString()));
+        bool hs = await ImageUtils.HasCustomRankCardSettings(ulong.Parse(UserService.GetUserId(_principal).ToString()));
         hasCustomRankCardSettings = hs;
-        var userId = ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString());
+        var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         var settings = await ImageUtils.GetCustomRankCardSettings(userId);
         if (settings != null)
         {

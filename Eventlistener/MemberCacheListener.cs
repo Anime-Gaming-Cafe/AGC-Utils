@@ -6,6 +6,10 @@ using AGC_Management.Services;
 
 namespace AGC_Management.Eventlistener;
 
+/// <summary>
+///     GUILD_CREATE wipes the guild's member cache. That happens on startup and after every
+///     reconnect, so the cache is rebuilt at exactly that point.
+/// </summary>
 [EventHandler]
 public class MemberCacheListener : BaseCommandModule
 {

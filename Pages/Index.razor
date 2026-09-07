@@ -1,7 +1,6 @@
 ﻿@page "/"
 @using AGC_Management.Entities.Web
 @using AGC_Management.Controller
-@inject IHttpContextAccessor httpContextAccessor
 @inject UserService userService
 @inject NavigationManager NavigationManager
 
@@ -16,7 +15,7 @@
     </div>
 </AuthorizeView>
 
-@if (!userService.IsAuthenticated(httpContextAccessor.HttpContext))
+@if (initialized && !isAuthenticated)
 {
     <div class="alert alert-warning-glass" role="alert">
         Nicht angemeldet! Bitte <a href="/login">anmelden</a>
@@ -27,20 +26,31 @@
 @code {
     private DiscordUserWebClaim claim;
     private string username = "";
+    private bool isAuthenticated;
+    private bool initialized;
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var userid = userService.GetUserId(httpContextAccessor.HttpContext);
-            var user = await CurrentApplication.DiscordClient.GetUserAsync(userid.Value);
-            username = user.Username;
+            var principal = AuthState is null ? null : (await AuthState).User;
+            isAuthenticated = userService.IsAuthenticated(principal);
+
+            var userid = userService.GetUserId(principal);
+            if (userid is not null)
+            {
+                var user = await CurrentApplication.DiscordClient.GetUserAsync(userid.Value);
+                username = user.Username;
+            }
         }
         catch (Exception)
         {
             // ignored
         }
+
+        initialized = true;
     }
 
 }

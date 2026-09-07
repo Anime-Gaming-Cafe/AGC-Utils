@@ -2,7 +2,6 @@
 @using AGC_Management.Controller
 @using AGC_Management.Utils
 @inject UserService UserService
-@inject IHttpContextAccessor httpContextAccessor
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
 @if (loaded)
@@ -39,19 +38,23 @@ else
 
 @code
 {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+
     private bool loaded;
     private bool pingActive;
 
 
     private ulong GetUserId()
     {
-        var context = httpContextAccessor.HttpContext;
-        var currentuserid = UserService.GetUserId(context!).ToString();
+        var currentuserid = UserService.GetUserId(_principal).ToString();
         return ulong.Parse(currentuserid!);
     }
 
     protected override async Task OnInitializedAsync()
     {
+        _principal = AuthState is null ? null : (await AuthState).User;
+
         pingActive = await LevelUtils.IsLevelUpPingEnabled(GetUserId());
         loaded = true;
     }

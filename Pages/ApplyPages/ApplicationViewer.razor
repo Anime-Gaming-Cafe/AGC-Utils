@@ -2,7 +2,6 @@
 @using AGC_Management.Entities
 @using AGC_Management.Controller
 @using AGC_Management.Utils
-@inject IHttpContextAccessor HttpContextAccessor
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
@@ -98,6 +97,9 @@ else if (!found && loaded)
 
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+
     [Parameter] public string applicationid { get; set; }
     private bool found;
     private bool loaded;
@@ -277,10 +279,12 @@ else if (!found && loaded)
 
     protected override async Task OnInitializedAsync()
     {
+        _principal = AuthState is null ? null : (await AuthState).User;
+
         await LoadApplication();
         await Task.Delay(1000);
         loaded = true;
-        var userid = UserService.GetUserId(HttpContextAccessor.HttpContext);
+        var userid = UserService.GetUserId(_principal);
         if (userid != null)
         {
             await AddCurrentUserToSeenByIfNotAlready((long)userid);

@@ -1,12 +1,11 @@
-@using AGC_Management.Controller
-@inject IHttpContextAccessor httpContextAccessor
+﻿@using AGC_Management.Controller
 @inject UserService usrSvc
 
 @if (initialized)
 {
     <div class="top-row ps-3 navbar navbar-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="">@CurrentApplication.TargetGuild.NameWithRemovedRegionSuffix()</a>
+            <a class="navbar-brand" href="">@(CurrentApplication.TargetGuild?.NameWithRemovedRegionSuffix() ?? "Dashboard")</a>
             <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -17,6 +16,8 @@
         <nav class="flex-column">
             <AuthorizeView>
                 <Authorized>
+                    @if (user is not null)
+                    {
                     <div class="nav-item dropdown px-3">
                         <a class="nav-link dropdown-toggle" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
                             <img src="@user.AvatarUrl" class="nav-profile-pic" alt=""/>
@@ -38,6 +39,7 @@
 
                         </ul>
                     </div>
+                    }
                 </Authorized>
                 <NotAuthorized>
                     <div class="nav-item px-3">
@@ -120,9 +122,17 @@
     private bool initialized = false;
 
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-        userId = usrSvc.GetUserId(httpContextAccessor.HttpContext);
+        userId = AuthState is null ? null : usrSvc.GetUserId((await AuthState).User);
+
+        if (userId is null)
+        {
+            initialized = true;
+            return;
+        }
 
         try
         {

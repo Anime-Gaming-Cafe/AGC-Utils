@@ -12,17 +12,32 @@ public class UserService
 {
     private static readonly HttpClient client = new();
 
-    public bool IsAuthenticated(HttpContext httpContext)
+    public bool IsAuthenticated(ClaimsPrincipal? principal)
     {
-        return httpContext.User.Identity.IsAuthenticated;
+        return principal?.Identity?.IsAuthenticated ?? false;
     }
 
-    public ulong? GetUserId(HttpContext httpContext)
+    /// <summary>
+    ///     Only usable from MVC / Razor Pages. Inside Blazor components the HttpContext is null
+    ///     outside of the prerender, use the ClaimsPrincipal overload there.
+    /// </summary>
+    public bool IsAuthenticated(HttpContext? httpContext)
     {
-        if (!httpContext.User.Identity.IsAuthenticated) return null;
+        return this.IsAuthenticated(httpContext?.User);
+    }
 
-        var claims = httpContext.User.Claims;
-        return ulong.Parse(claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value);
+    public ulong? GetUserId(ClaimsPrincipal? principal)
+    {
+        if (!this.IsAuthenticated(principal)) return null;
+
+        var claim = principal!.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier);
+        return claim is null ? null : ulong.Parse(claim.Value);
+    }
+
+    /// <inheritdoc cref="IsAuthenticated(HttpContext)" />
+    public ulong? GetUserId(HttpContext? httpContext)
+    {
+        return this.GetUserId(httpContext?.User);
     }
 
 
@@ -32,10 +47,18 @@ public class UserService
     /// <param name="httpContext"></param>
     /// <returns></returns>
     public async Task<DiscordUserWebClaim> GetInfo(HttpContext httpContext)
-    {
-        if (!httpContext.User.Identity.IsAuthenticated) return null;
+        => await this.GetInfo(httpContext?.User);
 
-        var claims = httpContext.User.Claims;
+    /// <summary>
+    ///     Parses the user's discord claim for their `identify` information
+    /// </summary>
+    /// <param name="principal"></param>
+    /// <returns></returns>
+    public async Task<DiscordUserWebClaim> GetInfo(ClaimsPrincipal? principal)
+    {
+        if (!this.IsAuthenticated(principal)) return null;
+
+        var claims = principal!.Claims;
         bool? verified;
         if (bool.TryParse(claims.FirstOrDefault(x => x.Type == "urn:discord:verified")?.Value, out var _verified))
             verified = _verified;

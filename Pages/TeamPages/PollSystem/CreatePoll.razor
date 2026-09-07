@@ -1,6 +1,5 @@
 ﻿@page "/teamarea/pollsystem/createpoll"
 @inject UserService UserService
-@inject IHttpContextAccessor httpContextAccessor
 @using ValidationSummary = Microsoft.AspNetCore.Components.Forms.ValidationSummary
 @using AGC_Management.Enums.PollSystem
 @using AGC_Management.Controller
@@ -81,12 +80,17 @@
 </div>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+
     private readonly PollItem pollItem = new();
     private ulong userId;
     private HashSet<DiscordChannel> channels = new();
 
     protected override async Task OnInitializedAsync()
     {
+        _principal = AuthState is null ? null : (await AuthState).User;
+
         HashSet<DiscordChannel> _channels = new();
         foreach (var ch in CurrentApplication.TargetGuild.Channels.Values)
         {
@@ -97,7 +101,7 @@
         }
 
         channels = _channels;
-        userId = ulong.Parse(UserService.GetUserId(httpContextAccessor.HttpContext).ToString());
+        userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         pollItem.CreatorId = userId;
         pollItem.Options = new List<PollOption> { new() };
         StateHasChanged();

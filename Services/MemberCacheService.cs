@@ -6,6 +6,13 @@ using AGC_Management.Utils;
 
 namespace AGC_Management.Services;
 
+/// <summary>
+///     Keeps the member cache of the target guild populated.
+///     Discord only ships a handful of members in GUILD_CREATE (large_threshold, 250 at most) and
+///     DisCatSharp wipes <c>guild.Members</c> on every GUILD_CREATE before writing the payload into it.
+///     READY additionally swaps out all guild objects. So the cache has to be rebuilt after every
+///     (re)connect, not just once on startup.
+/// </summary>
 public static class MemberCacheService
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
@@ -13,6 +20,9 @@ public static class MemberCacheService
 
     public static ulong TargetGuildId => ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
 
+    /// <summary>
+    ///     Safety net in case a refresh is missed. The actual trigger is GuildAvailable.
+    /// </summary>
     public static Task StartPeriodicRefresh(DiscordClient client, ulong guildId)
     {
         return Task.Run(async () =>
@@ -25,6 +35,10 @@ public static class MemberCacheService
         });
     }
 
+    /// <summary>
+    ///     Loads all members of the guild into the cache. Only ever runs once at a time, additional
+    ///     triggers while a download is in flight are dropped.
+    /// </summary>
     public static async Task RefreshAsync(DiscordClient client, ulong guildId, string reason)
     {
         if (!await Gate.WaitAsync(TimeSpan.Zero))
@@ -39,8 +53,8 @@ public static class MemberCacheService
                 ? cached
                 : await client.GetGuildAsync(guildId);
 
-            // READY ersetzt alle gecachten Guild-Objekte. Die Globals müssen deshalb auf die
-            // aktuelle Instanz zeigen, sonst lesen alle .Members-Zugriffe darauf einen toten Cache.
+            // READY replaces every cached guild object, so the globals have to point at the live
+            // instance again - otherwise everything reading .Members off them sees a dead cache.
             GlobalProperties.AGCGuild = guild;
             CurrentApplication.TargetGuild = guild;
 
@@ -68,6 +82,10 @@ public static class MemberCacheService
         }
     }
 
+    /// <summary>
+    ///     Requests all members over the gateway (OP 8). Considerably cheaper than the REST pagination
+    ///     since the chunks arrive over the existing socket and do not consume a rate limit.
+    /// </summary>
     private static async Task<bool> RequestViaGatewayAsync(DiscordClient client, DiscordGuild guild, int expected)
     {
         var nonce = Guid.NewGuid().ToString("N");
@@ -91,6 +109,7 @@ public static class MemberCacheService
         {
             await guild.RequestMembersAsync("", 0, true, nonce: nonce);
 
+            // Discord sends 1000 members per chunk, a few seconds per chunk is plenty.
             var timeout = TimeSpan.FromSeconds(Math.Clamp(expected / 1000 * 5, 60, 600));
             return await Task.WhenAny(completion.Task, Task.Delay(timeout)) == completion.Task;
         }
