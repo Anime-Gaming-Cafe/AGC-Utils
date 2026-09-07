@@ -139,10 +139,12 @@ public class DiscordBotService : IHostedService
         Client = discord;
 
         _ = StartTasks(discord);
-        _ = UpdateGuild(discord);
 
-        CurrentApplication.TargetGuild =
-            await discord.GetGuildAsync(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]));
+        var targetGuildId = MemberCacheService.TargetGuildId;
+        CurrentApplication.TargetGuild = await discord.GetGuildAsync(targetGuildId);
+        GlobalProperties.AGCGuild = CurrentApplication.TargetGuild;
+
+        _ = MemberCacheService.StartPeriodicRefresh(discord, targetGuildId);
 
         IsReady = true;
     }
@@ -302,55 +304,6 @@ public class DiscordBotService : IHostedService
             int commandStart = message.GetStringPrefixLength(prefix);
             return commandStart;
         });
-    }
-
-    private static async Task UpdateGuild(DiscordClient client)
-    {
-        await Task.Delay(TimeSpan.FromSeconds(5));
-        var guildId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
-        while (true)
-        {
-            try
-            {
-                var guild = client.Guilds.TryGetValue(guildId, out var cached)
-                    ? cached
-                    : await client.GetGuildAsync(guildId);
-
-                GlobalProperties.AGCGuild = guild;
-
-                var expected = guild.MemberCount;
-                CurrentApplication.Logger.Information($"Starting member download ({expected} members expected)...");
-
-                var received = 0;
-
-                Task ProgressHandler(DiscordClient s, GuildMembersChunkEventArgs e)
-                {
-                    if (e.Guild.Id != guild.Id) return Task.CompletedTask;
-                    var total = Interlocked.Add(ref received, e.Members.Count);
-                    CurrentApplication.Logger.Information(
-                        $"Member download progress: chunk {e.ChunkIndex + 1}/{e.ChunkCount}, {total}/{expected} members.");
-                    return Task.CompletedTask;
-                }
-
-                client.GuildMembersChunked += ProgressHandler;
-                try
-                {
-                    var members = await guild.GetAllMembersAsync();
-                    CurrentApplication.Logger.Information(
-                        $"Member download complete: received {members.Count} members, cache now holds {guild.Members.Count}.");
-                }
-                finally
-                {
-                    client.GuildMembersChunked -= ProgressHandler;
-                }
-            }
-            catch (Exception ex)
-            {
-                CurrentApplication.Logger.Error(ex, "Member download failed");
-            }
-
-            await Task.Delay(TimeSpan.FromMinutes(30));
-        }
     }
 
     private static async Task Discord_ClientErrored(DiscordClient sender, ClientErrorEventArgs e)
