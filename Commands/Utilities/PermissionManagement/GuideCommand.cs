@@ -4,8 +4,6 @@ using AGC_Management.Attributes;
 using AGC_Management.Utils;
 using DisCatSharp.ApplicationCommands.Attributes;
 using DisCatSharp.ApplicationCommands.Context;
-using DisCatSharp.Interactivity.Entities;
-using DisCatSharp.Interactivity.Enums;
 using DisCatSharp.Interactivity.Extensions;
 
 #endregion
@@ -195,21 +193,85 @@ public partial class PermissionManagement
     [SlashCommand("guide", "Erklärt das Extra Permission System mit Beispielen")]
     public static async Task Guide(InteractionContext ctx)
     {
-        var pages = GuideChapters.Select((chapter, index) => new Page
+        const string selectId = "guide-chapter-select";
+        const string prevId = "guide-prev";
+        const string nextId = "guide-next";
+        var lastIndex = GuideChapters.Length - 1;
+
+        DiscordEmbedBuilder BuildEmbed(int index)
         {
-            Embed = new DiscordEmbedBuilder
+            var (title, body) = GuideChapters[index];
+            return new DiscordEmbedBuilder
             {
-                Title = chapter.Title,
-                Description = chapter.Body,
+                Title = title,
+                Description = body,
                 Color = BotConfig.GetEmbedColor(),
                 Footer = new DiscordEmbedBuilder.EmbedFooter
                 {
-                    Text = $"Seite {index + 1}/{GuideChapters.Length} · /permissionmanagement guide"
+                    Text = $"Kapitel {index + 1}/{GuideChapters.Length} · /permissionmanagement guide"
                 }
-            }
-        }).ToList();
+            };
+        }
 
-        await ctx.Interaction.SendPaginatedResponseAsync(false, false, ctx.User, pages,
-            behaviour: PaginationBehaviour.Ignore, deletion: ButtonPaginationBehavior.Disable);
+        List<DiscordActionRowComponent> BuildRows(int selected, bool disabled = false)
+        {
+            var options = GuideChapters.Select((chapter, index) => new DiscordStringSelectComponentOption(
+                $"{index + 1}. {chapter.Title}", index.ToString(), isDefault: index == selected)).ToList();
+            var select = new DiscordStringSelectComponent("Kapitel wählen", options, selectId, disabled: disabled);
+            var prev = new DiscordButtonComponent(ButtonStyle.Secondary, prevId, "◀ Zurück",
+                disabled || selected == 0);
+            var next = new DiscordButtonComponent(ButtonStyle.Secondary, nextId, "Weiter ▶",
+                disabled || selected == lastIndex);
+            return
+            [
+                new DiscordActionRowComponent([select]),
+                new DiscordActionRowComponent([prev, next])
+            ];
+        }
+
+        var currentIndex = 0;
+        await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder()
+                .AddEmbed(BuildEmbed(currentIndex))
+                .AddComponents(BuildRows(currentIndex)));
+
+        var message = await ctx.Interaction.GetOriginalResponseAsync();
+        var interactivity = ctx.Client.GetInteractivity();
+
+        while (true)
+        {
+            var timeout = TimeSpan.FromMinutes(5);
+            var selectTask = interactivity.WaitForSelectAsync(message, ctx.User, selectId,
+                ComponentType.StringSelect, timeout);
+            var buttonTask = interactivity.WaitForButtonAsync(message, ctx.User, timeout);
+            await Task.WhenAny(selectTask, buttonTask);
+
+            ComponentInteractionCreateEventArgs interaction;
+            if (selectTask.IsCompletedSuccessfully && !selectTask.Result.TimedOut)
+            {
+                var result = selectTask.Result;
+                interaction = result.Result;
+                currentIndex = int.Parse(interaction.Values.First());
+            }
+            else if (buttonTask.IsCompletedSuccessfully && !buttonTask.Result.TimedOut)
+            {
+                var result = buttonTask.Result;
+                interaction = result.Result;
+                if (interaction.Id == prevId) currentIndex = Math.Max(0, currentIndex - 1);
+                else if (interaction.Id == nextId) currentIndex = Math.Min(lastIndex, currentIndex + 1);
+            }
+            else
+            {
+                await ctx.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder()
+                    .AddEmbed(BuildEmbed(currentIndex))
+                    .AddComponents(BuildRows(currentIndex, true)));
+                return;
+            }
+
+            await interaction.Interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage,
+                new DiscordInteractionResponseBuilder()
+                    .AddEmbed(BuildEmbed(currentIndex))
+                    .AddComponents(BuildRows(currentIndex)));
+        }
     }
 }
