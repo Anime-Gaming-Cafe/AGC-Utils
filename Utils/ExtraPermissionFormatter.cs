@@ -140,7 +140,7 @@ public static class ExtraPermissionFormatter
                 _ => ""
             };
 
-            var expiry = s.MemberState.ExpiresAt > 0 ? $" — {DescribeExpiry(s.MemberState)}" : "";
+            var expiry = s.MemberState.ExpiresAt > 0 ? $" - {DescribeExpiry(s.MemberState)}" : "";
             var icon = s.HasRole ? "✅" : "❌";
 
             return $"{icon} **{s.Permission.DisplayName}** ``{s.Permission.PermName}``{manual}{expiry}";

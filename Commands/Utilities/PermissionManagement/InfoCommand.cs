@@ -44,7 +44,7 @@ public partial class Perms
             var modeText = string.IsNullOrEmpty(mode) ? "" : $" · {mode}";
             var fired = s.MemberState.TriggerFired ? " · bereits ausgelöst" : "";
 
-            var block = $"**{s.Permission.DisplayName}** ``{s.Permission.PermName}`` — {roleText}{modeText}{fired}\n" +
+            var block = $"**{s.Permission.DisplayName}** ``{s.Permission.PermName}`` - {roleText}{modeText}{fired}\n" +
                         $"Status: {ExtraPermissionFormatter.DescribeStatus(s)}\n" +
                         $"Bedingungen:\n{ExtraPermissionFormatter.DescribeConditions(s.Permission, "> ")}\n" +
                         $"Rolle auf dem Mitglied: {(s.HasRole ? "ja" : "nein")}";
