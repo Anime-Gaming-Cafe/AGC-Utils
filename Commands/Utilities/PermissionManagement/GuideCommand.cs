@@ -16,7 +16,7 @@ public partial class PermissionManagement
 {
     private static readonly (string Title, string Body)[] GuideChapters =
     [
-        ("Extra Permissions in einem Satz",
+        ("Extra Permissions Guide",
             "Eine **Extra Permission** vergibt eine Rolle automatisch, sobald ein Mitglied die hinterlegten " +
             "Bedingungen erfüllt.\n\n" +
             "Geprüft wird, sobald jemand dem Server beitritt, eine Rolle bekommt oder verliert, den Boost " +
