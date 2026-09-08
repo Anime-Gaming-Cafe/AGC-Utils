@@ -10,9 +10,9 @@ using DisCatSharp.Exceptions;
 
 #endregion
 
-namespace AGC_Management.Commands.PermissionManagement;
+namespace AGC_Management.Commands.Perms;
 
-public partial class PermissionManagement
+public partial class Perms
 {
     [ApplicationCommandRequireModerationTeam]
     [SlashCommand("info", "Zeigt die Extra Permissions eines Mitglieds")]

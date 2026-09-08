@@ -6,9 +6,9 @@ using DisCatSharp.ApplicationCommands.Context;
 
 #endregion
 
-namespace AGC_Management.Commands.PermissionManagement;
+namespace AGC_Management.Commands.Perms;
 
-public partial class PermissionManagement
+public partial class Perms
 {
     [ApplicationCommandRequirePermissions(Permissions.Administrator)]
     [SlashCommand("settings", "Globale Einstellungen der Extra Permissions")]
@@ -27,6 +27,6 @@ public partial class PermissionManagement
             new DiscordInteractionResponseBuilder()
                 .WithContent($"{prefix}**Auto-Revoke bei Verlust der Bedingung:** {(current ? "an" : "aus")}\n" +
                              "Gilt für alle Permissions mit ``auto-revoke: Inherit``. Einzelne Permissions " +
-                             "können das über ``/permissionmanagement edit-permission-role`` überschreiben."));
+                             "können das über ``/perms edit-permission-role`` überschreiben."));
     }
 }

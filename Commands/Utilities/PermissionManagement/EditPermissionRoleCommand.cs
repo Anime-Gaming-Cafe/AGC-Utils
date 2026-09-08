@@ -8,9 +8,9 @@ using DisCatSharp.ApplicationCommands.Context;
 
 #endregion
 
-namespace AGC_Management.Commands.PermissionManagement;
+namespace AGC_Management.Commands.Perms;
 
-public partial class PermissionManagement
+public partial class Perms
 {
     [ApplicationCommandRequirePermissions(Permissions.Administrator)]
     [SlashCommand("edit-permission-role", "Bearbeitet eine bestehende Extra Permission")]

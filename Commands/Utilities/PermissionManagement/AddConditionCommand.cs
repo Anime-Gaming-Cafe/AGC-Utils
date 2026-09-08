@@ -8,9 +8,9 @@ using DisCatSharp.ApplicationCommands.Context;
 
 #endregion
 
-namespace AGC_Management.Commands.PermissionManagement;
+namespace AGC_Management.Commands.Perms;
 
-public partial class PermissionManagement
+public partial class Perms
 {
     [ApplicationCommandRequirePermissions(Permissions.Administrator)]
     [SlashCommand("add-condition", "Fügt einer Permission eine Bedingung hinzu")]

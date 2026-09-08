@@ -11,11 +11,11 @@ using DisCatSharp.Exceptions;
 
 #endregion
 
-namespace AGC_Management.Commands.PermissionManagement;
+namespace AGC_Management.Commands.Perms;
 
-[SlashCommandGroup("permissionmanagement", "Verwaltung der Extra Permissions",
+[SlashCommandGroup("Perms", "Verwaltung der Extra Permissions",
     (long)Permissions.ModerateMembers)]
-public partial class PermissionManagement : ApplicationCommandsModule
+public partial class Perms : ApplicationCommandsModule
 {
     private static readonly ExtraPermissionConditionType[] ValueConditions =
     [
