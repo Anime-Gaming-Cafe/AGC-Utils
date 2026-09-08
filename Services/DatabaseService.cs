@@ -260,6 +260,30 @@ public static class DatabaseService
             {
                 "botsettings",
                 "CREATE TABLE IF NOT EXISTS botsettings (section TEXT, key TEXT, value TEXT, PRIMARY KEY (section, key))"
+            },
+            {
+                "extra_permissions",
+                "CREATE TABLE IF NOT EXISTS extra_permissions (permname TEXT PRIMARY KEY, displayname TEXT, description TEXT, roleid BIGINT, trigger_type TEXT DEFAULT 'none', trigger_value BIGINT DEFAULT 0, trigger_mode TEXT DEFAULT 'recurring', auto_revoke TEXT DEFAULT 'inherit', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "extra_permission_members",
+                "CREATE TABLE IF NOT EXISTS extra_permission_members (userid BIGINT, permname TEXT, state TEXT DEFAULT 'auto', expires_at BIGINT DEFAULT 0, actor_id BIGINT DEFAULT 0, reason TEXT DEFAULT '', updated_at BIGINT DEFAULT 0, trigger_fired BOOLEAN DEFAULT false, trigger_fired_at BIGINT DEFAULT 0, PRIMARY KEY (userid, permname))"
+            },
+            {
+                "idx_extra_permission_members_expires",
+                "CREATE INDEX IF NOT EXISTS idx_extra_permission_members_expires ON extra_permission_members (expires_at)"
+            },
+            {
+                "idx_extra_permission_members_permname",
+                "CREATE INDEX IF NOT EXISTS idx_extra_permission_members_permname ON extra_permission_members (permname)"
+            },
+            {
+                "extra_permission_conditions",
+                "CREATE TABLE IF NOT EXISTS extra_permission_conditions (condition_id TEXT PRIMARY KEY, permname TEXT, group_id INTEGER DEFAULT 1, condition_type TEXT DEFAULT 'level', comparator TEXT DEFAULT 'gte', value BIGINT DEFAULT 0, scope_ids BIGINT[] DEFAULT '{}', window_days INTEGER DEFAULT 0, negate BOOLEAN DEFAULT false, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_extra_permission_conditions_permname",
+                "CREATE INDEX IF NOT EXISTS idx_extra_permission_conditions_permname ON extra_permission_conditions (permname)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -549,6 +573,118 @@ public static class DatabaseService
                     { "perma", "ALTER TABLE warns ADD COLUMN IF NOT EXISTS perma BOOLEAN" },
                     { "caseid", "ALTER TABLE warns ADD COLUMN IF NOT EXISTS caseid VARCHAR" }
                 }
+            },
+            {
+                "extra_permissions",
+                new Dictionary<string, string>
+                {
+                    { "displayname", "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS displayname TEXT" },
+                    { "description", "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS description TEXT" },
+                    { "roleid", "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS roleid BIGINT" },
+                    {
+                        "trigger_type",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS trigger_type TEXT DEFAULT 'none'"
+                    },
+                    {
+                        "trigger_value",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS trigger_value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "trigger_mode",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS trigger_mode TEXT DEFAULT 'recurring'"
+                    },
+                    {
+                        "auto_revoke",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS auto_revoke TEXT DEFAULT 'inherit'"
+                    },
+                    {
+                        "created_by",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "extra_permission_members",
+                new Dictionary<string, string>
+                {
+                    { "userid", "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS userid BIGINT" },
+                    { "permname", "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS permname TEXT" },
+                    {
+                        "state",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'auto'"
+                    },
+                    {
+                        "expires_at",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS expires_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "actor_id",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS actor_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "reason",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT ''"
+                    },
+                    {
+                        "updated_at",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "trigger_fired",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS trigger_fired BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "trigger_fired_at",
+                        "ALTER TABLE extra_permission_members ADD COLUMN IF NOT EXISTS trigger_fired_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "unique_index",
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_extra_permission_members_userid_permname ON extra_permission_members (userid, permname)"
+                    }
+                }
+            },
+            {
+                "extra_permission_conditions",
+                new Dictionary<string, string>
+                {
+                    { "permname", "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS permname TEXT" },
+                    {
+                        "group_id",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS group_id INTEGER DEFAULT 1"
+                    },
+                    {
+                        "condition_type",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS condition_type TEXT DEFAULT 'level'"
+                    },
+                    {
+                        "comparator",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS comparator TEXT DEFAULT 'gte'"
+                    },
+                    {
+                        "value",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "scope_ids",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS scope_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "window_days",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS window_days INTEGER DEFAULT 0"
+                    },
+                    {
+                        "negate",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS negate BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
             }
         };
 
@@ -594,7 +730,8 @@ public static class DatabaseService
             ("BoosterColors", "BypassEligibility", "false"),
             ("BoosterColors", "EmbedTitle", "Booster Farben"),
             ("BoosterColors", "EmbedDescription",
-                "Hier kannst du dir deine Booster Farbe auswählen. Sie ist jederzeit anpassbar. Deine Farbe wird automatisch wieder entfernt, sobald dein Boost ausläuft.")
+                "Hier kannst du dir deine Booster Farbe auswählen. Sie ist jederzeit anpassbar. Deine Farbe wird automatisch wieder entfernt, sobald dein Boost ausläuft."),
+            ("ExtraPermissions", "AutoRevokeOnConditionLoss", "false")
         };
 
         foreach (var (section, key, value) in defaults)

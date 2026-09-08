@@ -30,6 +30,62 @@ public static class ToolSet
         return dateTimeOffset.ToString("dd.MM.yyyy HH:mm:ss");
     }
 
+    public static TimeSpan? ParseDuration(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+
+        var text = input.Trim().ToLowerInvariant().Replace(" ", "");
+        var total = TimeSpan.Zero;
+        var digits = new StringBuilder();
+        var unit = new StringBuilder();
+
+        foreach (var c in text)
+        {
+            if (char.IsDigit(c))
+            {
+                if (unit.Length > 0)
+                {
+                    if (!TryAppendDurationPart(digits.ToString(), unit.ToString(), ref total)) return null;
+                    digits.Clear();
+                    unit.Clear();
+                }
+
+                digits.Append(c);
+                continue;
+            }
+
+            if (digits.Length == 0) return null;
+            unit.Append(c);
+        }
+
+        if (digits.Length == 0 || unit.Length == 0) return null;
+        if (!TryAppendDurationPart(digits.ToString(), unit.ToString(), ref total)) return null;
+
+        return total > TimeSpan.Zero ? total : null;
+    }
+
+    private static bool TryAppendDurationPart(string digits, string unit, ref TimeSpan total)
+    {
+        if (!long.TryParse(digits, out var amount) || amount < 0) return false;
+
+        var span = unit switch
+        {
+            "s" or "sec" => TimeSpan.FromSeconds(amount),
+            "m" or "min" => TimeSpan.FromMinutes(amount),
+            "h" or "std" => TimeSpan.FromHours(amount),
+            "d" or "t" => TimeSpan.FromDays(amount),
+            "w" => TimeSpan.FromDays(amount * 7),
+            "mo" => TimeSpan.FromDays(amount * 30),
+            "y" or "j" => TimeSpan.FromDays(amount * 365),
+            _ => TimeSpan.MinValue
+        };
+
+        if (span == TimeSpan.MinValue) return false;
+
+        total += span;
+        return true;
+    }
+
 
     public static string GetFormattedTimeFromUnixAndRespectTimeZone(long unixTime)
     {

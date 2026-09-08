@@ -275,6 +275,10 @@ public sealed class UserInfoCommand : BaseCommandModule
                 ? "Es wurden keine gefunden.\n"
                 : string.Join("\n\n", flagResults) + "\n";
 
+            var extraPermissions = await ExtraPermissionService.GetStatusAsync(user.Id, member);
+            userinfostring += "\n**__Extra Permissions__**\n";
+            userinfostring += ExtraPermissionFormatter.BuildUserInfoSection(extraPermissions);
+
 
             var embedbuilder = new DiscordEmbedBuilder();
             embedbuilder.WithTitle(
@@ -445,6 +449,10 @@ public sealed class UserInfoCommand : BaseCommandModule
                 : string.Join("\n\n", flagResults) + "\n";
             userinfostring += "\n**Lokaler Bannstatus**\n";
             userinfostring += banStatus + "";
+
+            var extraPermissions = await ExtraPermissionService.GetStatusAsync(user.Id, null);
+            userinfostring += "\n\n**__Extra Permissions__**\n";
+            userinfostring += ExtraPermissionFormatter.BuildUserInfoSection(extraPermissions);
 
 
             var embedbuilder = new DiscordEmbedBuilder();

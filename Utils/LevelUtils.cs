@@ -3,7 +3,9 @@
 using System.Text;
 using AGC_Management.Entities;
 using AGC_Management.Entities.Web;
+using AGC_Management.Enums.ExtraPermissions;
 using AGC_Management.Enums.LevelSystem;
+using AGC_Management.Services;
 
 #endregion
 
@@ -1113,6 +1115,8 @@ public static class LevelUtils
         if (!pingEnabled) messagebuilder.WithAllowedMentions(Mentions.None);
 
         await channel.SendMessageAsync(messagebuilder);
+
+        await ExtraPermissionService.EvaluateMemberAsync(member, ExtraPermissionConditionType.Level);
     }
 
     private static async Task<bool> IsLevelRewarded(int level)

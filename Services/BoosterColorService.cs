@@ -85,7 +85,7 @@ public static class BoosterColorService
         // mutates the cached object in place without ever copying premium_since over. So anyone who
         // starts boosting after they were cached keeps a stale null until the entry is replaced.
         // Confirm against the API before denying them.
-        if (await IsBoostingFetchedAsync(member)) return true;
+        if (await IsBoostingAsync(member)) return true;
 
         return await GetBypassEligibilityAsync();
     }
@@ -94,7 +94,7 @@ public static class BoosterColorService
     ///     Re-fetches the member from the API to get an authoritative PremiumSince. The fetch also
     ///     replaces the stale cache entry, so this only costs a request the first time around.
     /// </summary>
-    private static async Task<bool> IsBoostingFetchedAsync(DiscordMember member)
+    public static async Task<bool> IsBoostingAsync(DiscordMember member)
     {
         var guild = member.Guild;
         if (guild is null) return false;
