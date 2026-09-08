@@ -115,7 +115,6 @@ public class DiscordBotService : IHostedService
         });
 
         discord.ClientErrored += Discord_ClientErrored;
-        discord.ComponentInteractionCreated += Client_ComponentInteractionCreatedAsync;
         commands.CommandExecuted += LogCommandExecution;
         commands.CommandErrored += Commands_CommandErrored;
 
@@ -182,15 +181,6 @@ public class DiscordBotService : IHostedService
                 throw new ApplicationException();
             }
         }
-    }
-
-    private static Task Client_ComponentInteractionCreatedAsync(DiscordClient sender, ComponentInteractionCreateEventArgs e)
-    {
-        if (e.Id == "pgb-skip-left" || e.Id == "pgb-skip-right" || e.Id == "pgb-right" || e.Id == "pgb-left" || e.Id == "pgb-stop" || e.Id == "leftskip" || e.Id == "rightskip" || e.Id == "stop" || e.Id == "left" || e.Id == "right")
-        {
-            return e.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
-        }
-        return Task.CompletedTask;
     }
 
     private static Task StartTasks(DiscordClient discord)
