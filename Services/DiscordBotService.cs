@@ -1,3 +1,4 @@
+using AGC_Management.Attributes;
 using System.Reflection;
 using DisCatSharp;
 using DisCatSharp.ApplicationCommands;
@@ -273,7 +274,9 @@ public class DiscordBotService : IHostedService
     {
         if (e.Exception is SlashExecutionChecksFailedException ex)
         {
-            if (ex.FailedChecks.Any(x => x is ApplicationCommandRequireUserPermissionsAttribute))
+            if (ex.FailedChecks.Any(x => x is ApplicationCommandRequireUserPermissionsAttribute
+                    or ApplicationCommandRequirePermissionsAttribute
+                    or ApplicationCommandRequireModerationTeam))
             {
                 var embed = EmbedGenerator.GetErrorEmbed(
                     "You don't have the required permissions to execute this command.");

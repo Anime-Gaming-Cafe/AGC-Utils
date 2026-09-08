@@ -1,5 +1,6 @@
 #region
 
+using AGC_Management.Attributes;
 using AGC_Management.Enums.ExtraPermissions;
 using AGC_Management.Services;
 using AGC_Management.Utils;
@@ -13,7 +14,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("info", "Zeigt die Extra Permissions eines Mitglieds", (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("info", "Zeigt die Extra Permissions eines Mitglieds")]
     public static async Task Info(InteractionContext ctx,
         [Option("member", "Das Mitglied")] DiscordUser user)
     {
@@ -68,6 +70,6 @@ public partial class PermissionManagement
             .WithFooter(footer);
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-            new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
+            new DiscordInteractionResponseBuilder().AddEmbed(embed));
     }
 }

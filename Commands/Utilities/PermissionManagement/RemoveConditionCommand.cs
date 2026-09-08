@@ -11,8 +11,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("remove-condition", "Entfernt eine Bedingung von einer Permission",
-        (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("remove-condition", "Entfernt eine Bedingung von einer Permission")]
     public static async Task RemoveCondition(InteractionContext ctx,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die Permission", true)]
@@ -44,7 +44,6 @@ public partial class PermissionManagement
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
                 .WithContent($"<:success:1085333481820790944> **Erfolgreich!** Bedingung ``{conditionId}`` entfernt." +
-                             $"\n\n{BuildPermissionLine(updated ?? permission)}{note}")
-                .AsEphemeral());
+                             $"\n\n{BuildPermissionLine(updated ?? permission)}{note}"));
     }
 }

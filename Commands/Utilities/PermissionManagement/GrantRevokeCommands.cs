@@ -1,5 +1,6 @@
 #region
 
+using AGC_Management.Attributes;
 using AGC_Management.Enums.ExtraPermissions;
 using AGC_Management.Providers;
 using AGC_Management.Services;
@@ -14,7 +15,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("grant", "Erteilt einem Mitglied eine Extra Permission", (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("grant", "Erteilt einem Mitglied eine Extra Permission")]
     public static Task Grant(InteractionContext ctx,
         [Option("member", "Das Mitglied")] DiscordUser user,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
@@ -28,7 +30,8 @@ public partial class PermissionManagement
         return SetOverrideAsync(ctx, user, permName, duration, reason, ExtraPermissionState.Granted);
     }
 
-    [SlashCommand("revoke", "Entzieht einem Mitglied eine Extra Permission", (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("revoke", "Entzieht einem Mitglied eine Extra Permission")]
     public static Task Revoke(InteractionContext ctx,
         [Option("member", "Das Mitglied")] DiscordUser user,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
@@ -42,7 +45,8 @@ public partial class PermissionManagement
         return SetOverrideAsync(ctx, user, permName, duration, reason, ExtraPermissionState.Revoked);
     }
 
-    [SlashCommand("reset", "Übergibt ein Mitglied wieder an den Automatismus", (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("reset", "Übergibt ein Mitglied wieder an den Automatismus")]
     public static async Task Reset(InteractionContext ctx,
         [Option("member", "Das Mitglied")] DiscordUser user,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
@@ -60,7 +64,7 @@ public partial class PermissionManagement
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
-                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt...").AsEphemeral());
+                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt..."));
 
         await ExtraPermissionService.ResetOverrideAsync(user.Id, permName, rearmTrigger);
 
@@ -99,7 +103,7 @@ public partial class PermissionManagement
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
-                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt...").AsEphemeral());
+                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt..."));
 
         await ExtraPermissionService.SetOverrideAsync(user.Id, permName, state, expiresAt, ctx.User.Id, reason);
 

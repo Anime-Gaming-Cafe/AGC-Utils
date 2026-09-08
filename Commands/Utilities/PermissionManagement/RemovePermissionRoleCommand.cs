@@ -11,7 +11,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("remove-permission-role", "Löscht eine Extra Permission", (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("remove-permission-role", "Löscht eine Extra Permission")]
     public static async Task RemovePermissionRole(InteractionContext ctx,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die zu löschende Permission", true)]
@@ -28,7 +29,7 @@ public partial class PermissionManagement
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
-                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt...").AsEphemeral());
+                .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt..."));
 
         var stripped = 0;
         if (stripRole)

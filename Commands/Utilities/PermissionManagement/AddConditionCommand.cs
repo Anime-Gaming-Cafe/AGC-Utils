@@ -12,7 +12,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("add-condition", "Fügt einer Permission eine Bedingung hinzu", (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("add-condition", "Fügt einer Permission eine Bedingung hinzu")]
     public static async Task AddCondition(InteractionContext ctx,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die Permission", true)]
@@ -62,7 +63,6 @@ public partial class PermissionManagement
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
                 .WithContent($"<:success:1085333481820790944> **Erfolgreich!** Bedingung ``{condition!.ConditionId}`` " +
-                             $"zu ``{permName}`` hinzugefügt.\n\n" + BuildPermissionLine(updated ?? permission))
-                .AsEphemeral());
+                             $"zu ``{permName}`` hinzugefügt.\n\n" + BuildPermissionLine(updated ?? permission)));
     }
 }

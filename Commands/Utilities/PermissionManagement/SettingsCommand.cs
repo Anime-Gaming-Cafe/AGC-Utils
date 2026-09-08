@@ -10,7 +10,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("settings", "Globale Einstellungen der Extra Permissions", (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("settings", "Globale Einstellungen der Extra Permissions")]
     public static async Task Settings(InteractionContext ctx,
         [Option("auto-revoke", "Rolle entziehen wenn die Trigger-Bedingung wegfällt")]
         bool? autoRevoke = null)
@@ -26,7 +27,6 @@ public partial class PermissionManagement
             new DiscordInteractionResponseBuilder()
                 .WithContent($"{prefix}**Auto-Revoke bei Verlust der Bedingung:** {(current ? "an" : "aus")}\n" +
                              "Gilt für alle Permissions mit ``auto-revoke: Inherit``. Einzelne Permissions " +
-                             "können das über ``/permissionmanagement edit-permission-role`` überschreiben.")
-                .AsEphemeral());
+                             "können das über ``/permissionmanagement edit-permission-role`` überschreiben."));
     }
 }

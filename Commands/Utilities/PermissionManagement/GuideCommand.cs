@@ -1,5 +1,6 @@
 #region
 
+using AGC_Management.Attributes;
 using AGC_Management.Utils;
 using DisCatSharp.ApplicationCommands.Attributes;
 using DisCatSharp.ApplicationCommands.Context;
@@ -190,8 +191,8 @@ public partial class PermissionManagement
             "Bei ``permission`` und ``condition`` hilft dir überall die Autovervollständigung.")
     ];
 
-    [SlashCommand("guide", "Erklärt das Extra Permission System mit Beispielen",
-        (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("guide", "Erklärt das Extra Permission System mit Beispielen")]
     public static async Task Guide(InteractionContext ctx)
     {
         var pages = GuideChapters.Select((chapter, index) => new Page
@@ -208,7 +209,7 @@ public partial class PermissionManagement
             }
         }).ToList();
 
-        await ctx.Interaction.SendPaginatedResponseAsync(false, true, ctx.User, pages,
+        await ctx.Interaction.SendPaginatedResponseAsync(false, false, ctx.User, pages,
             behaviour: PaginationBehaviour.Ignore, deletion: ButtonPaginationBehavior.Disable);
     }
 }

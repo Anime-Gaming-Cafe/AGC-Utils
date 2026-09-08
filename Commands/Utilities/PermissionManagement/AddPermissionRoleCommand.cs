@@ -13,7 +13,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("add-permission-role", "Legt eine neue Extra Permission an", (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("add-permission-role", "Legt eine neue Extra Permission an")]
     public static async Task AddPermissionRole(InteractionContext ctx,
         [Option("name", "Name der Permission, frei wählbar")]
         string name,
@@ -102,7 +103,6 @@ public partial class PermissionManagement
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
                 .WithContent($"<:success:1085333481820790944> **Erfolgreich!** Permission angelegt.\n\n" +
-                             BuildPermissionLine(permission))
-                .AsEphemeral());
+                             BuildPermissionLine(permission)));
     }
 }

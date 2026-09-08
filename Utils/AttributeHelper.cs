@@ -2,6 +2,8 @@
 
 using System.Data;
 using AGC_Management.Managers;
+using DisCatSharp.ApplicationCommands.Attributes;
+using DisCatSharp.ApplicationCommands.Context;
 
 #endregion
 
@@ -149,5 +151,25 @@ public class AGCEasterEggsEnabled : CheckBaseAttribute
         }
 
         return false;
+    }
+}
+
+/// <summary>
+///     Moderationsteam: ModRoleId oder SupportRoleId. Eventler sind bewusst nicht enthalten.
+/// </summary>
+public class ApplicationCommandRequireModerationTeam : ApplicationCommandCheckBaseAttribute
+{
+    public override Task<bool> ExecuteChecksAsync(BaseContext ctx)
+    {
+        if (GlobalProperties.DebugMode) return Task.FromResult(true);
+        if (ctx.Member is null) return Task.FromResult(false);
+        if ((ctx.Member.Permissions & Permissions.Administrator) == Permissions.Administrator)
+            return Task.FromResult(true);
+
+        var servercfg = BotConfig.GetConfig()["ServerConfig"];
+        var modRoleId = ulong.Parse(servercfg["ModRoleId"]);
+        var supportRoleId = ulong.Parse(servercfg["SupportRoleId"]);
+
+        return Task.FromResult(ctx.Member.Roles.Any(r => r.Id == modRoleId || r.Id == supportRoleId));
     }
 }

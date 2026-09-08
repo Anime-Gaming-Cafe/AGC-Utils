@@ -13,8 +13,8 @@ using DisCatSharp.Exceptions;
 
 namespace AGC_Management.Commands.PermissionManagement;
 
-[ApplicationCommandRequirePermissions(Permissions.Administrator)]
-[SlashCommandGroup("permissionmanagement", "Verwaltung der Extra Permissions", (long)Permissions.Administrator)]
+[SlashCommandGroup("permissionmanagement", "Verwaltung der Extra Permissions",
+    (long)Permissions.ModerateMembers)]
 public partial class PermissionManagement : ApplicationCommandsModule
 {
     private static readonly ExtraPermissionConditionType[] ValueConditions =

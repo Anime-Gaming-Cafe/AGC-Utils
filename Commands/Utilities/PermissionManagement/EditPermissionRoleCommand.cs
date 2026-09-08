@@ -12,8 +12,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("edit-permission-role", "Bearbeitet eine bestehende Extra Permission",
-        (long)Permissions.Administrator)]
+    [ApplicationCommandRequirePermissions(Permissions.Administrator)]
+    [SlashCommand("edit-permission-role", "Bearbeitet eine bestehende Extra Permission")]
     public static async Task EditPermissionRole(InteractionContext ctx,
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die zu bearbeitende Permission", true)]
@@ -71,7 +71,6 @@ public partial class PermissionManagement
             new DiscordInteractionResponseBuilder()
                 .WithContent("<:success:1085333481820790944> **Erfolgreich!** Permission aktualisiert.\n" +
                              "Bedingungen änderst du über ``add-condition`` und ``remove-condition``.\n\n" +
-                             BuildPermissionLine(permission))
-                .AsEphemeral());
+                             BuildPermissionLine(permission)));
     }
 }

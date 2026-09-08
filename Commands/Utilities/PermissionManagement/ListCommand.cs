@@ -1,5 +1,6 @@
 #region
 
+using AGC_Management.Attributes;
 using AGC_Management.Services;
 using DisCatSharp.ApplicationCommands.Attributes;
 using DisCatSharp.ApplicationCommands.Context;
@@ -10,7 +11,8 @@ namespace AGC_Management.Commands.PermissionManagement;
 
 public partial class PermissionManagement
 {
-    [SlashCommand("list", "Zeigt alle angelegten Extra Permissions", (long)Permissions.Administrator)]
+    [ApplicationCommandRequireModerationTeam]
+    [SlashCommand("list", "Zeigt alle angelegten Extra Permissions")]
     public static async Task ListPermissions(InteractionContext ctx)
     {
         var permissions = await ExtraPermissionService.GetPermissionsAsync();
@@ -32,6 +34,6 @@ public partial class PermissionManagement
             .WithFooter(footer);
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-            new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
+            new DiscordInteractionResponseBuilder().AddEmbed(embed));
     }
 }
