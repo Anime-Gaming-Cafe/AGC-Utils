@@ -1,6 +1,8 @@
-#region
+﻿#region
 
+using System.Collections.Concurrent;
 using AGC_Management.Utils;
+using DisCatSharp.Exceptions;
 
 #endregion
 
@@ -17,6 +19,7 @@ public static class MemberCacheService
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
+    private static readonly ConcurrentDictionary<ulong, byte> PendingCompletions = new();
 
     public static ulong TargetGuildId => ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
 
@@ -79,6 +82,38 @@ public static class MemberCacheService
         finally
         {
             Gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Fills in a cache entry that DisCatSharp created from a bare DiscordUser.
+    ///     When a GUILD_MEMBER_UPDATE arrives for a member that is not cached yet, its handler builds
+    ///     the entry with the <c>DiscordMember(DiscordUser)</c> constructor and then copies only a
+    ///     subset of the payload onto it - JoinedAt, PremiumSince and the voice flags stay unset even
+    ///     though the gateway sent them. Refetching replaces the entry with a complete one.
+    /// </summary>
+    public static async Task EnsureCompleteAsync(DiscordGuild guild, DiscordMember? member)
+    {
+        // A real member always has a join date, so this doubles as the "entry is incomplete" check.
+        if (member is null || member.IsBot || member.JoinedAt != default) return;
+        if (!PendingCompletions.TryAdd(member.Id, 0)) return;
+
+        try
+        {
+            await guild.GetMemberAsync(member.Id, true);
+            CurrentApplication.Logger.Debug($"Completed partial cache entry for member {member.Id}.");
+        }
+        catch (NotFoundException)
+        {
+            // Member left between the update and the fetch, nothing to complete.
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Failed to complete cache entry for member {MemberId}", member.Id);
+        }
+        finally
+        {
+            PendingCompletions.TryRemove(member.Id, out _);
         }
     }
 

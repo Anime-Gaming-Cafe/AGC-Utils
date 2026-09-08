@@ -1,5 +1,6 @@
-#region
+﻿#region
 
+using DisCatSharp.Exceptions;
 using SkiaSharp;
 
 #endregion
@@ -79,7 +80,39 @@ public static class BoosterColorService
 
         if (member.PremiumSince.HasValue) return true;
 
+        // A cached member can claim not to be boosting even when they are: DisCatSharp sets
+        // PremiumSince only in the DiscordMember constructor and its GUILD_MEMBER_UPDATE handler
+        // mutates the cached object in place without ever copying premium_since over. So anyone who
+        // starts boosting after they were cached keeps a stale null until the entry is replaced.
+        // Confirm against the API before denying them.
+        if (await IsBoostingFetchedAsync(member)) return true;
+
         return await GetBypassEligibilityAsync();
+    }
+
+    /// <summary>
+    ///     Re-fetches the member from the API to get an authoritative PremiumSince. The fetch also
+    ///     replaces the stale cache entry, so this only costs a request the first time around.
+    /// </summary>
+    private static async Task<bool> IsBoostingFetchedAsync(DiscordMember member)
+    {
+        var guild = member.Guild;
+        if (guild is null) return false;
+
+        try
+        {
+            var fresh = await guild.GetMemberAsync(member.Id, true);
+            return fresh.PremiumSince.HasValue;
+        }
+        catch (NotFoundException)
+        {
+            return false;
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to refetch member {MemberId}", member.Id);
+            return false;
+        }
     }
 
     #endregion
