@@ -21,9 +21,14 @@ public partial class PermissionManagement
         [Option("role", "Neue Rolle die vergeben werden soll")]
         DiscordRole? role = null,
         [Option("mode", "Wiederkehrend oder einmalig")]
-        ExtraPermissionTriggerMode? mode = null,
+        [Choice("Recurring", "Recurring")]
+        [Choice("Once", "Once")]
+        string? mode = null,
         [Option("auto-revoke", "Rolle entziehen wenn die Bedingungen wegfallen")]
-        ExtraPermissionAutoRevoke? autoRevoke = null,
+        [Choice("Inherit", "Inherit")]
+        [Choice("On", "On")]
+        [Choice("Off", "Off")]
+        string? autoRevoke = null,
         [Option("name", "Neuer Anzeigename")] string? displayName = null,
         [Option("description", "Wofür ist diese Permission gedacht?")]
         string? description = null)
@@ -55,8 +60,8 @@ public partial class PermissionManagement
             permission.RoleId = role.Id;
         }
 
-        if (mode.HasValue) permission.TriggerMode = mode.Value;
-        if (autoRevoke.HasValue) permission.AutoRevoke = autoRevoke.Value;
+        if (mode != null) permission.TriggerMode = Enum.Parse<ExtraPermissionTriggerMode>(mode);
+        if (autoRevoke != null) permission.AutoRevoke = Enum.Parse<ExtraPermissionAutoRevoke>(autoRevoke);
         if (displayName != null) permission.DisplayName = displayName.Trim();
         if (description != null) permission.Description = description;
 
