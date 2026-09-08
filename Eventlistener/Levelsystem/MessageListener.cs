@@ -20,6 +20,7 @@ public sealed class MessageListener : ApplicationCommandsModule
         {
             if (CurrentApplication.TargetGuild == null) // check init
                 return;
+            if (args.Guild == null) return;
 
             if (args.Channel.Type == ChannelType.Private || args.Author.IsBot)
                 return;

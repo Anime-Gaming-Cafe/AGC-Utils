@@ -20,6 +20,7 @@ public sealed class CountingListener : ApplicationCommandsModule
         _ = Task.Run(async () =>
         {
             if (CurrentApplication.TargetGuild == null) return;
+            if (args.Guild == null) return;
             if (args.Channel.Type == ChannelType.Private) return;
             if (args.Guild.Id != CurrentApplication.TargetGuild.Id) return;
             if (args.Channel.Id != CountingChannelId) return;

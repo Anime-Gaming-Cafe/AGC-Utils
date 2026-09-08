@@ -331,7 +331,7 @@ public class DiscordBotService : IHostedService
             var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
             await using var com = con.CreateCommand(
                 "INSERT INTO cmdexec (commandname, commandcontent, userid, timestamp) VALUES (@commandname, @commandcontent, @userid, @timestamp)");
-            com.Parameters.AddWithValue("commandname", args.Context);
+            com.Parameters.AddWithValue("commandname", args.Context.FullCommandName);
             com.Parameters.AddWithValue("commandcontent", "NULL (Slash Command)");
             com.Parameters.AddWithValue("userid", (long)args.Context.User.Id);
             com.Parameters.AddWithValue("timestamp", DateTimeOffset.Now.ToUnixTimeMilliseconds());
