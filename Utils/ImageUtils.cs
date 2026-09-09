@@ -30,16 +30,12 @@ public sealed class ImageUtils
         var textPaint = new SKPaint
         {
             Color = SKColors.White,
-            FilterQuality = SKFilterQuality.High,
-            TextSize = 18,
-            TextAlign = SKTextAlign.Center,
             IsAntialias = true
         };
-        var textBounds = new SKRect();
         using var typeface = SKTypeface.FromFamilyName("Verdana");
-        textPaint.Typeface = typeface;
-        textPaint.MeasureText(text, ref textBounds);
-        canvas.DrawText(text, width / 2, (height + textBounds.Height) / 2, textPaint);
+        using var textFont = new SKFont(typeface, 18);
+        textFont.MeasureText(text, out var textBounds, textPaint);
+        canvas.DrawText(text, width / 2, (height + textBounds.Height) / 2, SKTextAlign.Center, textFont, textPaint);
 
         return bmp;
     }
@@ -99,9 +95,9 @@ public sealed class ImageUtils
 
         var avatarPaint = new SKPaint
         {
-            IsAntialias = true,
-            FilterQuality = SKFilterQuality.High
+            IsAntialias = true
         };
+        var avatarSampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
 
         var backgroundPaint = new SKPaint
         {
@@ -169,7 +165,7 @@ public sealed class ImageUtils
 
         canvas.Save();
         canvas.ClipPath(mask);
-        canvas.DrawBitmap(avatarBitmap, avatarRect, avatarPaint);
+        canvas.DrawBitmap(avatarBitmap, avatarRect, avatarSampling, avatarPaint);
         canvas.Restore();
 
 
@@ -189,7 +185,7 @@ public sealed class ImageUtils
 
             canvas.Save();
             canvas.ClipPath(guildiconmask);
-            canvas.DrawBitmap(guildicon, guildiconrect, avatarPaint);
+            canvas.DrawBitmap(guildicon, guildiconrect, avatarSampling, avatarPaint);
             canvas.Restore();
 
             var borderPaint = new SKPaint
@@ -204,40 +200,21 @@ public sealed class ImageUtils
         }
 
 
-        var namePaint = new SKPaint
+        var textPaint = new SKPaint
         {
             Color = SKColors.White,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright),
-            TextAlign = SKTextAlign.Left,
-            TextSize = 30
+            IsAntialias = true
         };
 
-        var nameBounds = new SKRect();
-        namePaint.MeasureText(user.Username, ref nameBounds);
-        canvas.DrawText(user.GetFormattedUserName(), 300, 70, namePaint);
+        using var boldTypeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
+            SKFontStyleSlant.Upright);
+        using var nameFont = new SKFont(boldTypeface, 30);
+        using var rankLevelFont = new SKFont(boldTypeface, 25);
+        using var totalxpFont = new SKFont(boldTypeface, 18);
 
-        var rankLevelPaint = new SKPaint
-        {
-            Color = SKColors.White,
-            TextSize = 25,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright)
-        };
-
-        var totalxpPaint = new SKPaint
-        {
-            Color = SKColors.White,
-            TextSize = 18,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright)
-        };
-
-        canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, rankLevelPaint);
-        canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, totalxpPaint);
+        canvas.DrawText(user.GetFormattedUserName(), 300, 70, SKTextAlign.Left, nameFont, textPaint);
+        canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, SKTextAlign.Left, rankLevelFont, textPaint);
+        canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, SKTextAlign.Left, totalxpFont, textPaint);
 
         var progressBarBackgroundPaint = new SKPaint
         {
@@ -263,16 +240,16 @@ public sealed class ImageUtils
             $"{Converter.FormatWithCommas(currentxpforthislevel)}/{xptoCompleteCurrentLevel} XP ({Math.Round(progress * 100, 2)}%)";
         var xpPaint = new SKPaint
         {
-            TextSize = 25,
-            TextAlign = SKTextAlign.Center,
             Color = SKColors.White,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font)
+            IsAntialias = true
         };
 
-        var xpTextWidth = xpPaint.MeasureText(xpText);
+        using var xpTypeface = SKTypeface.FromFamilyName(font);
+        using var xpFont = new SKFont(xpTypeface, 25);
+
+        var xpTextWidth = xpFont.MeasureText(xpText, xpPaint);
         var xpTextX = progressBarBackgroundRect.Left + progressBarBackgroundRect.Width / 2;
-        var xpTextY = progressBarBackgroundRect.Top + progressBarBackgroundRect.Height / 2 + xpPaint.TextSize / 2;
+        var xpTextY = progressBarBackgroundRect.Top + progressBarBackgroundRect.Height / 2 + xpFont.Size / 2;
         xpTextY -= 2;
 
         if (xpTextX + xpTextWidth / 2 > progressBarRect.Right)
@@ -280,7 +257,7 @@ public sealed class ImageUtils
             canvas.Save();
             canvas.ClipRect(new SKRect(progressBarRect.Left, progressBarRect.Top, progressBarRect.Right,
                 progressBarRect.Bottom));
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
             canvas.Restore();
 
             xpPaint.Color = SKColors.White;
@@ -288,12 +265,12 @@ public sealed class ImageUtils
             canvas.Save();
             canvas.ClipRect(new SKRect(progressBarRect.Right, progressBarRect.Top, progressBarBackgroundRect.Right,
                 progressBarBackgroundRect.Bottom));
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
             canvas.Restore();
         }
         else
         {
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
         }
 
 
@@ -365,9 +342,9 @@ public sealed class ImageUtils
 
         var avatarPaint = new SKPaint
         {
-            IsAntialias = true,
-            FilterQuality = SKFilterQuality.High
+            IsAntialias = true
         };
+        var avatarSampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
 
         var backgroundPaint = new SKPaint
         {
@@ -400,7 +377,7 @@ public sealed class ImageUtils
 
         canvas.Save();
         canvas.ClipPath(mask);
-        canvas.DrawBitmap(avatarBitmap, avatarRect, avatarPaint);
+        canvas.DrawBitmap(avatarBitmap, avatarRect, avatarSampling, avatarPaint);
         canvas.Restore();
 
 
@@ -420,7 +397,7 @@ public sealed class ImageUtils
 
             canvas.Save();
             canvas.ClipPath(guildiconmask);
-            canvas.DrawBitmap(guildicon, guildiconrect, avatarPaint);
+            canvas.DrawBitmap(guildicon, guildiconrect, avatarSampling, avatarPaint);
             canvas.Restore();
 
             var borderPaint = new SKPaint
@@ -435,40 +412,21 @@ public sealed class ImageUtils
         }
 
 
-        var namePaint = new SKPaint
+        var textPaint = new SKPaint
         {
             Color = SKColors.White,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright),
-            TextAlign = SKTextAlign.Left,
-            TextSize = 30
+            IsAntialias = true
         };
 
-        var nameBounds = new SKRect();
-        namePaint.MeasureText(user.Username, ref nameBounds);
-        canvas.DrawText(user.GetFormattedUserName(), 300, 70, namePaint);
+        using var boldTypeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
+            SKFontStyleSlant.Upright);
+        using var nameFont = new SKFont(boldTypeface, 30);
+        using var rankLevelFont = new SKFont(boldTypeface, 25);
+        using var totalxpFont = new SKFont(boldTypeface, 18);
 
-        var rankLevelPaint = new SKPaint
-        {
-            Color = SKColors.White,
-            TextSize = 25,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright)
-        };
-
-        var totalxpPaint = new SKPaint
-        {
-            Color = SKColors.White,
-            TextSize = 18,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
-                SKFontStyleSlant.Upright)
-        };
-
-        canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, rankLevelPaint);
-        canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, totalxpPaint);
+        canvas.DrawText(user.GetFormattedUserName(), 300, 70, SKTextAlign.Left, nameFont, textPaint);
+        canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, SKTextAlign.Left, rankLevelFont, textPaint);
+        canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, SKTextAlign.Left, totalxpFont, textPaint);
 
         var progressBarBackgroundPaint = new SKPaint
         {
@@ -494,16 +452,16 @@ public sealed class ImageUtils
             $"{Converter.FormatWithCommas(currentxpforthislevel)}/{xptoCompleteCurrentLevel} XP ({Math.Round(progress * 100, 2)}%)";
         var xpPaint = new SKPaint
         {
-            TextSize = 25,
-            TextAlign = SKTextAlign.Center,
             Color = SKColors.White,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName(font)
+            IsAntialias = true
         };
 
-        var xpTextWidth = xpPaint.MeasureText(xpText);
+        using var xpTypeface = SKTypeface.FromFamilyName(font);
+        using var xpFont = new SKFont(xpTypeface, 25);
+
+        var xpTextWidth = xpFont.MeasureText(xpText, xpPaint);
         var xpTextX = progressBarBackgroundRect.Left + progressBarBackgroundRect.Width / 2;
-        var xpTextY = progressBarBackgroundRect.Top + progressBarBackgroundRect.Height / 2 + xpPaint.TextSize / 2;
+        var xpTextY = progressBarBackgroundRect.Top + progressBarBackgroundRect.Height / 2 + xpFont.Size / 2;
         xpTextY -= 2;
 
         if (xpTextX + xpTextWidth / 2 > progressBarRect.Right)
@@ -511,7 +469,7 @@ public sealed class ImageUtils
             canvas.Save();
             canvas.ClipRect(new SKRect(progressBarRect.Left, progressBarRect.Top, progressBarRect.Right,
                 progressBarRect.Bottom));
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
             canvas.Restore();
 
             xpPaint.Color = SKColors.White;
@@ -519,12 +477,12 @@ public sealed class ImageUtils
             canvas.Save();
             canvas.ClipRect(new SKRect(progressBarRect.Right, progressBarRect.Top, progressBarBackgroundRect.Right,
                 progressBarBackgroundRect.Bottom));
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
             canvas.Restore();
         }
         else
         {
-            canvas.DrawText(xpText, xpTextX, xpTextY, xpPaint);
+            canvas.DrawText(xpText, xpTextX, xpTextY, SKTextAlign.Center, xpFont, xpPaint);
         }
 
 
