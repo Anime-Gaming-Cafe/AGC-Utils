@@ -1,40 +1,39 @@
-﻿@page "/benutzereinstellungen/"
+@page "/benutzereinstellungen/"
 @using AGC_Management.Controller
 @using AGC_Management.Utils
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
-@if (loaded)
-{
-    <h1>Benutzereinstellungen</h1>
+<PageHeader Title="Einstellungen"/>
 
-    <div class="card-group mt-5 mb-5">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Levelsystem Einstellungen</h5>
-                <a href="/benutzereinstellungen/levelsystem/adjustrankcard" class="btn btn-primary-glass">Rangkarte anpassen</a>
-                <button class="btn btn-primary-glass" @onclick="TogglePing">
-                    Levelup Ping umschalten
-                    @if (pingActive)
-                    {
-                        <span class="badge-success-glass">Aktuell aktiv</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-danger">Aktuell inaktiv</span>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Einstellungen werden geladen"
+                Description="Deine Levelsystem-Einstellungen werden abgefragt."/>
 }
 else
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-}
+    <Panel Title="Levelsystem">
+        @* This was a button with a status badge inside it. It is a setting, so it is a switch. *@
+        <div class="form-check form-switch field">
+            <input class="form-check-input" type="checkbox" role="switch" id="levelupPing"
+                   checked="@pingActive" disabled="@saving" @onchange="TogglePing"/>
+            <label class="form-check-label" for="levelupPing">Bei einem Levelaufstieg anpingen</label>
+            <span class="field__hint">
+                @(pingActive
+                    ? "Der Bot erwähnt dich in der Levelup-Nachricht."
+                    : "Die Levelup-Nachricht erscheint ohne Erwähnung.")
+            </span>
+        </div>
 
+        <div class="field">
+            <p class="field__label">Rangkarte</p>
+            <span class="field__hint">Farbe, Deckkraft, Schrift und Hintergrund deiner Karte beim Rang-Befehl.</span>
+            <a class="btn btn-secondary btn-sm mt-2" href="/benutzereinstellungen/levelsystem/adjustrankcard">Rangkarte anpassen</a>
+        </div>
+    </Panel>
+}
 
 @code
 {
@@ -42,14 +41,10 @@ else
     private ClaimsPrincipal? _principal;
 
     private bool loaded;
+    private bool saving;
     private bool pingActive;
 
-
-    private ulong GetUserId()
-    {
-        var currentuserid = UserService.GetUserId(_principal).ToString();
-        return ulong.Parse(currentuserid!);
-    }
+    private ulong GetUserId() => UserService.GetUserId(_principal) ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -61,7 +56,14 @@ else
 
     private async Task TogglePing()
     {
-        pingActive = await LevelUtils.ToggleLevelUpPing(GetUserId());
+        saving = true;
+        try
+        {
+            pingActive = await LevelUtils.ToggleLevelUpPing(GetUserId());
+        }
+        finally
+        {
+            saving = false;
+        }
     }
-
 }

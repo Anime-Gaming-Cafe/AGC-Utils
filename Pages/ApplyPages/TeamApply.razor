@@ -1,0 +1,96 @@
+@page "/apply"
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<PageHeader Title="Bewerben"
+            Lead="Bitte beachte vor deiner Bewerbung die Anforderungen auf dem Server.">
+    <Actions>
+        <a class="btn btn-secondary" href="/apply/status">Meine Bewerbungen</a>
+    </Actions>
+</PageHeader>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Positionen werden geladen"
+                Description="Ausgeschriebene Positionen und ihre Bewerbungsphasen werden abgefragt."/>
+}
+else if (entries.Count == 0)
+{
+    <StateBlock Title="Zurzeit ist keine Position ausgeschrieben"
+                Description="Sobald das Team eine Position ausschreibt, erscheint sie hier."
+                ActionText="Meine Bewerbungen"
+                ActionHref="/apply/status"/>
+}
+else
+{
+    <Panel Flush="true">
+        <ul class="rows">
+            @* Open positions first: they are the ones this page is for. *@
+            @foreach (var entry in entries.OrderByDescending(e => e.IsOpen).ThenBy(e => e.Position.PositionName))
+            {
+                <li>
+                    <div class="rows__main">
+                        <p class="rows__title">@entry.Position.PositionName</p>
+                        @if (!string.IsNullOrWhiteSpace(entry.Position.Description))
+                        {
+                            <p class="rows__text">@entry.Position.Description</p>
+                        }
+                        @if (!entry.IsOpen && entry.NextOpensAt > 0)
+                        {
+                            <p class="rows__text">
+                                @opensAtText <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(entry.NextOpensAt)</time>
+                            </p>
+                        }
+                    </div>
+                    <div class="rows__side">
+                        @if (entry.IsOpen)
+                        {
+                            <a class="btn btn-primary" href="/apply/@entry.Position.PositionId">Jetzt bewerben</a>
+                        }
+                        else
+                        {
+                            <StatusPill Text="@closedText"/>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<PositionEntry> entries = new();
+    private string closedText = "Bewerbungen aktuell geschlossen";
+    private string opensAtText = "Naechste Bewerbungsphase ab";
+
+    protected override async Task OnInitializedAsync()
+    {
+        closedText = await TeamApplicationService.GetTextAsync("PanelClosedText", closedText);
+        opensAtText = await TeamApplicationService.GetTextAsync("PanelOpensAtText", opensAtText);
+
+        foreach (var position in await TeamApplicationService.GetPositionsAsync(true))
+        {
+            var opening = await TeamApplicationService.ResolveOpeningAsync(position);
+
+            entries.Add(new PositionEntry
+            {
+                Position = position,
+                IsOpen = opening.CanApply,
+                NextOpensAt = opening.NextOpensAt
+            });
+        }
+
+        loaded = true;
+    }
+
+    private sealed class PositionEntry
+    {
+        public TeamApplicationPosition Position { get; init; } = new();
+        public bool IsOpen { get; init; }
+        public long NextOpensAt { get; init; }
+    }
+}

@@ -1,4 +1,4 @@
-using AGC_Management.Attributes;
+﻿using AGC_Management.Attributes;
 using System.Reflection;
 using DisCatSharp;
 using DisCatSharp.ApplicationCommands;
@@ -62,10 +62,6 @@ public class DiscordBotService : IHostedService
             {
                 MinimumLogLevel = Microsoft.Extensions.Logging.LogLevel.Debug,
                 LogTimestampFormat = "MMM dd yyyy - HH:mm:ss tt"
-            },
-            Telemetry = new()
-            {
-                DeveloperUserId = GlobalProperties.BotOwnerId
             },
             Api = new()
             {
@@ -176,7 +172,6 @@ public class DiscordBotService : IHostedService
             }
             catch
             {
-                Sentry.SentrySdk.CaptureMessage("Discord API Token could not be loaded.");
                 CurrentApplication.Logger.Fatal("Der Discord API Token konnte nicht geladen werden.");
                 throw new ApplicationException();
             }
@@ -200,6 +195,7 @@ public class DiscordBotService : IHostedService
         _ = TicketSearchTools.LoadTicketsIntoCache();
         _ = BoosterColorCleanupTask.LaunchLoops();
         _ = ExtraPermissionSyncTask.LaunchLoops();
+        _ = TeamApplicationPhaseTask.LaunchLoops();
 
         return Task.CompletedTask;
     }

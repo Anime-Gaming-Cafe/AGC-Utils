@@ -6,85 +6,132 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
-@if (loaded)
+<PageHeader Title="Rangkarte"
+            Lead="Farbe, Deckkraft, Schrift und Hintergrund deiner Rangkarte."
+            BackHref="/benutzereinstellungen" BackText="Einstellungen"/>
+
+@if (!loaded)
 {
-    <div class="container mt-4">
-        <h1>Rankcard Einstellungen</h1>
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="colorPicker" class="form-label">Farbe</label>
-                    <input type="color" class="form-control" id="colorPicker" @onchange="ColorChanged" value="@color"/>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Rangkarte wird geladen"
+                Description="Deine gespeicherten Einstellungen werden abgefragt."/>
+}
+else
+{
+    <div class="editor-grid">
+        <div>
+            <Panel Title="Einstellungen">
+                <div class="field">
+                    <label class="field__label" for="rc-color">Balkenfarbe</label>
+                    <input type="color" class="form-control form-control-color" id="rc-color" value="@color" @onchange="ColorChanged"/>
                 </div>
 
-                <div class="mb-3">
-                    <label for="boxAlpha" class="form-label">Box Transparenz</label><br>
-                    <input type="range" class="form-range" id="boxAlpha" min="0" max="255" @onchange="BoxAlphaChanged" value="@boxalpha"/> @boxalpha / 255
+                <div class="field">
+                    <label class="field__label" for="rc-alpha">Deckkraft der Box</label>
+                    <input type="range" class="form-range" id="rc-alpha" min="0" max="255" value="@boxalpha" @onchange="BoxAlphaChanged"/>
+                    <span class="field__hint tnum">@boxalpha von 255</span>
                 </div>
 
-                <div class="mb-3">
-                    <label for="fontSelect" class="form-label">Schriftart</label>
-                    <select style="backdrop-filter: none; color: #FFFFFF; background-color:rgba(255, 255, 255, 0.3)" class="form-select" id="fontSelect" bind="@font" @onchange="FontChanged">
-                        @foreach (var fontFamily in SKFontManager.Default.GetFontFamilies().ToList())
+                <div class="field">
+                    <label class="field__label" for="rc-font">Schriftart</label>
+                    @* The old select carried "bind=" without the @, so it never bound. *@
+                    <select class="form-select" id="rc-font" @onchange="FontChanged">
+                        @foreach (var fontFamily in fontFamilies)
                         {
-                            <option style="color: #000000; backdrop-filter: blur(2px) ;background: rgba(255, 255, 255, 0.3)" value="@fontFamily" selected="@(font == fontFamily)">@fontFamily</option>
+                            <option value="@fontFamily" selected="@(font == fontFamily)">@fontFamily</option>
                         }
                     </select>
                 </div>
 
-                <div class="mb-3">
-                    <label for="imageUpload" class="form-label">Hintergrundbild (Empfohlen: 930x280) (Max: 5MB)</label>
-                    <InputFile placeholder="Bild" accept="image/*" class="form-control" style="color:white; background: rgba(255, 255, 255, 0.3)" id="imageUpload" OnChange="UploadFile"/>
+                <div class="field">
+                    <label class="field__label" for="rc-image">Hintergrundbild</label>
+                    <InputFile id="rc-image" class="form-control" accept="image/png,image/jpeg,image/webp" OnChange="UploadFile"/>
+                    <span class="field__hint">Empfohlen 930 × 280 Pixel, höchstens 5 MB. PNG, JPG oder WebP.</span>
                     @if (!string.IsNullOrWhiteSpace(uploadStatus))
                     {
-                        <p class="text-success">@((MarkupString)uploadStatus)</p>
+                        <span class="field__hint" role="status">@uploadStatus</span>
                     }
                     @if (!string.IsNullOrWhiteSpace(errorMessage))
                     {
-                        <p class="text-danger">@((MarkupString)errorMessage)</p>
+                        @* Rendered as text now. It used to go through MarkupString, and it can carry
+                           exception messages and reasons returned by the image check API. *@
+                        <span class="field__error" role="alert">@errorMessage</span>
                     }
                 </div>
 
-                <button class="btn btn-primary-glass" @onclick="async () => await SaveSettings()">Speichern und Anwenden</button>
-                @if (hasCustomRankCardSettings)
+                <div class="form-foot">
+                    <button type="button" class="btn btn-primary" @onclick="SaveSettings">Speichern und anwenden</button>
+                    @if (hasCustomRankCardSettings && !pendingReset)
+                    {
+                        <button type="button" class="btn btn-danger" @onclick="() => pendingReset = true">Zurücksetzen</button>
+                    }
+                </div>
+
+                @if (pendingReset)
                 {
-                    <button class="btn btn-danger-glass mt-2" @onclick="async () => await ResetCard()">Rangkarte zurücksetzen</button>
+                    <ConfirmInline Title="Rangkarte zurücksetzen?"
+                                   ConfirmText="Ja, zurücksetzen"
+                                   OnConfirm="ResetCard"
+                                   OnCancel="() => pendingReset = false">
+                        <p>Farbe, Schrift, Deckkraft und dein hochgeladenes Hintergrundbild werden gelöscht.</p>
+                    </ConfirmInline>
                 }
-            </div>
-            <div class="col-md-6">
-                <h2>Vorschau</h2>
-                @if (!string.IsNullOrWhiteSpace(previewImageData) && hasPreviewData)
+            </Panel>
+        </div>
+
+        <div>
+            <Panel Title="Vorschau" Lead="Die Karte mit den Einstellungen links, noch nicht gespeichert.">
+                @if (previewFailed)
                 {
-                    <img src="@previewImageData" alt="Rangkarte" class="img-fluid"/>
+                    <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
+                                Title="Vorschau konnte nicht erzeugt werden"
+                                Description="Mit diesen Einstellungen ließ sich keine Karte rendern. Gespeichert ist noch nichts."
+                                ActionText="Erneut versuchen"
+                                OnAction="CopySettingsToPreview"/>
+                }
+                else if (!string.IsNullOrWhiteSpace(previewImageData))
+                {
+                    <img src="@previewImageData" alt="Vorschau der Rangkarte" class="preview-img"/>
                 }
                 else
                 {
-                    <h1>Vorschau wird generiert <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></h1>
+                    <StateBlock Kind="StateBlock.StateKind.Loading" Inline="true"
+                                Title="Vorschau wird erzeugt"
+                                Description="Avatar, Server-Icon und Hintergrund werden geladen und zur Karte gerendert."/>
                 }
-                <h2>Aktuelle Karte</h2>
-                @if (!string.IsNullOrWhiteSpace(base64String))
+            </Panel>
+
+            <Panel Title="Aktuelle Karte" Lead="So erscheint deine Rangkarte gerade in Discord.">
+                @if (cardFailed)
                 {
-                    <img src="@base64String" alt="Rangkarte" class="img-fluid"/>
+                    <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
+                                Title="Karte konnte nicht erzeugt werden"
+                                Description="Ein Bild für die Karte ließ sich nicht abrufen. Deine Einstellungen sind davon nicht betroffen."
+                                ActionText="Erneut versuchen"
+                                OnAction="RenderCurrentCard"/>
+                }
+                else if (!string.IsNullOrWhiteSpace(base64String))
+                {
+                    <img src="@base64String" alt="Aktuelle Rangkarte" class="preview-img"/>
                 }
                 else
                 {
-                    <h1>Karte wird abgerufen <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></h1>
+                    <StateBlock Kind="StateBlock.StateKind.Loading" Inline="true"
+                                Title="Karte wird erzeugt"
+                                Description="Avatar, Server-Icon und Hintergrund werden geladen und zur Karte gerendert."/>
                 }
-            </div>
+            </Panel>
         </div>
     </div>
 }
-else
-{
-    <h1>Loading... <span class="spinner-border spinner-border" role="status" aria-hidden="true"></span></h1>
-}
-
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private ClaimsPrincipal? _principal;
 
     private bool loaded;
+    private bool pendingReset;
+    private readonly string[] fontFamilies = SKFontManager.Default.GetFontFamilies();
 
     private string imageToInstall = "";
     private string base64String = "";
@@ -99,8 +146,11 @@ else
     private string uploadStatus = "";
     private string errorMessage = "";
 
+    private bool cardsRequested;
+    private bool cardFailed;
+    private bool previewFailed;
+
     // data for preview
-    private bool hasPreviewData;
     private string previewImageData = "";
     private string previewImageToInstall = "";
     private int previewBoxAlpha = 150;
@@ -117,7 +167,7 @@ else
             return;
         }
 
-        uploadStatus = "Datei wird hochgeladen... <span class=\"spinner-border spinner-border-sm\" role=\"status\" aria-hidden=\"true\"></span>";
+        uploadStatus = "Datei wird hochgeladen.";
 
         if (file.Size > 5242880)
         {
@@ -176,14 +226,14 @@ else
 
     private async Task ResetCard()
     {
+        pendingReset = false;
         var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand();
         cmd.CommandText = @"DELETE FROM userrankcardsettings WHERE userid = @userid";
         cmd.Parameters.AddWithValue("userid", (long)userId);
         await cmd.ExecuteNonQueryAsync();
-        await OnInitializedAsync();
-        await CopySettingsToPreview();
+        await ReloadAsync();
     }
 
     private async Task SaveSettings()
@@ -207,7 +257,7 @@ else
                 {
                     if (isActivated)
                     {
-                        uploadStatus = "Bild wird moderativ geprüft... <span class=\"spinner-border spinner-border-sm\" role=\"status\" aria-hidden=\"true\"></span>";
+                        uploadStatus = "Bild wird geprüft.";
                         using var client = new HttpClient();
                         var apikey = BotConfig.GetConfig()["LinkLens"]["API-KEY"];
                         client.DefaultRequestHeaders.Add("api-key", apikey);
@@ -268,7 +318,7 @@ else
             await SaveCustomRankCardSetting("boxalpha", boxalpha, userId);
         }
 
-        await OnInitializedAsync();
+        await ReloadAsync();
     }
 
 
@@ -300,15 +350,43 @@ else
         _principal = AuthState is null ? null : (await AuthState).User;
 
         await RetrieveCurrentSettings();
-        await RenderPage();
         loaded = true;
     }
 
-    private async Task RenderPage()
+    // Rendering a card downloads avatar, guild icon and background. It waits until the page is
+    // interactive, so a slow image host delays the pictures instead of the whole page, and the
+    // prerender pass does not pay for it a second time.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        base64String = await RetrieveRankCardForCurrentUser();
-        StateHasChanged();
+        if (!loaded || cardsRequested) return;
+        cardsRequested = true;
+
+        await RenderCurrentCard();
         await CopySettingsToPreview();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await RetrieveCurrentSettings();
+        await RenderCurrentCard();
+        await CopySettingsToPreview();
+    }
+
+    private async Task RenderCurrentCard()
+    {
+        cardFailed = false;
+        try
+        {
+            base64String = await RetrieveRankCardForCurrentUser();
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Rangkarte für das Dashboard konnte nicht erzeugt werden");
+            base64String = "";
+            cardFailed = true;
+        }
+
+        StateHasChanged();
     }
 
 
@@ -328,7 +406,8 @@ else
 
     private async Task RenderPreview()
     {
-        if (hasPreviewData)
+        previewFailed = false;
+        try
         {
             var currentuserid = UserService.GetUserId(_principal);
             var user = await CurrentApplication.DiscordClient.GetUserAsync(ulong.Parse(currentuserid.ToString()));
@@ -341,37 +420,34 @@ else
             var xpForThisLevelUntilNow = totalxp - xpForCurrentLevel;
             var percentage = (int)(xpForThisLevelUntilNow / (float)xpForThisLevel * 100);
             var userRank = await LevelUtils.GetUserRankAsync(user.Id);
-            SKData? imagedata = null;
-            try
-            {
-                var id = await ImageUtils.GenerateRankCardForWebPreview(user, xpForThisLevelUntilNow, level, userRank, percentage,
-                    totalxp,
-                    xpForThisLevel, previewBoxAlpha, previewFont, previewImageToInstall, previewColor);
-                imagedata = id;
-            }
-            catch (Exception e)
-            {
-                errorMessage = "Fehler beim generieren der Vorschau. Diese Datei ist kein Bild oder hat ein ungültiges Format.";
-                uploadStatus = "";
-                return;
-            }
-
-            var imgstream = imagedata.AsStream();
-            byte[] bytes = new byte[imgstream.Length];
-            imgstream.Read(bytes, 0, (int)imgstream.Length);
-            previewImageData = "data:image/png;base64," + Convert.ToBase64String(bytes);
-            StateHasChanged();
+            var imagedata = await ImageUtils.GenerateRankCardForWebPreview(user, xpForThisLevelUntilNow, level,
+                userRank, percentage, totalxp, xpForThisLevel, previewBoxAlpha, previewFont, previewImageToInstall,
+                previewColor);
+            previewImageData = "data:image/png;base64," + Convert.ToBase64String(imagedata.ToArray());
         }
+        catch (Exception e)
+        {
+            previewFailed = true;
+            if (hasImageChanged)
+            {
+                errorMessage = "Mit diesem Bild ließ sich keine Vorschau erzeugen. Die Datei ist vermutlich kein gültiges Bild.";
+                uploadStatus = "";
+            }
+            else
+            {
+                CurrentApplication.Logger.Error(e, "Vorschau der Rangkarte konnte nicht erzeugt werden");
+            }
+        }
+
+        StateHasChanged();
     }
 
     private async Task CopySettingsToPreview()
     {
-        hasPreviewData = false;
         previewBoxAlpha = boxalpha;
         previewColor = color;
         previewFont = font;
         previewImageToInstall = imageToInstall;
-        hasPreviewData = true;
         await RenderPreview();
     }
 
@@ -425,39 +501,33 @@ else
         return "data:image/png;base64," + Convert.ToBase64String(bytes);
     }
 
-    private async Task<string> RetrieveCurrentImageforCurrentUser()
-    {
-        var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
-        var i = await ImageUtils.HasCustomRankCardSettings(userId);
-        if (i)
-        {
-            var settings = await ImageUtils.GetCustomRankCardSettings(userId);
-            // check if bg is null
-            if (settings.Background != null)
-            {
-                return settings.Background;
-            }
-
-            return await ImageUtils.GetFallbackBackground();
-            return settings.Background;
-        }
-
-        return await ImageUtils.GetFallbackBackground();
-    }
-
     private async Task RetrieveCurrentSettings()
     {
-        bool hs = await ImageUtils.HasCustomRankCardSettings(ulong.Parse(UserService.GetUserId(_principal).ToString()));
-        hasCustomRankCardSettings = hs;
         var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
-        var settings = await ImageUtils.GetCustomRankCardSettings(userId);
-        if (settings != null)
+
+        // ImageUtils.GetCustomRankCardSettings also downloads the fallback background, which the editor
+        // does not need, so the three values are read directly.
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(
+            "SELECT barcolor, textfont, boxalpha FROM userrankcardsettings WHERE userid = @userid");
+        cmd.Parameters.AddWithValue("userid", (long)userId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+
+        hasCustomRankCardSettings = await reader.ReadAsync();
+        if (hasCustomRankCardSettings)
         {
-            color = settings.HexColor ?? "#000000";
-            font = settings.Font ?? "Verdana";
-            base64String = settings.Background ?? await RetrieveCurrentImageforCurrentUser();
-            boxalpha = settings.BoxOpacity ?? 100;
+            color = reader.IsDBNull(0) ? "#000000" : reader.GetString(0);
+            font = reader.IsDBNull(1) ? "Verdana" : reader.GetString(1);
+            boxalpha = reader.IsDBNull(2) ? 100 : reader.GetInt32(2);
+            return;
         }
+
+        // After a reset the editor has to show the defaults again, not the deleted values.
+        color = "#9f00ff";
+        font = "Verdana";
+        boxalpha = 150;
+        imageToInstall = "";
+        hasImageChanged = false;
     }
 
 }

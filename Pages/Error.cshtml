@@ -1,32 +1,40 @@
-﻿@page
+@page
 @model AGC_Management.Pages.ErrorModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de" data-bs-theme="dark">
 
 <head>
     <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-    <title>Error</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="color-scheme" content="dark"/>
+    <title>Fehler</title>
     <link href="~/css/bootstrap/bootstrap.min.css" rel="stylesheet"/>
-    <link href="~/css/site.css" rel="stylesheet" asp-append-version="true"/>
+    <link href="~/css/Inter.css" rel="stylesheet"/>
+    <link href="~/css/tokens.css" rel="stylesheet" asp-append-version="true"/>
+    <link href="~/css/app.css" rel="stylesheet" asp-append-version="true"/>
 </head>
 
 <body>
-<div class="main">
-    <div class="content px-4">
-        <h1 class="text-danger">Error.</h1>
-        <h2 class="text-danger">An error occurred while processing your request.</h2>
-
-        @if (Model.ShowRequestId)
-        {
-            <p>
-                <strong>Request ID:</strong> <code>@Model.RequestId</code>
+@* Rendered by the exception handler outside Blazor, so it uses the classes directly instead of StateBlock. *@
+<main class="app__content">
+    <div class="state state--bad">
+        <div>
+            <p class="state__title">Es ist ein Fehler aufgetreten</p>
+            <p class="state__text">
+                Die Anfrage konnte nicht verarbeitet werden. Lade die Seite neu oder versuche es später noch einmal.
             </p>
-        }
-
+            @if (Model.ShowRequestId)
+            {
+                <p class="state__text">Anfrage-ID für das Team: <code>@Model.RequestId</code></p>
+            }
+            <div class="state__actions">
+                <a class="btn btn-secondary btn-sm" href="~/">Zur Startseite</a>
+            </div>
+        </div>
     </div>
-</div>
+</main>
 </body>
 
 </html>

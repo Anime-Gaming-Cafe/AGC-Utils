@@ -1,14 +1,12 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<PageTitle>@CurrentApplication.TargetGuild.Name - Dashboard</PageTitle>
+<PageTitle>@(CurrentApplication.TargetGuild?.NameWithRemovedRegionSuffix() ?? "Dashboard")</PageTitle>
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu/>
-    </div>
-    <main>
-        <article class="content px-4">
+<div class="app">
+    <NavMenu/>
+    <main class="app__main">
+        <div class="app__content">
             @Body
-        </article>
+        </div>
     </main>
 </div>

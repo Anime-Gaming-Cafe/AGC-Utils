@@ -41,7 +41,7 @@ public class TicketManager
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd =
             con.CreateCommand(
-                $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False)");
+                $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed, opened_at) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False, {DateTimeOffset.UtcNow.ToUnixTimeSeconds()})");
         await cmd.ExecuteNonQueryAsync();
 
         ticket_channel = await context.Guild.CreateChannelAsync($"support-{ticket_number}", ChannelType.Text,
@@ -103,7 +103,7 @@ public class TicketManager
                 var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
                 await using var cmd =
                     con.CreateCommand(
-                        $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False)");
+                        $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed, opened_at) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False, {DateTimeOffset.UtcNow.ToUnixTimeSeconds()})");
                 await cmd.ExecuteNonQueryAsync();
 
                 ticket_channel = await interaction.Guild.CreateChannelAsync($"report-{ticket_number}", ChannelType.Text,
@@ -123,7 +123,7 @@ public class TicketManager
                 var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
                 await using var cmd =
                     con.CreateCommand(
-                        $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False)");
+                        $"INSERT INTO ticketstore (ticket_id, ticket_owner, tickettype, closed, opened_at) VALUES ('{ticketid}', '{memberid}', '{ticketType.ToString().ToLower()}', False, {DateTimeOffset.UtcNow.ToUnixTimeSeconds()})");
                 await cmd.ExecuteNonQueryAsync();
 
                 ticket_channel = await interaction.Guild.CreateChannelAsync($"support-{ticket_number}",
@@ -206,7 +206,7 @@ public class TicketManager
         await reader.CloseAsync();
 
         await using var cmd2 =
-            con.CreateCommand($"UPDATE ticketstore SET closed = True WHERE ticket_id = '{ticket_id}'");
+            con.CreateCommand($"UPDATE ticketstore SET closed = True, closed_at = {DateTimeOffset.UtcNow.ToUnixTimeSeconds()} WHERE ticket_id = '{ticket_id}'");
         await cmd2.ExecuteNonQueryAsync();
 
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
@@ -300,7 +300,7 @@ public class TicketManager
         await reader.CloseAsync();
 
         await using var cmd2 =
-            con.CreateCommand($"UPDATE ticketstore SET closed = True WHERE ticket_id = '{ticket_id}'");
+            con.CreateCommand($"UPDATE ticketstore SET closed = True, closed_at = {DateTimeOffset.UtcNow.ToUnixTimeSeconds()} WHERE ticket_id = '{ticket_id}'");
         await cmd2.ExecuteNonQueryAsync();
 
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
@@ -405,7 +405,7 @@ public class TicketManager
         await reader.CloseAsync();
 
         await using var cmd2 =
-            con.CreateCommand($"UPDATE ticketstore SET closed = True WHERE ticket_id = '{ticket_id}'");
+            con.CreateCommand($"UPDATE ticketstore SET closed = True, closed_at = {DateTimeOffset.UtcNow.ToUnixTimeSeconds()} WHERE ticket_id = '{ticket_id}'");
         await cmd2.ExecuteNonQueryAsync();
 
         var query2 = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";

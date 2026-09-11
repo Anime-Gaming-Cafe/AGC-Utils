@@ -1,0 +1,26 @@
+@using AGC_Management.Enums.ApplicationSystem
+@* How an application status reads for the applicant. Internal markings stay invisible:
+   Gelesen, Vorgemerkt and WartetAufRueckfrage all read as "In Bearbeitung". *@
+
+<StatusPill Text="@Label(Status)" Tone="@Tone(Status)"/>
+
+@code {
+    [Parameter] [EditorRequired] public TeamApplicationStatus Status { get; set; }
+
+    public static string Label(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Eingereicht => "Eingegangen",
+        TeamApplicationStatus.Angenommen => "Angenommen",
+        TeamApplicationStatus.Abgelehnt => "Abgelehnt",
+        TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
+        _ => "In Bearbeitung"
+    };
+
+    /// <summary>Only a decision is a signal; everything still open stays neutral.</summary>
+    public static StatusPill.PillTone Tone(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Angenommen => StatusPill.PillTone.Ok,
+        TeamApplicationStatus.Abgelehnt => StatusPill.PillTone.Bad,
+        _ => StatusPill.PillTone.Neutral
+    };
+}

@@ -1,0 +1,29 @@
+@* Replaces five hand-rolled pagination blocks whose classes (pagination-lg, page-info)
+   were never defined, so none of them had any layout at all. *@
+
+@if (TotalPages > 1)
+{
+    <nav class="pager" aria-label="Seitennavigation">
+        <span class="pager__info">Seite @Current von @TotalPages@(TotalItems > 0 ? $" · {TotalItems} Einträge" : "")</span>
+        <div class="pager__controls">
+            <button type="button" class="btn btn-secondary btn-sm" disabled="@(Current <= 1)"
+                    @onclick="() => Go(Current - 1)">Zurück</button>
+            <button type="button" class="btn btn-secondary btn-sm" disabled="@(Current >= TotalPages)"
+                    @onclick="() => Go(Current + 1)">Weiter</button>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter] [EditorRequired] public int Current { get; set; } = 1;
+    [Parameter] [EditorRequired] public int TotalPages { get; set; }
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public EventCallback<int> CurrentChanged { get; set; }
+
+    private Task Go(int page)
+    {
+        if (page < 1 || page > this.TotalPages) return Task.CompletedTask;
+
+        return this.CurrentChanged.InvokeAsync(page);
+    }
+}

@@ -1,0 +1,120 @@
+@page "/teamarea/applysystem/legacy/eventapplication/{applicationid}"
+@using AGC_Management.Entities
+@using AGC_Management.Utils
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, HeadEventmanager")]
+
+<PageHeader Title="@(application != null ? userName : "Alte Bewerbung")"
+            Lead="Altsystem, nur lesend."
+            BackHref="/teamarea/applysystem/legacy/eventapplications" BackText="Alte Eventteam-Bewerbungen"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bewerbung wird geladen"
+                Description="Die Bewerbung aus dem alten System wird abgefragt."/>
+}
+else if (application == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Bewerbung nicht gefunden"
+                Description="Im alten System gibt es keine Bewerbung mit dieser ID."
+                ActionText="Zu den alten Bewerbungen"
+                ActionHref="/teamarea/applysystem/legacy/eventapplications"/>
+}
+else
+{
+    <div class="detail-grid">
+        <div>
+            @* Was a 25-row read-only textarea, which looked editable and was not. *@
+            <Panel Title="Bewerbungstext">
+                <p class="qa__a">@ToolSet.GettextfromBase64(application.Bewerbungstext)</p>
+            </Panel>
+        </div>
+        <div>
+            <Panel Title="Bewerber">
+                <dl class="facts">
+                    <dt>Status</dt>
+                    <dd><StatusPill Text="@StatusLabel(application.Status)" Tone="@StatusTone(application.Status)"/></dd>
+                    <dt>Position</dt>
+                    <dd>@application.PositionName</dd>
+                    <dt>Eingereicht</dt>
+                    <dd class="tnum">@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.Timestamp)</dd>
+                    <dt>Level heute</dt>
+                    <dd class="tnum">@level</dd>
+                    <dt>Beigetreten</dt>
+                    <dd class="tnum">@joinedAt</dd>
+                    <dt>Account seit</dt>
+                    <dd class="tnum">@createdAt</dd>
+                    <dt>Nutzer-ID</dt>
+                    <dd class="mono">@application.UserId</dd>
+                </dl>
+            </Panel>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string applicationid { get; set; } = "";
+
+    private bool loaded;
+    private Application? application;
+    private string userName = "";
+    private int level;
+    private string joinedAt = "unbekannt";
+    private string createdAt = "unbekannt";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApplication();
+        loaded = true;
+    }
+
+    private async Task LoadApplication()
+    {
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using (var command = db.CreateCommand())
+        {
+            command.CommandText = "SELECT bewerbungsid, userid, positionname, status, timestamp, bewerbungstext, seenby FROM bewerbungen WHERE bewerbungsid = @applicationid AND positionname = @positionname";
+            command.Parameters.AddWithValue("applicationid", applicationid);
+            command.Parameters.AddWithValue("positionname", "Eventmanager");
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return;
+
+            application = new Application
+            {
+                BewerbungsId = reader.GetString(0),
+                UserId = reader.GetInt64(1),
+                PositionName = reader.GetString(2),
+                Status = reader.GetInt32(3),
+                Timestamp = reader.GetInt64(4),
+                Bewerbungstext = reader.GetString(5)
+            };
+        }
+
+        // These used to run synchronously inside the render, behind a fixed one second delay.
+        var userId = (ulong)application!.UserId;
+        userName = ToolSet.GetFormattedName(userId);
+        level = await LevelUtils.GetLevel(userId);
+
+        if (CurrentApplication.DiscordClient.UserCache.TryGetValue(userId, out var user))
+            createdAt = ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(user.CreationTimestamp.ToUnixTimeSeconds());
+        if (CurrentApplication.TargetGuild.Members.TryGetValue(userId, out var member))
+            joinedAt = ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(member.JoinedAt.ToUnixTimeSeconds());
+    }
+
+    private static string StatusLabel(int status) => status switch
+    {
+        1 => "Gelesen",
+        2 => "Vorgemerkt",
+        3 => "Angenommen",
+        4 => "Abgelehnt",
+        _ => "Ungelesen"
+    };
+
+    private static StatusPill.PillTone StatusTone(int status) => status switch
+    {
+        3 => StatusPill.PillTone.Ok,
+        4 => StatusPill.PillTone.Bad,
+        _ => StatusPill.PillTone.Neutral
+    };
+}

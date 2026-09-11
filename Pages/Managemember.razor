@@ -1,78 +1,47 @@
-﻿@page "/managemember"
+@page "/managemember"
+@using AGC_Management.Utils
 @using Microsoft.AspNetCore.WebUtilities
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter")]
-@inject NavigationManager NavigationManager_
+@inject NavigationManager Nav
 
-<h3>Mitgliederverwaltung</h3>
-<br>
-<div class="row">
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title">Nutzerinformationen</h5>
-            </div>
-            <div class="card-body">
-                <p class="card-text">Nutzername: @member.Username</p>
-                <p class="card-text">Nickname: @member.Nickname</p>
-                <p class="card-text">Beigetreten am: @_joinedAt</p>
-                <p class="card-text">Erstellt am: @_createdAt</p>
-            </div>
-        </div>
-    </div>
-</div>
+<PageHeader Title="@(member != null ? ToolSet.GetFormattedName(member) : "Mitglied")"
+            BackHref="/mitglieder" BackText="Mitglieder"/>
+
+@if (member == null)
+{
+    @* The old page silently redirected to the start page here, so a wrong ID looked like a broken link. *@
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Mitglied nicht gefunden"
+                Description="Unter dieser ID ist kein Mitglied des Servers bekannt. Vielleicht hat es den Server verlassen."
+                ActionText="Zur Mitgliederliste"
+                ActionHref="/mitglieder"/>
+}
+else
+{
+    <Panel Title="Nutzerinformationen">
+        <dl class="facts">
+            <dt>Nutzername</dt>
+            <dd>@member.Username</dd>
+            <dt>Nickname</dt>
+            <dd>@(string.IsNullOrWhiteSpace(member.Nickname) ? "keiner" : member.Nickname)</dd>
+            <dt>User-ID</dt>
+            <dd class="mono">@member.Id</dd>
+            <dt>Beigetreten</dt>
+            <dd class="tnum">@member.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
+            <dt>Account erstellt</dt>
+            <dd class="tnum">@member.CreationTimestamp.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
+        </dl>
+    </Panel>
+}
 
 @code {
-    private string _parameter;
+    private DiscordMember? member;
 
-    private DateTime _joinedAt;
-    private DateTime _createdAt;
-    private DiscordMember member;
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        var uri = new Uri(NavigationManager_.Uri);
-        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("userid", out var param))
-        {
-            _parameter = param;
-        }
-
-
-        bool isValid = isValidUserId();
-        if (!isValid)
-        {
-            NavigationManager_.NavigateTo("/");
-        }
-
-        member = CurrentApplication.TargetGuild.Members[ulong.Parse(_parameter)];
-        _joinedAt = member.JoinedAt.UtcDateTime;
-        _createdAt = member.CreationTimestamp.UtcDateTime;
+        var uri = new Uri(Nav.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("userid", out var raw) &&
+            ulong.TryParse(raw, out var id))
+            CurrentApplication.TargetGuild.Members.TryGetValue(id, out member);
     }
-
-
-    private bool isValidUserId()
-    {
-        if (_parameter == null)
-        {
-            NavigationManager_.NavigateTo("/");
-        }
-        else
-        {
-            try
-            {
-                if (CurrentApplication.TargetGuild.Members.ContainsKey(ulong.Parse(_parameter)))
-                {
-                    return true;
-                }
-
-                NavigationManager_.NavigateTo("/");
-            }
-            catch (Exception)
-            {
-                NavigationManager_.NavigateTo("/");
-            }
-        }
-
-        return false;
-    }
-
 }

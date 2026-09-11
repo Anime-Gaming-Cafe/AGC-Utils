@@ -1,0 +1,368 @@
+@page "/konfiguration/applysystem/questions/{PositionId}"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<PageHeader Title="Fragenkatalog"
+            Lead="@(position?.PositionName)"
+            BackHref="/konfiguration/applysystem/positions" BackText="Positionen"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Fragenkatalog wird geladen"
+                Description="Entwurf, veröffentlichte Version und deine Rechte werden abgefragt."/>
+}
+else if (!mayManage)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Den Fragenkatalog dieser Position darfst du nicht bearbeiten. Rechte vergibt ein Administrator in der Rechte-Matrix."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
+}
+else if (position == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Position nicht gefunden"
+                Description="Diese Position existiert nicht, oder sie wurde gelöscht."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+    }
+
+    <Panel Title="Versionen"
+           Lead="Eine veröffentlichte Version wird nie mehr verändert. Laufende Phasen behalten die Version, die beim Öffnen eingefroren wurde.">
+        <dl class="facts">
+            <dt>Veröffentlicht</dt>
+            <dd>@(published != null ? $"Version {published.Version}" : "keine")</dd>
+            <dt>Entwurf</dt>
+            <dd>@(draft != null ? $"Version {draft.Version}" : "keiner")</dd>
+        </dl>
+        <div class="form-foot">
+            @if (draft == null)
+            {
+                <button type="button" class="btn btn-primary" @onclick="CreateDraft">Entwurf anlegen</button>
+                @if (published != null)
+                {
+                    <span class="meta">Der Entwurf startet als Kopie der veröffentlichten Version.</span>
+                }
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary" @onclick="PublishDraft">Entwurf veröffentlichen</button>
+            }
+        </div>
+    </Panel>
+
+    @if (draft != null)
+    {
+        <h2 class="section-title">Entwurf, Version @draft.Version</h2>
+
+        @if (questions.Count == 0)
+        {
+            <StateBlock Title="Der Entwurf hat noch keine Fragen"
+                        Description="Veröffentlichen geht erst mit mindestens einer Frage."
+                        ActionText="Frage hinzufügen"
+                        OnAction="AddQuestion"/>
+        }
+
+        @for (var index = 0; index < questions.Count; index++)
+        {
+            var question = questions[index];
+            var currentIndex = index;
+
+            <Panel Title="@($"Frage {index + 1}")">
+                <Actions>
+                    <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == 0)"
+                            @onclick="() => MoveQuestion(currentIndex, -1)">Nach oben</button>
+                    <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == questions.Count - 1)"
+                            @onclick="() => MoveQuestion(currentIndex, 1)">Nach unten</button>
+                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => DeleteQuestion(question)">Löschen</button>
+                </Actions>
+                <ChildContent>
+                    <div class="field-grid">
+                        <div class="field field--wide">
+                            <label class="field__label" for="q-text-@question.QuestionId">Fragetext</label>
+                            <input id="q-text-@question.QuestionId" class="form-control" @bind="question.Text"/>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="q-type-@question.QuestionId">Typ</label>
+                            <select id="q-type-@question.QuestionId" class="form-select" @bind="question.Type">
+                                @foreach (var type in Enum.GetValues<TeamApplicationQuestionType>())
+                                {
+                                    <option value="@type">@TypeLabel(type)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="q-desc-@question.QuestionId">Hilfetext (optional)</label>
+                            <input id="q-desc-@question.QuestionId" class="form-control" @bind="question.Description"/>
+                        </div>
+
+                        @if (question.SupportsLength)
+                        {
+                            <div class="field">
+                                <label class="field__label" for="q-min-@question.QuestionId">Minimale Länge</label>
+                                <input id="q-min-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinLength"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label" for="q-max-@question.QuestionId">Maximale Länge</label>
+                                <input id="q-max-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxLength"/>
+                                <span class="field__hint">0 heißt ohne Grenze.</span>
+                            </div>
+                        }
+
+                        @if (question.SupportsRange)
+                        {
+                            <div class="field">
+                                <label class="field__label" for="q-vmin-@question.QuestionId">Kleinster Wert</label>
+                                <input id="q-vmin-@question.QuestionId" type="number" class="form-control" @bind="question.MinValue"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label" for="q-vmax-@question.QuestionId">Größter Wert</label>
+                                <input id="q-vmax-@question.QuestionId" type="number" class="form-control" @bind="question.MaxValue"/>
+                            </div>
+                        }
+
+                        @if (question.SupportsSelectionLimits)
+                        {
+                            <div class="field">
+                                <label class="field__label" for="q-smin-@question.QuestionId">Mindestens auswählen</label>
+                                <input id="q-smin-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinSelections"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label" for="q-smax-@question.QuestionId">Höchstens auswählen</label>
+                                <input id="q-smax-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxSelections"/>
+                            </div>
+                        }
+                    </div>
+
+                    @if (question.IsChoice)
+                    {
+                        <div class="field mt-3">
+                            <span class="field__label">Optionen</span>
+                            @for (var optionIndex = 0; optionIndex < question.Options.Count; optionIndex++)
+                            {
+                                var current = optionIndex;
+                                <div class="option-row">
+                                    <input class="form-control" aria-label="@($"Option {current + 1}")"
+                                           @bind="question.Options[current]"/>
+                                    <button type="button" class="btn btn-ghost btn-sm"
+                                            @onclick="() => question.Options.RemoveAt(current)">Entfernen</button>
+                                </div>
+                            }
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => question.Options.Add(string.Empty)">
+                                Option hinzufügen
+                            </button>
+                            @if (question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2)
+                            {
+                                <span class="field__hint">Auswahlfragen brauchen mindestens zwei Optionen.</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="q-req-@question.QuestionId"
+                               @bind="question.Required"/>
+                        <label class="form-check-label" for="q-req-@question.QuestionId">Pflichtfeld</label>
+                    </div>
+
+                    <div class="form-foot">
+                        <button type="button" class="btn btn-secondary" @onclick="() => SaveQuestion(question)">Frage speichern</button>
+                    </div>
+                </ChildContent>
+            </Panel>
+        }
+
+        @if (questions.Count > 0)
+        {
+            <button type="button" class="btn btn-secondary mt-3" @onclick="AddQuestion">Frage hinzufügen</button>
+        }
+    }
+
+    @if (published != null)
+    {
+        <h2 class="section-title">Veröffentlicht, Version @published.Version</h2>
+        <Panel Flush="true">
+            <ul class="rows">
+                @foreach (var question in publishedQuestions)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@question.Text</p>
+                            <p class="rows__text">@TypeLabel(question.Type)@(question.Required ? " · Pflicht" : "")</p>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </Panel>
+    }
+}
+
+@code {
+    [Parameter] public string PositionId { get; set; } = "";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private bool mayManage;
+    private string statusMessage = "";
+    private string statusTone = "ok";
+
+    private TeamApplicationPosition? position;
+    private TeamApplicationQuestionSet? draft;
+    private TeamApplicationQuestionSet? published;
+    private List<TeamApplicationQuestion> questions = new();
+    private List<TeamApplicationQuestion> publishedQuestions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        mayManage = await TeamApplicationPermissionService.HasAsync(userId,
+            TeamApplicationPermission.ManageQuestions, PositionId);
+
+        if (mayManage) await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        position = await TeamApplicationService.GetPositionAsync(PositionId);
+        if (position == null) return;
+
+        draft = await TeamApplicationService.GetDraftAsync(PositionId);
+        published = await TeamApplicationService.GetPublishedAsync(PositionId);
+
+        questions = draft == null
+            ? new List<TeamApplicationQuestion>()
+            : await TeamApplicationService.GetQuestionsAsync(PositionId, draft.Version);
+        publishedQuestions = published == null
+            ? new List<TeamApplicationQuestion>()
+            : await TeamApplicationService.GetQuestionsAsync(PositionId, published.Version);
+    }
+
+    private static string TypeLabel(TeamApplicationQuestionType type) => type switch
+    {
+        TeamApplicationQuestionType.ShortText => "Freitext kurz",
+        TeamApplicationQuestionType.LongText => "Freitext lang",
+        TeamApplicationQuestionType.SingleChoice => "Einfachauswahl",
+        TeamApplicationQuestionType.MultipleChoice => "Mehrfachauswahl",
+        TeamApplicationQuestionType.Number => "Zahl",
+        _ => type.ToString()
+    };
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
+    private async Task<bool> EnsurePermission()
+    {
+        if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
+                PositionId)) return true;
+
+        Say("Dafür fehlt dir die Berechtigung.", "bad");
+        return false;
+    }
+
+    private async Task CreateDraft()
+    {
+        if (!await EnsurePermission()) return;
+
+        await TeamApplicationService.CreateDraftAsync(PositionId, userId);
+        await LoadAll();
+        Say("Entwurf angelegt.", "ok");
+    }
+
+    private async Task PublishDraft()
+    {
+        if (!await EnsurePermission()) return;
+
+        if (questions.Count == 0)
+        {
+            Say("Ein leerer Katalog kann nicht veröffentlicht werden.", "bad");
+            return;
+        }
+
+        var invalid = questions.FirstOrDefault(q => string.IsNullOrWhiteSpace(q.Text) ||
+                                                    (q.IsChoice && q.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2));
+        if (invalid != null)
+        {
+            Say("Jede Frage braucht einen Text, Auswahlfragen brauchen mindestens zwei Optionen.", "bad");
+            return;
+        }
+
+        await TeamApplicationService.PublishDraftAsync(PositionId);
+        await LoadAll();
+        Say("Entwurf veröffentlicht.", "ok");
+    }
+
+    private async Task AddQuestion()
+    {
+        if (draft == null || !await EnsurePermission()) return;
+
+        var question = new TeamApplicationQuestion
+        {
+            PositionId = PositionId,
+            Version = draft.Version,
+            SortOrder = questions.Count == 0 ? 0 : questions.Max(q => q.SortOrder) + 1,
+            Text = "Neue Frage"
+        };
+
+        await TeamApplicationService.UpsertQuestionAsync(question);
+        questions.Add(question);
+        Say("Frage hinzugefügt.", "ok");
+    }
+
+    private async Task SaveQuestion(TeamApplicationQuestion question)
+    {
+        if (!await EnsurePermission()) return;
+
+        question.Options = question.Options.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
+
+        await TeamApplicationService.UpsertQuestionAsync(question);
+        Say("Frage gespeichert.", "ok");
+    }
+
+    private async Task DeleteQuestion(TeamApplicationQuestion question)
+    {
+        if (!await EnsurePermission()) return;
+
+        await TeamApplicationService.DeleteQuestionAsync(question.QuestionId);
+        questions.Remove(question);
+        await PersistOrder();
+        Say("Frage gelöscht.", "ok");
+    }
+
+    private async Task MoveQuestion(int index, int offset)
+    {
+        if (!await EnsurePermission()) return;
+
+        var target = index + offset;
+        if (target < 0 || target >= questions.Count) return;
+
+        (questions[index], questions[target]) = (questions[target], questions[index]);
+        await PersistOrder();
+    }
+
+    private async Task PersistOrder()
+    {
+        for (var i = 0; i < questions.Count; i++)
+        {
+            questions[i].SortOrder = i;
+            await TeamApplicationService.UpsertQuestionAsync(questions[i]);
+        }
+    }
+}

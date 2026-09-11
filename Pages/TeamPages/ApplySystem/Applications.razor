@@ -1,0 +1,249 @@
+@page "/teamarea/applysystem/applications"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@implements IDisposable
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<PageHeader Title="Bewerbungen" Lead="Unentschiedene Bewerbungen stehen oben.">
+    <Actions>
+        @if (loaded && allowedPositions.Count > 0)
+        {
+            <button type="button" class="btn btn-secondary" @onclick="Reload">
+                <AppIcon Name="refresh"/> Aktualisieren
+            </button>
+        }
+    </Actions>
+</PageHeader>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bewerbungen werden geladen"
+                Description="Deine Rechte und die Bewerbungen der Positionen, die du sehen darfst, werden abgefragt."/>
+}
+else if (allowedPositions.Count == 0)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Bewerbungen sichtbar"
+                Description="Du hast für keine Position das Recht, Bewerbungen einzusehen. Rechte vergibt ein Administrator in der Rechte-Matrix."/>
+}
+else
+{
+    <Panel>
+        <div class="filter-bar">
+            <div class="field">
+                <label class="field__label" for="f-position">Position</label>
+                <select id="f-position" class="form-select" @bind="filterPosition" @bind:after="ApplyFilters">
+                    <option value="">Alle Positionen</option>
+                    @foreach (var position in positions)
+                    {
+                        <option value="@position.PositionId">@position.PositionName</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="f-phase">Phase</label>
+                <select id="f-phase" class="form-select" @bind="filterPhase" @bind:after="ApplyFilters">
+                    <option value="">Alle Phasen</option>
+                    @foreach (var phase in VisiblePhases)
+                    {
+                        <option value="@phase.PhaseId">@phase.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="f-status">Status</label>
+                <select id="f-status" class="form-select" @bind="filterStatus" @bind:after="ApplyFilters">
+                    <option value="">Alle Status</option>
+                    @foreach (var status in Enum.GetValues<TeamApplicationStatus>())
+                    {
+                        <option value="@status">@ApplicationStatusPill.Label(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="f-search">Suche</label>
+                <input id="f-search" class="form-control" placeholder="Name oder Nutzer-ID"
+                       value="@searchTerm" @oninput="OnSearchChanged"/>
+            </div>
+        </div>
+        @if (AnyFilter)
+        {
+            <div class="form-foot">
+                <span class="meta tnum">@filtered.Count von @applications.Count Bewerbungen</span>
+                <button type="button" class="btn btn-ghost btn-sm" @onclick="ResetFilters">Filter zurücksetzen</button>
+            </div>
+        }
+    </Panel>
+
+    <div class="mt-3">
+        @if (applications.Count == 0)
+        {
+            @if (mayManagePositions)
+            {
+                <StateBlock Title="Noch keine Bewerbungen"
+                            Description="Auf den Positionen, die du sehen darfst, ist noch keine Bewerbung eingegangen. Bewerbungen kommen erst herein, wenn eine Phase offen ist."
+                            ActionText="Positionen und Phasen verwalten"
+                            ActionHref="/konfiguration/applysystem/positions"/>
+            }
+            else
+            {
+                <StateBlock Title="Noch keine Bewerbungen"
+                            Description="Auf den Positionen, die du sehen darfst, ist noch keine Bewerbung eingegangen. Neue erscheinen hier, sobald jemand eine abschickt."/>
+            }
+        }
+        else if (filtered.Count == 0)
+        {
+            <StateBlock Title="Keine Bewerbung passt zu diesem Filter"
+                        Description="Es gibt Bewerbungen, aber keine davon erfüllt alle gewählten Bedingungen."
+                        ActionText="Filter zurücksetzen"
+                        OnAction="ResetFilters"/>
+        }
+        else
+        {
+            <ul class="record-list">
+                @foreach (var application in PageItems)
+                {
+                    <li class="record @ApplicationStatusPill.EdgeClass(application.Status)">
+                        <a href="/teamarea/applysystem/application/@application.ApplicationId">
+                            <p class="record__title">@ToolSet.GetFormattedName(application.UserId)</p>
+                            <div class="record__meta">
+                                <span>@application.PositionName</span>
+                                <span>@application.PhaseName</span>
+                                <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)</time>
+                                <span class="mono">@application.UserId</span>
+                            </div>
+                            <div class="record__foot">
+                                <ApplicationStatusPill Status="@application.Status"/>
+                                @if (application.Readers.Count > 0)
+                                {
+                                    <span class="avatar-row">
+                                        <span class="meta me-1">Gelesen von</span>
+                                        <SeenByAvatars Readers="@application.Readers"/>
+                                    </span>
+                                }
+                            </div>
+                        </a>
+                    </li>
+                }
+            </ul>
+
+            <Pager Current="currentPage" CurrentChanged="p => currentPage = p"
+                   TotalPages="TotalPages" TotalItems="filtered.Count"/>
+        }
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private HashSet<string> allowedPositions = new();
+    private List<TeamApplicationPosition> positions = new();
+    private List<TeamApplicationPhase> phases = new();
+    private List<TeamApplication> applications = new();
+    private List<TeamApplication> filtered = new();
+
+    private string filterPosition = "";
+    private string filterPhase = "";
+    private string filterStatus = "";
+    private string searchTerm = "";
+    private Timer? debounceTimer;
+
+    private const int PageSize = 25;
+    private int currentPage = 1;
+    private bool mayManagePositions;
+
+    private IEnumerable<TeamApplication> PageItems => filtered.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
+
+    private bool AnyFilter => !string.IsNullOrEmpty(filterPosition) || !string.IsNullOrEmpty(filterPhase) ||
+                              !string.IsNullOrEmpty(filterStatus) || !string.IsNullOrWhiteSpace(searchTerm);
+
+    private IEnumerable<TeamApplicationPhase> VisiblePhases => string.IsNullOrEmpty(filterPosition)
+        ? phases
+        : phases.Where(p => p.PositionId == filterPosition);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        allowedPositions = await TeamApplicationPermissionService.GetAllowedPositionsAsync(userId,
+            TeamApplicationPermission.ViewApplications);
+
+        mayManagePositions = await TeamApplicationPermissionService.HasAsync(userId,
+            TeamApplicationPermission.ManageQuestions);
+
+        if (allowedPositions.Count > 0) await Reload();
+        loaded = true;
+    }
+
+    private async Task Reload()
+    {
+        positions = (await TeamApplicationService.GetPositionsAsync())
+            .Where(p => allowedPositions.Contains(p.PositionId))
+            .ToList();
+        phases = (await TeamApplicationService.GetPhasesAsync())
+            .Where(p => allowedPositions.Contains(p.PositionId))
+            .ToList();
+
+        applications = await TeamApplicationService.GetApplicationsAsync(allowedPositions);
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<TeamApplication> query = applications;
+
+        if (!string.IsNullOrEmpty(filterPosition))
+            query = query.Where(a => a.PositionId == filterPosition);
+        if (!string.IsNullOrEmpty(filterPhase))
+            query = query.Where(a => a.PhaseId == filterPhase);
+        if (Enum.TryParse<TeamApplicationStatus>(filterStatus, out var status))
+            query = query.Where(a => a.Status == status);
+
+        var term = searchTerm.Trim();
+        if (term.Length > 0)
+            query = query.Where(a => a.UserId.ToString().Contains(term) ||
+                                     ToolSet.GetFormattedName(a.UserId)
+                                         .Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        filtered = query
+            .OrderByDescending(a => a.IsOpen)
+            .ThenByDescending(a => a.SubmittedAt)
+            .ToList();
+        currentPage = 1;
+        StateHasChanged();
+    }
+
+    private void ResetFilters()
+    {
+        filterPosition = "";
+        filterPhase = "";
+        filterStatus = "";
+        searchTerm = "";
+        ApplyFilters();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? "";
+
+        if (debounceTimer == null)
+            debounceTimer = new Timer(_ => InvokeAsync(ApplyFilters), null, 250, Timeout.Infinite);
+        else
+            debounceTimer.Change(250, Timeout.Infinite);
+    }
+
+    public void Dispose()
+    {
+        debounceTimer?.Dispose();
+    }
+}

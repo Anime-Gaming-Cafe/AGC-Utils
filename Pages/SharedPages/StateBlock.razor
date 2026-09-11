@@ -1,0 +1,63 @@
+@* Loading, empty and error in one place.
+
+   Title and Description are both required, which is the point: the old code had 11
+   identical bare spinners, 4 English "Loading...", and 23 empty states of which not a
+   single one told the user why the screen was empty or what to do about it.
+
+   An action is optional only because some screens genuinely have none - a log fills
+   itself when the bot logs something. Those say so in the Description instead. *@
+
+<div class="state @(Inline ? "state--inline" : null) @(Kind == StateKind.Error ? "state--bad" : null)">
+    @if (Kind == StateKind.Loading)
+    {
+        <span class="spinner @(Inline ? "spinner--sm" : null)" role="status" aria-label="Wird geladen"></span>
+    }
+
+    <div>
+        <p class="state__title">@Title</p>
+        <p class="state__text">@Description</p>
+
+        @if (ChildContent is not null)
+        {
+            @ChildContent
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ActionText))
+        {
+            <div class="state__actions">
+                @if (!string.IsNullOrEmpty(ActionHref))
+                {
+                    <a class="btn btn-secondary btn-sm" href="@ActionHref" target="@(ActionTargetsServer ? "_top" : null)">@ActionText</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="OnAction">@ActionText</button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    public enum StateKind { Loading, Empty, Error }
+
+    [Parameter] public StateKind Kind { get; set; } = StateKind.Empty;
+
+    /// <summary>For Loading, name what is loading. For Empty, name what is missing.</summary>
+    [Parameter] [EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>Why this state happened, in the user's terms.</summary>
+    [Parameter] [EditorRequired] public string Description { get; set; } = "";
+
+    [Parameter] public string? ActionText { get; set; }
+    [Parameter] public string? ActionHref { get; set; }
+
+    /// <summary>
+    ///     ActionHref is a controller route such as /login. Blazor would intercept the click, find no page
+    ///     and force a reload from inside the circuit, which fails while the page unloads.
+    /// </summary>
+    [Parameter] public bool ActionTargetsServer { get; set; }
+    [Parameter] public EventCallback OnAction { get; set; }
+    [Parameter] public bool Inline { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

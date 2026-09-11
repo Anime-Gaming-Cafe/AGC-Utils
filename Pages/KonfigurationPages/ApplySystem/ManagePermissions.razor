@@ -1,0 +1,190 @@
+@page "/konfiguration/applysystem/permissions"
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@attribute [Authorize(Roles = "BotOwner, Administrator")]
+
+<PageHeader Title="Rechte-Matrix"
+            Lead="Rechte im Bewerbungssystem hängen an Discord-Rollen. Bot-Owner und Administratoren haben immer alle Rechte und brauchen keinen Eintrag."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Rechte werden geladen"
+                Description="Vergebene Rechte, Positionen und Serverrollen werden abgefragt."/>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+    }
+
+    @if (rules.Count == 0)
+    {
+        <StateBlock Title="Noch kein Recht vergeben"
+                    Description="Ohne Einträge haben nur Bot-Owner und Administratoren Zugriff auf das Bewerbungssystem. Vergib das erste Recht im Formular darunter."/>
+    }
+    else
+    {
+        <Panel Title="Vergebene Rechte" Flush="true">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Rolle</th>
+                        <th>Position</th>
+                        <th>Recht</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var rule in rules.OrderBy(r => RoleName(r.RoleId)).ThenBy(r => r.Permission))
+                    {
+                        <tr>
+                            <td>@RoleName(rule.RoleId)</td>
+                            <td>@(rule.PositionId == null ? "Alle Positionen" : PositionName(rule.PositionId))</td>
+                            <td>
+                                @if (rule.Permission == TeamApplicationPermission.FullAccess)
+                                {
+                                    @* Flagged because its reach is easy to underestimate in a long list. *@
+                                    <StatusPill Text="@PermissionLabel(rule.Permission)" Tone="StatusPill.PillTone.Warn"/>
+                                }
+                                else
+                                {
+                                    @PermissionLabel(rule.Permission)
+                                }
+                            </td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveRule(rule)">Entfernen</button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </Panel>
+    }
+
+    <Panel Title="Recht vergeben" Class="mt-3"
+           Lead="Vollzugriff deckt alle Rechte dieser Liste ab, nicht aber das Löschen von Positionen. Das bleibt Administratoren vorbehalten.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="r-role">Rolle</label>
+                <select id="r-role" class="form-select" @bind="newRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in roles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="r-position">Position</label>
+                <select id="r-position" class="form-select" @bind="newPositionId">
+                    <option value="">Alle Positionen</option>
+                    @foreach (var position in positions)
+                    {
+                        <option value="@position.PositionId">@position.PositionName</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="r-permission">Recht</label>
+                <select id="r-permission" class="form-select" @bind="newPermission">
+                    @foreach (var permission in Enum.GetValues<TeamApplicationPermission>())
+                    {
+                        <option value="@permission">@PermissionLabel(permission)</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddRule">Recht vergeben</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private string statusMessage = "";
+    private string statusTone = "ok";
+
+    private List<TeamApplicationPermissionRule> rules = new();
+    private List<TeamApplicationPosition> positions = new();
+    private List<DiscordRole> roles = new();
+
+    private ulong newRoleId;
+    private string newPositionId = "";
+    private TeamApplicationPermission newPermission = TeamApplicationPermission.ViewApplications;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        rules = await TeamApplicationPermissionService.GetRulesAsync();
+        positions = await TeamApplicationService.GetPositionsAsync();
+        roles = CurrentApplication.TargetGuild.Roles.Values
+            .Where(r => !r.IsManaged && r.Name != "@everyone")
+            .OrderByDescending(r => r.Position)
+            .ToList();
+    }
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
+    private string RoleName(ulong roleId)
+    {
+        var role = roles.FirstOrDefault(r => r.Id == roleId);
+        return role?.Name ?? roleId.ToString();
+    }
+
+    private string PositionName(string positionId)
+    {
+        var position = positions.FirstOrDefault(p => p.PositionId == positionId);
+        return position?.PositionName ?? positionId;
+    }
+
+    private static string PermissionLabel(TeamApplicationPermission permission) => permission switch
+    {
+        TeamApplicationPermission.FullAccess => "Vollzugriff",
+        TeamApplicationPermission.ViewApplications => "Bewerbungen ansehen",
+        TeamApplicationPermission.MarkInternal => "Intern markieren",
+        TeamApplicationPermission.Notes => "Interne Notizen",
+        TeamApplicationPermission.Decide => "Entscheiden",
+        TeamApplicationPermission.ManagePhases => "Phasen verwalten",
+        TeamApplicationPermission.ManageQuestions => "Fragenkatalog verwalten",
+        TeamApplicationPermission.GrantReapply => "Sofort-Wiederbewerbung erlauben",
+        TeamApplicationPermission.ViewModerationHistory => "Moderationshistorie einsehen",
+        _ => permission.ToString()
+    };
+
+    private async Task AddRule()
+    {
+        if (newRoleId == 0)
+        {
+            Say("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        await TeamApplicationPermissionService.AddRuleAsync(newRoleId,
+            string.IsNullOrWhiteSpace(newPositionId) ? null : newPositionId, null, newPermission);
+        await LoadAll();
+        Say("Recht vergeben.", "ok");
+    }
+
+    private async Task RemoveRule(TeamApplicationPermissionRule rule)
+    {
+        await TeamApplicationPermissionService.RemoveRuleAsync(rule.PermissionId);
+        await LoadAll();
+        Say("Recht entfernt.", "ok");
+    }
+}

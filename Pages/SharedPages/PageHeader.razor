@@ -1,0 +1,29 @@
+@* Every page title goes through here. Before this the app mixed <h1> and <h3>
+   across 28 pages with no rule. *@
+
+@if (!string.IsNullOrEmpty(BackHref))
+{
+    <a class="page-back" href="@BackHref"><AppIcon Name="back"/> @(BackText ?? "Zurück")</a>
+}
+
+<header class="page-header">
+    <div class="page-header__text">
+        <h1>@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Lead))
+        {
+            <p class="page-header__lead">@Lead</p>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="page-header__actions">@Actions</div>
+    }
+</header>
+
+@code {
+    [Parameter] [EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Lead { get; set; }
+    [Parameter] public string? BackHref { get; set; }
+    [Parameter] public string? BackText { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

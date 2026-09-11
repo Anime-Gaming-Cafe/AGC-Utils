@@ -1,105 +1,177 @@
-﻿@page "/konfiguration/applysystem/modifypanelmessage"
+@page "/konfiguration/applysystem/modifypanelmessage"
 @using AGC_Management.Services
 @using AGC_Management.Enums
 @using AGC_Management.ApplicationSystem
+@using DisCatSharp.Enums
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
+<PageHeader Title="Bewerbungspanel"
+            Lead="Die Nachricht in Discord, über die sich Mitglieder bewerben."
+            BackHref="/konfiguration" BackText="Administration"/>
 
-<script type="module" src="https://unpkg.com/@@aitsys/discord-components-core"></script>
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+}
 
-<div class="d-flex justify-content-center">
-    <div class="form-group w-75">
-        <h1>Bewerbungs-Panel Nachricht bearbeiten</h1>
-        <textarea class="form-control glassy-input" id="panelmessage" @bind="panelmessage" @oninput="UpdatePreview" rows="20"></textarea>
+<div class="detail-grid">
+    <div>
+        <Panel Title="Panel-Text" Lead="Unterstützt Markdown. Beim Speichern wird das bestehende Panel sofort aktualisiert.">
+            <div class="field">
+                <label class="field__label" for="panel-text">Text</label>
+                <textarea id="panel-text" class="form-control" rows="14" @bind="panelmessage" @oninput="UpdatePreview"></textarea>
+            </div>
+            <div class="form-foot">
+                <button type="button" class="btn btn-primary" @onclick="savePanelMessage">Text speichern</button>
+            </div>
+        </Panel>
 
-        <button class="btn btn-primary-glass mt-2 mb-2" @onclick="savePanelMessage">Speichern</button>
-        <button class="btn btn-primary-glass mt-2 mb-2" @onclick="TogglePreview">
-            Vorschau anzeigen
-            @if (showPreview)
+        <Panel Title="Vorschau" Lead="Ungefähre Darstellung. Discord rendert Markdown in Details anders.">
+            @* Replaces a Discord web-component library whose script sat in the component body and was
+               therefore never executed by Blazor. The bar is the panel embed's own colour (DiscordColor.Gold),
+               not the dashboard accent - see DESIGN.md, exceptions. *@
+            <div class="embed-preview" style="border-left-color: #F1C40F;">
+                <p class="embed-preview__title">Bewerbung</p>
+                <div class="embed-preview__body">
+                    @if (string.IsNullOrWhiteSpace(panelmessage))
+                    {
+                        <span>Es wurde noch kein Text für das Bewerbungspanel festgelegt.</span>
+                    }
+                    else
+                    {
+                        @((MarkupString)panelmessagepreview)
+                    }
+                </div>
+                <p class="embed-preview__footer">AGC Bewerbungssystem</p>
+            </div>
+        </Panel>
+    </div>
+
+    <div>
+        <Panel Title="Panel in Discord">
+            @if (panelMessageId == 0)
             {
-                <span class="badge badge-success-glass">An</span>
+                <p class="meta mb-3">Es wurde noch kein Bewerbungspanel gesendet.</p>
             }
             else
             {
-                <span class="badge badge-danger-glass">Aus</span>
+                <dl class="facts mb-3">
+                    <dt>Channel</dt>
+                    <dd>@CurrentPanelChannelName</dd>
+                    <dt>Nachricht</dt>
+                    <dd><a href="@PanelLink" target="_blank" rel="noopener">In Discord öffnen</a></dd>
+                </dl>
             }
-        </button>
 
+            <div class="field">
+                <label class="field__label" for="panel-channel">Channel für ein neues Panel</label>
+                <select id="panel-channel" class="form-select" @bind="selectedChannelId">
+                    <option value="0">Channel wählen</option>
+                    @foreach (var channel in textChannels)
+                    {
+                        <option value="@channel.Id">#@channel.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-foot">
+                <button type="button" class="btn btn-secondary" disabled="@sending" @onclick="SendPanel">Neues Panel senden</button>
+                <button type="button" class="btn btn-ghost" disabled="@(panelMessageId == 0)" @onclick="RefreshPanel">Aktualisieren</button>
+            </div>
+            <p class="field__hint">
+                Ein neues Panel ersetzt das alte nicht. Das alte bleibt stehen, wird aber nicht mehr aktualisiert.
+                Lösche es in Discord von Hand.
+            </p>
+        </Panel>
     </div>
 </div>
-
-<div class="alert alert-info-glass mt-4 justify-content-center" role="alert">
-    <h4 class="alert-heading">Hinweis</h4>
-    <hr>
-    <p>Die Nachricht wird im Bewerbungs-Panel angezeigt. Sie kann Markdown-Formatierungen enthalten.</p>
-</div>
-
-@if (showPreview)
-{
-    <!-- Warning only approximated preview -->
-    <div class="alert alert-warning-glass mt-4 justify-content-center" role="alert">
-        <h4 class="alert-heading">Vorschau</h4>
-        <hr>
-        <p>Die Vorschau ist nur ein ungefähres Abbild des tatsächlichen Ergebnisses. Die Darstellung kann auf Discord abweichen.</p>
-    </div>
-    <br/>
-    <div class="d-flex justify-content-center ">
-
-        <discord-messages>
-            <discord-embed style="max-width: 600px; background-color: #2C2F33; border-color: #23272A;">
-                <discord-embed-title slot="title" style="color: #FFFFFF;">
-                    Bewerbungs-Panel Vorschau
-                </discord-embed-title>
-                <discord-embed-description slot="description" style="color: #FFFFFF; padding: 8px 24px 8px 8px; white-space: pre-wrap; word-break: break-word;">
-                    <div style="color: #FFFFFF;">@((MarkupString)panelmessagepreview)</div>
-                </discord-embed-description>
-                <discord-embed-footer slot="footer" style="color: #FFFFFF;">
-                    AGC Bewerbungssystem
-                </discord-embed-footer>
-            </discord-embed>
-        </discord-messages>
-    </div>
-    <br/>
-}
-
 
 @code {
     private string panelmessage = "";
-    private string newpanelmessage = "";
-    private bool showPreview;
     private string panelmessagepreview = "";
+    private string statusMessage = "";
+    private string statusTone = "ok";
 
+    private List<DiscordChannel> textChannels = new();
+    private ulong selectedChannelId;
+    private ulong panelChannelId;
+    private ulong panelMessageId;
+    private bool sending;
+
+    private string CurrentPanelChannelName =>
+        CurrentApplication.TargetGuild.Channels.TryGetValue(panelChannelId, out var channel)
+            ? "#" + channel.Name
+            : panelChannelId.ToString();
+
+    private string PanelLink =>
+        $"https://discord.com/channels/{CurrentApplication.TargetGuild.Id}/{panelChannelId}/{panelMessageId}";
 
     protected override async Task OnInitializedAsync()
     {
-        var dbpanelmessage = await CachingService.GetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache, "applypaneltext");
-        if (dbpanelmessage != null)
+        panelmessage = await CachingService.GetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache, "applypaneltext") ?? "";
+        panelmessagepreview = panelmessage.ConvertMarkdownToHtml();
+
+        textChannels = CurrentApplication.TargetGuild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+
+        await LoadPanelLocation();
+        selectedChannelId = panelChannelId;
+    }
+
+    private async Task LoadPanelLocation()
+    {
+        (panelChannelId, panelMessageId) = await ApplyPanelCommands.GetPanelLocationAsync();
+    }
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
+    private async Task SendPanel()
+    {
+        if (selectedChannelId == 0)
         {
-            panelmessage = dbpanelmessage;
-            panelmessagepreview = panelmessage.ConvertMarkdownToHtml();
+            Say("Bitte zuerst einen Channel wählen.", "bad");
+            return;
         }
-        else
+
+        sending = true;
+        try
         {
-            panelmessage = "";
+            await ApplyPanelCommands.SendPanelToChannelAsync(selectedChannelId);
+            await LoadPanelLocation();
+            Say("Panel wurde gesendet.", "ok");
         }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "TeamApplications: Panel senden fehlgeschlagen");
+            Say("Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?", "bad");
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+
+    private void RefreshPanel()
+    {
+        ApplyPanelCommands.QueueRefreshPanel();
+        Say("Panel wird aktualisiert.", "ok");
     }
 
     private void UpdatePreview(ChangeEventArgs e)
     {
-        panelmessagepreview = e.Value.ToString().ConvertMarkdownToHtml();
-        StateHasChanged();
-    }
-
-    private async Task TogglePreview()
-    {
-        showPreview = !showPreview;
+        panelmessagepreview = (e.Value?.ToString() ?? "").ConvertMarkdownToHtml();
     }
 
     private async Task savePanelMessage()
     {
         await CachingService.SetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache, "applypaneltext", panelmessage);
         ApplyPanelCommands.QueueRefreshPanel();
-        StateHasChanged();
+        Say("Panel-Text gespeichert.", "ok");
     }
-
 }

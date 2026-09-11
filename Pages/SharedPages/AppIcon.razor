@@ -1,0 +1,25 @@
+@* Inline SVG icons. Replaces open-iconic, Bootstrap Icons and the Font Awesome kit -
+   three fonts and two external CDNs for what is roughly a dozen glyphs.
+   Each icon is picked for what it says about the thing it marks; add one only when
+   it carries meaning the label does not. *@
+
+<svg class="icon @Class" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    @switch (Name)
+    {
+        case "menu":
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+            break;
+        case "back":
+            <path d="M14 6l-6 6 6 6"/>
+            break;
+        case "refresh":
+            <path d="M20 11a8 8 0 1 0-.7 4.5"/>
+            <path d="M20 5v6h-6"/>
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter] [EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+}

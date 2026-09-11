@@ -1,0 +1,303 @@
+@page "/konfiguration/applysystem/positions"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.ApplicationSystem
+@using DisCatSharp.Enums
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<PageHeader Title="Bewerbungspositionen"
+            Lead="Jede Position braucht einen veröffentlichten Fragenkatalog und eine offene Phase, bevor sich jemand bewerben kann."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Positionen werden geladen"
+                Description="Positionen, Text-Channels und deine Rechte werden abgefragt."/>
+}
+else if (!mayManage)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Positionen verwalten darf, wer das Recht „Fragenkatalog verwalten“ hat. Rechte vergibt ein Administrator in der Rechte-Matrix."/>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+    }
+
+    @if (positions.Count == 0)
+    {
+        <StateBlock Title="Noch keine Position angelegt"
+                    Description="Lege die erste Position im Formular darunter an. Danach folgen Fragenkatalog und Bewerbungsphase."/>
+    }
+
+    @foreach (var position in positions)
+    {
+        <Panel Title="@position.PositionName" Lead="@($"Bewerbungs-URL: /apply/{position.PositionId}")">
+            <Actions>
+                @if (position.AlwaysOpen)
+                {
+                    <StatusPill Text="Testmodus" Tone="StatusPill.PillTone.Warn"/>
+                }
+                <StatusPill Text="@(position.Active ? "Im Panel" : "Ausgeblendet")"
+                            Tone="@(position.Active ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+            </Actions>
+            <ChildContent>
+                <div class="field-grid">
+                    <div class="field">
+                        <label class="field__label" for="name-@position.PositionId">Anzeigename</label>
+                        <input id="name-@position.PositionId" class="form-control" @bind="position.PositionName"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="lvl-@position.PositionId">Mindestlevel</label>
+                        <input id="lvl-@position.PositionId" type="number" min="0" class="form-control" @bind="position.MinLevel"/>
+                        <span class="field__hint">Bewerber sehen diese Zahl nie.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="ch-@position.PositionId">Benachrichtigungs-Channel</label>
+                        <select id="ch-@position.PositionId" class="form-select" @bind="position.NotifyChannelId">
+                            <option value="0">Kein Channel</option>
+                            @foreach (var channel in textChannels)
+                            {
+                                <option value="@channel.Id">#@channel.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field field--wide">
+                        <label class="field__label" for="desc-@position.PositionId">Beschreibung</label>
+                        <textarea id="desc-@position.PositionId" class="form-control" rows="2" @bind="position.Description"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="active-@position.PositionId"
+                           @bind="position.Active"/>
+                    <label class="form-check-label" for="active-@position.PositionId">Im Bewerbungspanel anzeigen</label>
+                </div>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="alwaysopen-@position.PositionId"
+                           @bind="position.AlwaysOpen"/>
+                    <label class="form-check-label" for="alwaysopen-@position.PositionId">
+                        Bewerbungseinsendung immer erlauben
+                    </label>
+                    <span class="field__hint">
+                        Zum Testen: überspringt offene Phase, Mindestlevel und „eine Bewerbung pro Phase“.
+                        Braucht trotzdem eine angelegte Phase und einen veröffentlichten Fragenkatalog.
+                    </span>
+                </div>
+
+                <div class="form-foot">
+                    <button type="button" class="btn btn-secondary" @onclick="() => SavePosition(position)">Speichern</button>
+                    <a class="btn btn-ghost" href="/konfiguration/applysystem/questions/@position.PositionId">Fragenkatalog</a>
+                    <a class="btn btn-ghost" href="/konfiguration/applysystem/phases/@position.PositionId">Phasen</a>
+                    @if (isAdministrator && pendingDelete != position.PositionId)
+                    {
+                        <button type="button" class="btn btn-danger ms-auto" @onclick="() => RequestDelete(position)">Löschen</button>
+                    }
+                </div>
+
+                @if (isAdministrator && pendingDelete == position.PositionId)
+                {
+                    <ConfirmInline Title="Position endgültig löschen?"
+                                   ConfirmText="Ja, endgültig löschen"
+                                   Busy="deleting"
+                                   OnConfirm="() => DeletePosition(position)"
+                                   OnCancel="() => pendingDelete = null">
+                        <p>
+                            Gelöscht werden die Position, alle Fragenkatalog-Versionen, alle Phasen sowie
+                            positionsbezogene Textbausteine und Rechte-Einträge@(pendingDeleteApplications > 0
+                                ? $", außerdem {pendingDeleteApplications} Bewerbungen mit allen Antworten und Notizen"
+                                : "").
+                            Das lässt sich nicht rückgängig machen.
+                        </p>
+                        @if (pendingDeleteApplications > 0)
+                        {
+                            <p>Soll die Position nur aus dem Panel verschwinden, schalte stattdessen „Im Bewerbungspanel anzeigen“ aus.</p>
+                        }
+                    </ConfirmInline>
+                }
+            </ChildContent>
+        </Panel>
+    }
+
+    <h2 class="section-title">Neue Position</h2>
+    <Panel>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="new-name">Name</label>
+                <input id="new-name" class="form-control" @bind="newName" placeholder="Name der Position"/>
+                <span class="field__hint">Aus dem Namen wird die Bewerbungs-URL. Sie lässt sich später nicht ändern.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="new-lvl">Mindestlevel</label>
+                <input id="new-lvl" type="number" min="0" class="form-control" @bind="newMinLevel"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="CreatePosition">Position anlegen</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private bool mayManage;
+    private bool isAdministrator;
+    private bool deleting;
+    private string statusMessage = "";
+    private string statusTone = "ok";
+
+    private string? pendingDelete;
+    private int pendingDeleteApplications;
+
+    private List<TeamApplicationPosition> positions = new();
+    private List<DiscordChannel> textChannels = new();
+
+    private string newName = "";
+    private int newMinLevel = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        mayManage = await TeamApplicationPermissionService.HasAsync(userId,
+            TeamApplicationPermission.ManageQuestions);
+        isAdministrator = await TeamApplicationPermissionService.IsAdministratorAsync(userId);
+
+        if (mayManage) await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        textChannels = CurrentApplication.TargetGuild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+
+        positions = await TeamApplicationService.GetPositionsAsync();
+    }
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
+    private async Task SavePosition(TeamApplicationPosition position)
+    {
+        if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
+                position.PositionId))
+        {
+            Say("Für diese Position fehlt dir die Berechtigung.", "bad");
+            return;
+        }
+
+        try
+        {
+            await TeamApplicationService.UpdatePositionAsync(position);
+            ApplyPanelCommands.QueueRefreshPanel();
+            Say($"„{position.PositionName}“ gespeichert.", "ok");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "TeamApplications: Position speichern fehlgeschlagen");
+            Say("Die Position konnte nicht gespeichert werden.", "bad");
+        }
+    }
+
+    private async Task RequestDelete(TeamApplicationPosition position)
+    {
+        if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
+        {
+            Say("Positionen dürfen nur Administratoren löschen.", "bad");
+            return;
+        }
+
+        pendingDeleteApplications = await TeamApplicationService.CountApplicationsForPositionAsync(
+            position.PositionId);
+        pendingDelete = position.PositionId;
+    }
+
+    private async Task DeletePosition(TeamApplicationPosition position)
+    {
+        if (deleting) return;
+
+        // Re-checked here, not just when the button was rendered.
+        if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
+        {
+            Say("Positionen dürfen nur Administratoren löschen.", "bad");
+            pendingDelete = null;
+            return;
+        }
+
+        deleting = true;
+        try
+        {
+            await TeamApplicationService.DeletePositionAsync(position.PositionId);
+            ApplyPanelCommands.QueueRefreshPanel();
+
+            CurrentApplication.Logger.Information(
+                $"TeamApplications: Position {position.PositionId} von {userId} gelöscht " +
+                $"({pendingDeleteApplications} Bewerbungen).");
+
+            pendingDelete = null;
+            await LoadAll();
+            Say($"„{position.PositionName}“ wurde gelöscht.", "ok");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "TeamApplications: Position löschen fehlgeschlagen");
+            Say("Die Position konnte nicht gelöscht werden. Es wurde nichts verändert.", "bad");
+        }
+        finally
+        {
+            deleting = false;
+        }
+    }
+
+    private async Task CreatePosition()
+    {
+        if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions))
+        {
+            Say("Dafür fehlt dir die Berechtigung.", "bad");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            Say("Bitte einen Namen angeben.", "bad");
+            return;
+        }
+
+        var slug = TeamApplicationService.Slugify(newName);
+        if (string.IsNullOrEmpty(slug) || TeamApplicationService.IsReservedSlug(slug))
+        {
+            Say("Aus diesem Namen lässt sich keine gültige URL bilden. Bitte einen anderen wählen.", "bad");
+            return;
+        }
+
+        var created = await TeamApplicationService.CreatePositionAsync(newName, newMinLevel, 0, "");
+        if (created == null)
+        {
+            Say("Es gibt bereits eine Position mit dieser URL.", "bad");
+            return;
+        }
+
+        newName = "";
+        newMinLevel = 20;
+        await LoadAll();
+        Say("Position angelegt. Als Nächstes den Fragenkatalog anlegen.", "ok");
+    }
+}

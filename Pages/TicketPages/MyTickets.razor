@@ -1,0 +1,135 @@
+@page "/tickets"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.Ticket
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<PageHeader Title="Meine Tickets"
+            Lead="Tickets, die du eröffnet hast oder zu denen du hinzugefügt wurdest."/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Tickets werden geladen"
+                Description="Deine offenen und geschlossenen Tickets werden abgefragt."/>
+}
+else if (failed)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Tickets konnten nicht geladen werden"
+                Description="Die Abfrage ist fehlgeschlagen. Versuch es in einem Moment erneut."
+                ActionText="Erneut versuchen"
+                OnAction="Load"/>
+}
+else if (tickets.Count == 0)
+{
+    <StateBlock Title="Du hattest noch kein Ticket"
+                Description="Tickets eröffnest du im Support-Kanal auf dem Server. Danach findest du sie hier, geschlossene mit ihrem Transcript."
+                ActionText="@(supportLink is null ? null : "Zum Support-Kanal")"
+                ActionHref="@supportLink"/>
+}
+else
+{
+    @if (tickets.Any(t => t.IsOpen))
+    {
+        <Panel Title="Offen" Flush="true">
+            <ul class="rows">
+                @foreach (var ticket in tickets.Where(t => t.IsOpen))
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@ticket.TypeLabel</p>
+                            <p class="rows__text">
+                                @if (ticket.ChannelName is not null)
+                                {
+                                    <span>#@ticket.ChannelName · </span>
+                                }
+                                @if (ticket.OpenedAt > 0)
+                                {
+                                    <span>eröffnet am <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(ticket.OpenedAt)</time> · </span>
+                                }
+                                <span class="mono">@ticket.TicketId</span>
+                            </p>
+                        </div>
+                        @if (ticket.ChannelUrl is not null)
+                        {
+                            <div class="rows__side">
+                                <a class="btn btn-secondary btn-sm" href="@ticket.ChannelUrl" target="_blank" rel="noopener">Zum Ticket</a>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        </Panel>
+    }
+
+    @if (tickets.Any(t => !t.IsOpen))
+    {
+        <Panel Title="Geschlossen" Flush="true">
+            <ul class="rows">
+                @foreach (var ticket in tickets.Where(t => !t.IsOpen))
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@ticket.TypeLabel</p>
+                            <p class="rows__text">
+                                @if (ticket.ClosedAt > 0)
+                                {
+                                    <span>geschlossen am <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(ticket.ClosedAt)</time> · </span>
+                                }
+                                <span class="mono">@ticket.TicketId</span>
+                            </p>
+                        </div>
+                        <div class="rows__side">
+                            @if (ticket.TranscriptUrl is not null)
+                            {
+                                <a class="btn btn-secondary btn-sm" href="@ticket.TranscriptUrl" target="_blank" rel="noopener">Transcript ansehen</a>
+                            }
+                            else
+                            {
+                                <span class="meta">Kein Transcript gespeichert</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </Panel>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool loaded;
+    private bool failed;
+    private ulong userId;
+    private string? supportLink;
+    private List<UserTicket> tickets = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(principal) ?? 0;
+        supportLink = UserTicketService.GetSupportLink();
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        failed = false;
+        try
+        {
+            tickets = await UserTicketService.GetTicketsAsync(userId);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Tickets für die Seite Meine Tickets konnten nicht geladen werden");
+            failed = true;
+        }
+
+        loaded = true;
+    }
+}

@@ -1,0 +1,24 @@
+@inject IJSRuntime JSRuntime
+@* Copies an id and confirms it where it was clicked. *@
+
+<button type="button" class="copy-id mono" title="ID kopieren" @onclick="Copy">@Value</button>
+@if (copied)
+{
+    <span class="copy-id__done" role="status">Kopiert</span>
+}
+
+@code {
+    [Parameter] [EditorRequired] public string Value { get; set; } = "";
+
+    private bool copied;
+
+    private async Task Copy()
+    {
+        await JSRuntime.InvokeVoidAsync("copyToClipboard", Value);
+        copied = true;
+        StateHasChanged();
+
+        await Task.Delay(2000);
+        copied = false;
+    }
+}

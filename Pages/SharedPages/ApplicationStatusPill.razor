@@ -1,0 +1,45 @@
+@using AGC_Management.Enums.ApplicationSystem
+@* The one place that knows how a team-side application status reads: its label, its
+   pill tone and its list edge. Overview and detail page both go through here. *@
+
+<StatusPill Text="@Label(Status)" Tone="@Tone(Status)"/>
+
+@code {
+    [Parameter] [EditorRequired] public TeamApplicationStatus Status { get; set; }
+
+    public static string Label(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Eingereicht => "Eingereicht",
+        TeamApplicationStatus.Gelesen => "Gelesen",
+        TeamApplicationStatus.Vorgemerkt => "Vorgemerkt",
+        TeamApplicationStatus.WartetAufRueckfrage => "Wartet auf Rückfrage",
+        TeamApplicationStatus.Angenommen => "Angenommen",
+        TeamApplicationStatus.Abgelehnt => "Abgelehnt",
+        TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
+        _ => status.ToString()
+    };
+
+    /// <summary>
+    ///     A decision is a signal, and so is an open question that needs a follow-up.
+    ///     Everything else is neutral - the label carries it.
+    /// </summary>
+    public static StatusPill.PillTone Tone(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.WartetAufRueckfrage => StatusPill.PillTone.Warn,
+        TeamApplicationStatus.Angenommen => StatusPill.PillTone.Ok,
+        TeamApplicationStatus.Abgelehnt => StatusPill.PillTone.Bad,
+        _ => StatusPill.PillTone.Neutral
+    };
+
+    public static string EdgeClass(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Eingereicht => "record--new",
+        TeamApplicationStatus.Gelesen => "record--read",
+        TeamApplicationStatus.Vorgemerkt => "record--shortlisted",
+        TeamApplicationStatus.WartetAufRueckfrage => "record--waiting",
+        TeamApplicationStatus.Angenommen => "record--accepted",
+        TeamApplicationStatus.Abgelehnt => "record--rejected",
+        TeamApplicationStatus.Zurueckgezogen => "record--withdrawn",
+        _ => "record--new"
+    };
+}

@@ -83,9 +83,8 @@ request your email address, so no email address is collected.
 | Staff applications | If you submit an application: an application ID, your user ID, the position, a timestamp, and your full free-text application. The application text is base64 encoded in the database, which is an encoding and not encryption. The user IDs of the staff who opened your application are also recorded. |
 
 
-Two external resources are loaded on every dashboard page: an icon stylesheet from jsDelivr and a
-Font Awesome Kit script. Loading them sends your IP address and browser user agent to those
-providers, and the Font Awesome script executes in your browser. See section 5.
+The dashboard loads its fonts, icons, stylesheets and scripts from its own server. The only images
+fetched from elsewhere are Discord avatars, which your browser loads from Discord's image servers.
 
 ### 3.6 Other features
 
@@ -130,8 +129,6 @@ Where processing rests on legitimate interests, you have the right to object. Se
 |---|---|---|
 | Discord | Everything, since the bot operates on the Discord platform | Always |
 | Server staff | Moderation records, tickets and transcripts, applications, member lists, ban and XP logs | Through the bot and the dashboard |
-| Sentry (error tracking) | Exception messages and stack traces, which can contain user IDs and fragments of content | On unhandled errors, only if a Sentry DSN is configured, which is currently not |
-| jsDelivr and Font Awesome | Your IP address and browser user agent | On every dashboard page load |
 | Transcript host and image host | See section 6 | On ticket close and on moderation actions with attachments |
 
 The transcript host and the image host are operated by the server operator, not by an outside

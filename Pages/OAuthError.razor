@@ -1,10 +1,10 @@
-﻿@page "/OAuthError"
-<h3>Login fehlgeschlagen</h3>
+@page "/OAuthError"
 
-<div class="alert alert-danger" role="alert">
-    Login abgebrochen!
-</div>
+<PageTitle>Anmeldung abgebrochen</PageTitle>
 
-@code {
-
-}
+<StateBlock Kind="StateBlock.StateKind.Error"
+            Title="Anmeldung abgebrochen"
+            Description="Die Anmeldung über Discord wurde abgebrochen oder abgelehnt. Ohne diese Freigabe kann das Dashboard dich keinem Konto zuordnen."
+            ActionText="Erneut anmelden"
+            ActionHref="/login"
+            ActionTargetsServer="true"/>

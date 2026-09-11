@@ -1,211 +1,174 @@
-﻿@page "/bot"
+@page "/bot"
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
+<PageHeader Title="Botinformationen">
+    <Actions>
+        @if (ready)
+        {
+            <button type="button" class="btn btn-secondary" @onclick="Measure">
+                <AppIcon Name="refresh"/> Neu messen
+            </button>
+        }
+    </Actions>
+</PageHeader>
 
-@inject NavigationManager NavigationManager_
+@if (!ready)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Status wird gemessen"
+                Description="Websocket-Latenz, Datenbank und Laufzeitumgebung werden abgefragt."/>
+}
+else if (failed)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Status nicht vollständig abrufbar"
+                Description="Mindestens eine Messung ist fehlgeschlagen, meistens die Datenbank. Details stehen im Log."
+                ActionText="Erneut messen"
+                OnAction="Measure"/>
+}
+else
+{
+    <div class="panel-grid">
+        <Panel Title="Bot">
+            <dl class="facts">
+                <dt>Websocket</dt>
+                <dd class="tnum">@ping</dd>
+                <dt>Nutzer im Cache</dt>
+                <dd class="tnum">@cachedUsers</dd>
+                <dt>Bot-Nutzer</dt>
+                <dd>@botUser</dd>
+                <dt>Version</dt>
+                <dd class="mono">@CurrentApplication.VersionString</dd>
+                <dt>Arbeitsspeicher</dt>
+                <dd class="tnum">@ramUsage</dd>
+            </dl>
+        </Panel>
 
-<h3>Botstatus</h3>
-<br>
-<div class="row">
-    <div class="col-md-3 mb-3">
-        <div class="glass-card">
-            <div class="card-header glass-effect-bg">
-                <h5 class="card-title"><i class="oi oi-dashboard"></i> Bot status</h5>
-            </div>
-            <div class="card-body">
-                <p class="card-text">Discord Websocket: @ping</p>
-                <div class="server-count" onmouseover="showServerPopup()" onmouseout="hideServerPopup()">
-                    <p class="card-text">Servercount: @guildcount</p>
-                    <div id="serverPopup" class="server-popup">
-                        <ul>
-                            @foreach (var server in serverList)
-                            {
-                                <li>@server</li>
-                            }
-                        </ul>
-                    </div>
-                </div>
-                <p class="card-text">Nutzer im Cache: @cacheduserscount</p>
-                <p class="card-text">Botuser: @botusername</p>
-                <p class="card-text">Botversion: @CurrentApplication.VersionString</p>
-                <p class="card-text">RAM Nutzung: @ramusage</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="glass-card">
-            <div class="card-header glass-effect-bg">
-                <h5 class="card-title"><i class="fa fa-gear"></i> Anwendungskonfiguration</h5>
-            </div>
-            <div class="card-body">
-                <p class="card-text">Target Server: @targetserver</p>
-                <p class="card-text">Anwendungsmodus: @prodmode</p>
-                <p class="card-text">Discord Library: @libversion</p>
-                <p class="card-text">Microsoft .NET Version: @Environment.Version</p>
-                <p class="card-text">Betriebssystem: @osversion</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="glass-card">
-            <div class="card-header glass-effect-bg">
-                <h5 class="card-title"><i class="fa fa-database"></i> Datenbank</h5>
-            </div>
-            <div class="card-body">
-                <p class="card-text">Datenbank Latenz (Simple Query): @dbping</p>
-                <p class="card-text">Datenbank Latenz (Expensive Query): @dbpingexpensive</p>
-                <p class="card-text">Datenbank User: @dbuser</p>
-                <p class="card-text">Datenbank Version: @dbversion</p>
-            </div>
-        </div>
-    </div>
-    <!-- Weitere Karten hier -->
-</div>
-<style>
-    .server-popup {
-        display: none;
-    }
-</style>
+        <Panel Title="Datenbank">
+            <dl class="facts">
+                <dt>Einfache Abfrage</dt>
+                <dd class="tnum">@dbPing</dd>
+                <dt>Aufwendige Abfrage</dt>
+                <dd class="tnum">@dbPingExpensive</dd>
+                <dt>Nutzer</dt>
+                <dd class="mono">@dbUser</dd>
+                <dt>Version</dt>
+                <dd>@dbVersion</dd>
+            </dl>
+        </Panel>
 
+        <Panel Title="Anwendung">
+            <dl class="facts">
+                <dt>Zielserver</dt>
+                <dd>@targetServer</dd>
+                <dt>Modus</dt>
+                <dd>@mode</dd>
+                <dt>Discord-Bibliothek</dt>
+                <dd>@libVersion</dd>
+                <dt>.NET</dt>
+                <dd class="tnum">@Environment.Version</dd>
+                <dt>Betriebssystem</dt>
+                <dd>@osVersion</dd>
+            </dl>
+        </Panel>
+
+        @* The server list used to hide in a hover popup driven by inline JavaScript. *@
+        <Panel Title="@($"Server ({serverList.Count})")" Flush="true">
+            <ul class="rows">
+                @foreach (var server in serverList)
+                {
+                    <li><span>@server</span></li>
+                }
+            </ul>
+        </Panel>
+    </div>
+}
 
 @code {
+    private bool ready;
+    private bool failed;
 
-    private string ping = "Loading...";
-    private string dbping = "Loading...";
-    private string dbversion = "Loading...";
-    private string dbpingexpensive = "Loading...";
-    private string dbuser = "Loading...";
-    private string guildcount = "Loading...";
-    private string cacheduserscount = "Loading...";
-    private string prodmode = "Loading...";
-
-    private string libversion = "Loading...";
-    private string osversion = "Loading...";
-    private string ramusage = "Loading...";
-    private string targetserver = "Loading...";
-    private string botusername = "Loading...";
-
+    private string ping = "";
+    private string dbPing = "";
+    private string dbPingExpensive = "";
+    private string dbVersion = "";
+    private string dbUser = "";
+    private string cachedUsers = "";
+    private string mode = "";
+    private string libVersion = "";
+    private string osVersion = "";
+    private string ramUsage = "";
+    private string targetServer = "";
+    private string botUser = "";
 
     private readonly List<string> serverList = new();
 
+    protected override Task OnInitializedAsync() => Measure();
 
-    protected override async Task OnInitializedAsync()
+    private async Task Measure()
     {
-        await Task.Delay(100);
-        await UpdateValues();
+        ready = false;
+        failed = false;
+
+        try
+        {
+            await UpdateValues();
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Botinformationen konnten nicht vollständig abgefragt werden");
+            failed = true;
+        }
+
+        ready = true;
     }
 
-    private string GetMode()
+    private static string GetMode()
     {
 #if DEBUG
-        return "Development";
+        return "Entwicklung";
 #else
-        return "Production";
+        return "Produktion";
 #endif
-    }
-
-    private void GetServerList()
-    {
-        serverList.Clear();
-        var guilds = CurrentApplication.DiscordClient.Guilds.Values.ToList();
-        foreach (var guild in guilds)
-        {
-            serverList.Add(guild.Name);
-        }
-    }
-
-
-    private string GetPing()
-    {
-        return CurrentApplication.DiscordClient.Ping.ToString();
     }
 
     private async Task UpdateValues()
     {
-        var pingValue = GetPing();
-        var dbPingValue = await GatherDBLatency();
-        var dbPingValueExpensive = await GatherDBLatencyExpensive();
-        var dbVersionValue = await DbVersion();
-        var dbUserValue = await DBuser();
-        var guildCountValue = await GatherGuildCount();
-        var cachedUsersCountValue = await GatherCachedUsersCount();
-        var prodmodevalue = GetMode();
-        GetServerList();
+        var client = CurrentApplication.DiscordClient;
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
 
-        await InvokeAsync(() =>
+        ping = client.Ping + " ms";
+        dbPing = await MeasureQueryAsync(con, "SELECT 1") + " ms";
+        dbPingExpensive = await MeasureQueryAsync(con, "SELECT COUNT(*) FROM flags") + " ms";
+
+        await using (var cmd = con.CreateCommand("SELECT current_user;"))
         {
-            ping = pingValue + " ms";
-            dbping = dbPingValue + " ms";
-            dbpingexpensive = dbPingValueExpensive + " ms";
-            dbuser = dbUserValue;
-            dbversion = dbVersionValue;
-            guildcount = guildCountValue;
-            cacheduserscount = cachedUsersCountValue;
-            prodmode = prodmodevalue;
-            botusername = CurrentApplication.DiscordClient.CurrentUser.UsernameWithDiscriminator;
-            libversion = CurrentApplication.DiscordClient.BotLibrary + " " + CurrentApplication.DiscordClient.VersionString.Split("+")[0];
-            osversion = Environment.OSVersion.ToString();
-            ramusage = (GC.GetTotalMemory(false) / 1024 / 1024) + " MB";
-            targetserver = CurrentApplication.TargetGuild.Name + " (" + CurrentApplication.TargetGuild.Id + ")";
-            StateHasChanged();
-        });
+            dbUser = (await cmd.ExecuteScalarAsync())?.ToString() ?? "";
+        }
+
+        await using (var cmd = con.CreateCommand("SELECT version();"))
+        {
+            // "PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by ..." - the tail is noise here.
+            dbVersion = ((await cmd.ExecuteScalarAsync())?.ToString() ?? "").Split(" on ")[0];
+        }
+
+        cachedUsers = client.UserCache.Count.ToString();
+        mode = GetMode();
+        botUser = client.CurrentUser.UsernameWithDiscriminator;
+        libVersion = client.BotLibrary + " " + client.VersionString.Split("+")[0];
+        osVersion = Environment.OSVersion.ToString();
+        ramUsage = GC.GetTotalMemory(false) / 1024 / 1024 + " MB";
+        targetServer = $"{CurrentApplication.TargetGuild.Name} ({CurrentApplication.TargetGuild.Id})";
+
+        serverList.Clear();
+        serverList.AddRange(client.Guilds.Values.Select(g => g.Name).OrderBy(n => n));
     }
 
-    private async Task<string> GatherGuildCount()
+    private static async Task<long> MeasureQueryAsync(NpgsqlDataSource con, string sql)
     {
-        var guilds = CurrentApplication.DiscordClient.Guilds.Values.ToList();
-        return guilds.Count.ToString();
-    }
-
-    private async Task<string> GatherCachedUsersCount()
-    {
-        var users = CurrentApplication.DiscordClient.UserCache.Keys.ToList();
-
-        return users.Count.ToString();
-    }
-
-    private async Task<string> GatherDBLatency()
-    {
-        var unixtimestampstart = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-        await using var cmd = con.CreateCommand("SELECT 1");
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        await using var cmd = con.CreateCommand(sql);
         await cmd.ExecuteScalarAsync();
-        var unixtimestampend = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        var latency = unixtimestampend - unixtimestampstart;
-        return latency.ToString();
+        return watch.ElapsedMilliseconds;
     }
-
-
-    private async Task<string> GatherDBLatencyExpensive()
-    {
-        var unixtimestampstart = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-        await using var cmd = con.CreateCommand("SELECT COUNT(*) FROM flags");
-        await cmd.ExecuteScalarAsync();
-        var unixtimestampend = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        var latency = unixtimestampend - unixtimestampstart;
-        return latency.ToString();
-    }
-
-    private async Task<string> DBuser()
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-        await using var cmd = con.CreateCommand("SELECT current_user;");
-        var version = await cmd.ExecuteScalarAsync();
-        return version.ToString();
-    }
-
-    private async Task<string> DbVersion()
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-        await using var cmd = con.CreateCommand("SELECT version();");
-        var version = await cmd.ExecuteScalarAsync();
-        return version.ToString();
-    }
-
-
 }

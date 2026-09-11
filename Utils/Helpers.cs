@@ -18,6 +18,48 @@ public static class ToolSet
 	public static string GetFaviconUrl() 
         => CurrentApplication.TargetGuild.IconUrl ?? "favicon.png";
 
+    /// <summary>
+    ///     The dashboard accent as space separated sRGB components for the --accent-rgb custom property,
+    ///     taken from the same colour the bot puts on every Discord embed.
+    /// </summary>
+    public static string GetAccentRgb()
+    {
+        try
+        {
+            var color = BotConfig.GetEmbedColor();
+            if (color.R == 0 && color.G == 0 && color.B == 0) return "47 132 162";
+
+            return $"{color.R} {color.G} {color.B}";
+        }
+        catch (Exception)
+        {
+            return "47 132 162";
+        }
+    }
+
+    /// <summary>
+    ///     Display name for log tables. A cached user costs nothing; an uncached one is only fetched when the
+    ///     caller asks, because a log of hundreds of rows must not turn into hundreds of REST calls.
+    ///     This replaces three copies that had drifted apart on how migrated usernames were shown.
+    /// </summary>
+    public static async Task<string> ResolveUserNameAsync(ulong userId, bool fetch = false)
+    {
+        try
+        {
+            if (CurrentApplication.DiscordClient.UserCache.TryGetValue(userId, out var cached))
+                return cached.IsMigrated ? cached.Username : cached.UsernameWithDiscriminator;
+
+            if (!fetch) return userId.ToString();
+
+            var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
+            return user.IsMigrated ? user.Username : user.UsernameWithDiscriminator;
+        }
+        catch (Exception)
+        {
+            return userId.ToString();
+        }
+    }
+
 	public static string GettextfromBase64(string base64)
     {
         var data = Convert.FromBase64String(base64);
@@ -379,6 +421,37 @@ public static class ToolSet
         return newOverwrites;
     }
 
+
+    /// <summary>
+    ///     Builds an absolute dashboard link. Both keys are optional in config.ini, so each read falls back
+    ///     the same way Program.RunAspAsync does when it rewrites the request host.
+    /// </summary>
+    public static string GetDashboardUrl(string relativePath = "")
+    {
+        bool useHttps;
+        try
+        {
+            useHttps = bool.Parse(BotConfig.GetConfig()["WebUI"]["UseHttps"]);
+        }
+        catch
+        {
+            useHttps = false;
+        }
+
+        string dashboardUrl;
+        try
+        {
+            dashboardUrl = BotConfig.GetConfig()["WebUI"]["DashboardURL"];
+        }
+        catch
+        {
+            dashboardUrl = "localhost";
+        }
+
+        var path = relativePath.TrimStart('/');
+        var baseUrl = $"{(useHttps ? "https" : "http")}://{dashboardUrl.TrimEnd('/')}";
+        return string.IsNullOrEmpty(path) ? baseUrl : $"{baseUrl}/{path}";
+    }
 
     public static string GenerateCaseID()
     {

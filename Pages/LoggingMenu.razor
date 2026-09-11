@@ -1,41 +1,20 @@
-﻿@page "/logs"
-
+@page "/logs"
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<h1>Logging</h1>
+<PageHeader Title="Logging"/>
 
-<div class="container mt-5 mb-5">
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">Bot Logs</h5>
-                <AuthorizeView Roles="BotOwner, Administrator">
-                    <a href="/logs/botlogs/errorlogs" class="btn btn-primary-glass"> Fehler</a>
-                </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator">
-                    <a href="/logs/botlogs/webuilogins" class="btn btn-primary-glass"> WebUI Logins</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">Levelsystem Logs</h5>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                    <a href="/logs/levelsystem/xptransferlogs" class="btn btn-primary-glass">XP Transfers</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">Moderation Logs</h5>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
-                    <a href="/logs/moderation/banlogs" class="btn btn-primary-glass">Banns</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-</div>
+<Panel Title="Moderation">
+    <ul class="nav-links">
+        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
+            <li><a href="/logs/moderation/banlogs">Banns</a></li>
+        </AuthorizeView>
+    </ul>
+</Panel>
+
+<Panel Title="Levelsystem">
+    <ul class="nav-links">
+        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+            <li><a href="/logs/levelsystem/xptransferlogs">XP-Transfers</a></li>
+        </AuthorizeView>
+    </ul>
+</Panel>

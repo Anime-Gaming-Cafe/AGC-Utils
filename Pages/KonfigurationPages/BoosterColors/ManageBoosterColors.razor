@@ -4,155 +4,181 @@
 @using DisCatSharp.Enums
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
-<h1>Booster Farben verwalten</h1>
+<PageHeader Title="Booster Farben"
+            Lead="Farbrollen, die Booster sich über das Panel selbst aussuchen."
+            BackHref="/konfiguration" BackText="Administration"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Booster Farben werden geladen"
+                Description="Einstellungen, Farbrollen und Text-Channels werden abgefragt."/>
 }
 else
 {
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
     }
 
     @if (boundariesMissing)
     {
-        <div class="alert alert-warning-glass mt-2" role="alert">
-            <h4 class="alert-heading">Boundary-Rollen fehlen</h4>
-            <hr>
+        <div class="notice notice--warn mb-3">
+            <p class="notice__title">Boundary-Rollen fehlen</p>
             <p>
-                Es wurden keine Rollen mit den Namen <code>BEGIN_BOOSTERCOLOR</code> und <code>END_BOOSTERCOLOR</code>
-                gefunden. Lege diese beiden Rollen an. Alle Farbrollen dazwischen werden automatisch als Booster Farben
-                erkannt.
+                Es gibt keine Rollen namens <code>BEGIN_BOOSTERCOLOR</code> und <code>END_BOOSTERCOLOR</code>.
+                Lege beide an. Jede Rolle zwischen ihnen wird automatisch als Booster Farbe erkannt.
             </p>
         </div>
     }
 
-    <!-- Einstellungen -->
-    <div class="glass-card mt-4 p-3">
-        <h3>Einstellungen</h3>
-
-        <div class="mb-3">
-            <label class="form-label">Panel-Channel</label>
-            <select class="form-select glassy-input" @bind="panelChannelId">
-                <option value="0">-- Channel wählen --</option>
-                @foreach (var channel in textChannels)
-                {
-                    <option value="@channel.Id">#@channel.Name</option>
-                }
-            </select>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Embed-Titel</label>
-            <input class="form-control glassy-input" @bind="embedTitle"/>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Embed-Beschreibung</label>
-            <textarea class="form-control glassy-input" rows="3" @bind="embedDescription"></textarea>
-        </div>
-
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="enabledCheck" @bind="enabled"/>
-            <label class="form-check-label" for="enabledCheck">Feature aktiviert</label>
-        </div>
-
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="bypassCheck" @bind="bypassEligibility"/>
-            <label class="form-check-label" for="bypassCheck">
-                Dev: Boost-Check umgehen (jeder gilt als Booster, Teammitglieder ausgenommen)
-            </label>
-        </div>
-
-        <button class="btn btn-primary-glass" @onclick="SaveSettings">Einstellungen speichern</button>
-        <button class="btn btn-primary-glass" @onclick="SendPanel">Panel senden</button>
-        <button class="btn btn-primary-glass" @onclick="RefreshPanel">Panel aktualisieren</button>
-    </div>
-
-    <!-- Farbrollen -->
-    <div class="glass-card mt-4 p-3">
-        <h3>Farbrollen</h3>
-        <p class="text-muted">Diese Rollen liegen zwischen den Boundary-Rollen und werden im Auswahl-Dropdown angezeigt.</p>
-
-        <table class="table">
-            <thead>
-            <tr>
-                <th>Vorschau</th>
-                <th>Name</th>
-                <th>Farbe</th>
-                <th>Gradient</th>
-                <th>Mitglieder</th>
-                <th>Aktionen</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach (var role in colorRoles)
-            {
-                <tr>
-                    <td>
-                        <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:@PreviewBackground(role);"></span>
-                    </td>
-                    <td>
-                        <input class="form-control glassy-input" @bind="role.Name"/>
-                    </td>
-                    <td>
-                        <input type="color" class="form-control form-control-color" @bind="role.Hex"/>
-                    </td>
-                    <td>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" @bind="role.Gradient"/>
-                        </div>
-                        @if (role.Gradient)
+    <Panel Title="Farbrollen" Lead="Rollen zwischen den Boundary-Rollen erscheinen im Auswahlmenü des Panels."
+           Flush="@(colorRoles.Count > 0)">
+        @if (colorRoles.Count == 0)
+        {
+            <StateBlock Inline="true"
+                        Title="Noch keine Farbrollen"
+                        Description="Lege unten die erste an, oder verschiebe bestehende Rollen zwischen die Boundary-Rollen."/>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Name</th>
+                        <th>Farbe</th>
+                        <th>Verlauf</th>
+                        <th class="text-end">Mitglieder</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var role in colorRoles)
+                    {
+                        <tr>
+                            <td><span class="swatch" style="background:@PreviewBackground(role);"></span></td>
+                            <td><input class="form-control form-control-sm" aria-label="Name" @bind="role.Name"/></td>
+                            <td><input type="color" class="form-control form-control-color" aria-label="Farbe" @bind="role.Hex"/></td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch" aria-label="Verlauf" @bind="role.Gradient"/>
+                                    </div>
+                                    @if (role.Gradient)
+                                    {
+                                        <input type="color" class="form-control form-control-color" aria-label="Zweite Farbe" @bind="role.SecondaryHex"/>
+                                    }
+                                </div>
+                            </td>
+                            <td class="tnum text-end">@role.MemberCount</td>
+                            <td>
+                                <div class="row-actions justify-content-end">
+                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => SaveRole(role)">Speichern</button>
+                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteRole = role.Id">Löschen</button>
+                                </div>
+                            </td>
+                        </tr>
+                        @if (pendingDeleteRole == role.Id)
                         {
-                            <input type="color" class="form-control form-control-color" @bind="role.SecondaryHex"/>
+                            <tr>
+                                <td colspan="6">
+                                    <ConfirmInline Title="@($"Farbrolle „{role.Name}“ löschen?")"
+                                                   ConfirmText="Ja, Rolle löschen"
+                                                   OnConfirm="() => DeleteRole(role)"
+                                                   OnCancel="() => pendingDeleteRole = 0">
+                                        <p>
+                                            Die Rolle wird in Discord gelöscht@(role.MemberCount > 0 ? $" und {role.MemberCount} Mitgliedern entzogen" : "").
+                                            Das lässt sich nicht rückgängig machen.
+                                        </p>
+                                    </ConfirmInline>
+                                </td>
+                            </tr>
                         }
-                    </td>
-                    <td>@role.MemberCount</td>
-                    <td>
-                        <button class="btn btn-primary-glass btn-sm" @onclick="() => SaveRole(role)">Speichern</button>
-                        <button class="btn btn-danger-glass btn-sm" @onclick="() => DeleteRole(role)">Löschen</button>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Panel>
 
-        <h4 class="mt-4">Neue Farbrolle anlegen</h4>
-        <div class="row g-2 align-items-end">
-            <div class="col-md-5">
-                <label class="form-label">Name</label>
-                <input class="form-control glassy-input" @bind="newRoleName" placeholder="z.B. Blood Red"/>
+    <Panel Title="Neue Farbrolle">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="bc-new-name">Name</label>
+                <input id="bc-new-name" class="form-control" @bind="newRoleName" placeholder="Name der Farbe"/>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Farbe</label>
-                <input type="color" class="form-control form-control-color" @bind="newRoleHex"/>
+            <div class="field">
+                <label class="field__label" for="bc-new-color">Farbe</label>
+                <input id="bc-new-color" type="color" class="form-control form-control-color" @bind="newRoleHex"/>
             </div>
-            <div class="col-md-2">
-                <div class="form-check mt-4">
-                    <input class="form-check-input" type="checkbox" id="newGradient" @bind="newRoleGradient"/>
-                    <label class="form-check-label" for="newGradient">Gradient</label>
+            <div class="field">
+                <span class="field__label">Verlauf</span>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="bc-new-gradient" @bind="newRoleGradient"/>
+                        <label class="form-check-label" for="bc-new-gradient">Zweite Farbe</label>
+                    </div>
+                    @if (newRoleGradient)
+                    {
+                        <input type="color" class="form-control form-control-color" aria-label="Zweite Farbe" @bind="newRoleSecondaryHex"/>
+                    }
                 </div>
-                @if (newRoleGradient)
-                {
-                    <input type="color" class="form-control form-control-color" @bind="newRoleSecondaryHex"/>
-                }
-            </div>
-            <div class="col-md-3">
-                <button class="btn btn-primary-glass mt-4" @onclick="CreateRole" disabled="@boundariesMissing">Anlegen</button>
+                <span class="field__hint">Verläufe brauchen ein ausreichendes Server-Boost-Level.</span>
             </div>
         </div>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@boundariesMissing" @onclick="CreateRole">Farbrolle anlegen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Panel und Einstellungen">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="bc-channel">Panel-Channel</label>
+                <select id="bc-channel" class="form-select" @bind="panelChannelId">
+                    <option value="0">Channel wählen</option>
+                    @foreach (var channel in textChannels)
+                    {
+                        <option value="@channel.Id">#@channel.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bc-title">Embed-Titel</label>
+                <input id="bc-title" class="form-control" @bind="embedTitle"/>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="bc-desc">Embed-Beschreibung</label>
+                <textarea id="bc-desc" class="form-control" rows="3" @bind="embedDescription"></textarea>
+            </div>
+        </div>
+
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="bc-enabled" @bind="enabled"/>
+            <label class="form-check-label" for="bc-enabled">Booster Farben aktiviert</label>
+        </div>
+        <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="bc-bypass" @bind="bypassEligibility"/>
+            <label class="form-check-label" for="bc-bypass">Boost-Prüfung überspringen</label>
+            <span class="field__hint">Zum Testen: jeder gilt als Booster, Teammitglieder ausgenommen.</span>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="SaveSettings">Einstellungen speichern</button>
+            <button type="button" class="btn btn-secondary" @onclick="SendPanel">Panel senden</button>
+            <button type="button" class="btn btn-ghost" @onclick="RefreshPanel">Panel aktualisieren</button>
+        </div>
+    </Panel>
 }
 
 @code {
     private bool loaded;
     private bool boundariesMissing;
     private string statusMessage = "";
+    private string statusTone = "ok";
+    private ulong pendingDeleteRole;
 
     private List<ColorRoleVm> colorRoles = new();
     private List<DiscordChannel> textChannels = new();
@@ -220,39 +246,39 @@ else
         await BoosterColorService.SetEnabledAsync(enabled);
         await BoosterColorService.SetBypassEligibilityAsync(bypassEligibility);
         BoosterColorPanelCommands.QueueRefreshPanel();
-        statusMessage = "Einstellungen gespeichert.";
+        Say("Einstellungen gespeichert.", "ok");
     }
 
     private async Task SendPanel()
     {
         if (panelChannelId == 0)
         {
-            statusMessage = "Bitte zuerst einen Panel-Channel wählen.";
+            Say("Bitte zuerst einen Panel-Channel wählen.", "bad");
             return;
         }
 
         try
         {
             await BoosterColorPanelCommands.SendPanelToChannelAsync(panelChannelId);
-            statusMessage = "Panel wurde gesendet.";
+            Say("Panel wurde gesendet.", "ok");
         }
         catch (Exception e)
         {
-            statusMessage = $"Fehler beim Senden des Panels: {e.Message}";
+            Say($"Fehler beim Senden des Panels: {e.Message}", "bad");
         }
     }
 
     private async Task RefreshPanel()
     {
         await BoosterColorPanelCommands.RefreshPanel();
-        statusMessage = "Panel wird aktualisiert.";
+        Say("Panel wird aktualisiert.", "ok");
     }
 
     private async Task CreateRole()
     {
         if (string.IsNullOrWhiteSpace(newRoleName))
         {
-            statusMessage = "Bitte einen Namen angeben.";
+            Say("Bitte einen Namen angeben.", "bad");
             return;
         }
 
@@ -269,7 +295,7 @@ else
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "BoosterColors: failed to create role");
-            statusMessage = $"Fehler beim Anlegen der Rolle: {DescribeError(e)}";
+            Say($"Fehler beim Anlegen der Rolle: {DescribeError(e)}", "bad");
             return;
         }
 
@@ -327,7 +353,8 @@ else
         newRoleHex = "#9f00ff";
         newRoleGradient = false;
         newRoleSecondaryHex = "#00b3ff";
-        statusMessage = $"Farbrolle '{role.Name}' wurde angelegt.{positionWarning}{colorWarning}";
+        Say($"Farbrolle „{role.Name}“ wurde angelegt.{positionWarning}{colorWarning}",
+            positionWarning.Length > 0 || colorWarning.Length > 0 ? "warn" : "ok");
         LoadColorRoles(guild);
     }
 
@@ -391,7 +418,7 @@ else
             var role = guild.GetRole(vm.Id);
             if (role == null)
             {
-                statusMessage = "Rolle nicht gefunden.";
+                Say("Rolle nicht gefunden.", "bad");
                 return;
             }
 
@@ -399,18 +426,19 @@ else
             await ApplyColorsAsync(role, vm.Hex, vm.Gradient, vm.SecondaryHex);
             await BoosterColorService.SyncEmojiAsync(guild.GetRole(vm.Id));
             BoosterColorPanelCommands.QueueRefreshPanel();
-            statusMessage = $"Farbrolle '{vm.Name}' wurde gespeichert.";
+            Say($"Farbrolle „{vm.Name}“ wurde gespeichert.", "ok");
             LoadColorRoles(guild);
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "BoosterColors: failed to save role");
-            statusMessage = $"Fehler beim Speichern: {DescribeError(e)}";
+            Say($"Fehler beim Speichern: {DescribeError(e)}", "bad");
         }
     }
 
     private async Task DeleteRole(ColorRoleVm vm)
     {
+        pendingDeleteRole = 0;
         var guild = CurrentApplication.TargetGuild;
         try
         {
@@ -419,14 +447,20 @@ else
                 await role.DeleteAsync("Booster color role deleted via WebUI");
             await BoosterColorService.DeleteEmojiAsync(vm.Id);
             BoosterColorPanelCommands.QueueRefreshPanel();
-            statusMessage = $"Farbrolle '{vm.Name}' wurde gelöscht.";
+            Say($"Farbrolle „{vm.Name}“ wurde gelöscht.", "ok");
             LoadColorRoles(guild);
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete role");
-            statusMessage = $"Fehler beim Löschen: {DescribeError(e)}";
+            Say($"Fehler beim Löschen: {DescribeError(e)}", "bad");
         }
+    }
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
     }
 
     private static string HexOf(DiscordColor c)

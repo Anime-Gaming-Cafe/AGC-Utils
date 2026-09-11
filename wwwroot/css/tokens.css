@@ -1,0 +1,85 @@
+/* Design tokens. See DESIGN.md for the reasoning behind every value in here.
+   This file defines variables only - no selectors carry paint. */
+
+:root {
+    /* --- Ground ------------------------------------------------------------ */
+    --bg: #14171a;
+    --surface: #1b1f23;
+    --surface-raised: #22272c;
+    --surface-sunken: #101316;
+    --border: #2d343a;
+    --border-strong: #3b444c;
+
+    /* --- Foreground -------------------------------------------------------- */
+    --fg: #e6eaed;
+    --fg-muted: #9aa5ad;
+    --fg-subtle: #6e7a83;
+
+    /* --- Accent ------------------------------------------------------------
+       --accent-rgb is overwritten at render time by _Host.cshtml from
+       BotConfig.GetEmbedColor(), so the dashboard carries the same colour as the
+       bot's Discord embeds. The value here is the fallback only. */
+    --accent-rgb: 47 132 162;
+    --accent: rgb(var(--accent-rgb));
+    --accent-hover: color-mix(in srgb, var(--accent) 86%, white);
+    --accent-strong: color-mix(in srgb, var(--accent) 62%, white);
+    --accent-tint: rgb(var(--accent-rgb) / 0.14);
+    --accent-tint-strong: rgb(var(--accent-rgb) / 0.26);
+    /* Dark text on the accent fill reaches 4.94:1; white would only reach 4.25:1. */
+    --on-accent: #0d1216;
+
+    /* --- Signals -----------------------------------------------------------
+       Status only. An element without a state gets none of these. */
+    --ok: #4f9d69;
+    --ok-text: #7fc596;
+    --ok-tint: rgb(79 157 105 / 0.16);
+    --warn: #b0812c;
+    --warn-text: #d7a950;
+    --warn-tint: rgb(176 129 44 / 0.16);
+    --bad: #b8524e;
+    --bad-text: #e08b87;
+    --bad-tint: rgb(184 82 78 / 0.16);
+
+    /* --- Radius ------------------------------------------------------------- */
+    --r-control: 4px;
+    --r-surface: 8px;
+
+    /* --- Elevation ----------------------------------------------------------
+       Exactly two elements use this: the user dropdown and Blazor's error bar. */
+    --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45);
+
+    /* --- Spacing ------------------------------------------------------------ */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+    --s-7: 48px;
+
+    /* --- Type --------------------------------------------------------------- */
+    --f-xs: 12px;
+    --f-sm: 13px;
+    --f-md: 14px;
+    --f-lg: 16px;
+    --f-xl: 20px;
+    --f-2xl: 24px;
+    --font: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    /* --- Motion ------------------------------------------------------------- */
+    --t-fast: 120ms;
+    --t-base: 180ms;
+    --ease: ease-out;
+
+    /* --- Layout ------------------------------------------------------------- */
+    --topbar-h: 56px;
+    --content-max: 1180px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --t-fast: 0ms;
+        --t-base: 0ms;
+    }
+}

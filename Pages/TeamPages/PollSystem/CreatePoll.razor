@@ -7,83 +7,99 @@
 @using System.Text.Json
 
 @attribute [Authorize(Roles = "BotOwner")]
-<h3>Umfrage erstellen</h3>
 
-<div class="container">
-    <EditForm Model="pollItem" OnValidSubmit="HandleValidSubmit" class="container">
+<PageHeader Title="Umfrage erstellen"
+            Lead="Die Umfrage wird als Nachricht mit Reaktionen in den gewählten Channel gesendet."
+            BackHref="/teamarea" BackText="Teambereich"/>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="notice notice--ok mb-3" role="status">@statusMessage</div>
+}
+
+<Panel>
+    <EditForm Model="pollItem" OnValidSubmit="HandleValidSubmit">
         <DataAnnotationsValidator/>
         <ValidationSummary/>
 
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="name" class="form-label">Name der Umfrage:</label>
-                    <InputText id="name" @bind-Value="pollItem.Name" class="form-control"/>
-                </div>
-
-                <div class="mb-3">
-                    <label for="text" class="form-label">Text der Umfrage:</label>
-                    <InputTextArea id="text" @bind-Value="pollItem.Text" class="form-control"/>
-                </div>
-
-                <div class="mb-3">
-                    <label for="channel" class="form-label">Channel:</label>
-                    <InputSelect id="channel" @bind-Value="pollItem.ChannelId" class="form-select">
-                        @foreach (var channel in channels)
-                        {
-                            <option value="@channel.Id">@channel.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-
-                <div class="mb-3">
-                    <label for="isMultipleChoice" class="form-label">Mehrfachauswahl erlauben?</label>
-                    <InputCheckbox id="isMultipleChoice" @bind-Value="pollItem.isMultiChoice" class="form-check-input"/>
-                </div>
-
-                <div class="mb-3">
-                    <label for="isExpiring" class="form-label">Läuft die Umfrage ab?</label>
-                    <InputCheckbox id="isExpiring" @bind-Value="pollItem.isExpiring" @onchange="ShowTimeOption" class="form-check-input"/>
-                </div>
-                @if (pollItem.isExpiring)
-                {
-                    <div class="mb-3">
-                        <label for="expiryDate" class="form-label">Ablaufdatum (falls zutreffend):</label>
-                        <InputDate id="expiryDate" @bind-Value="pollItem.ExpiryDate" class="form-control"/>
-                    </div>
-                    <div class="mb-3">
-                        <label for="expiryTime" class="form-label">Ablaufzeit (falls zutreffend):</label>
-                        <TimeInput type="time" id="expiryTime" @bind-Value="pollItem.ExpiryTime" class="form-control"/>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="NotifyCreatorOnEnd" class="form-label">Ersteller benachrichtigen, wenn Umfrage endet?</label>
-                        <InputCheckbox id="NotifyCreatorOnEnd" @bind-Value="pollItem.NotifyCreatorOnExpiry" class="form-check-input"/>
-                    </div>
-                }
-
-                <div class="mb-3">
-                    <label for="options" class="form-label">Optionen:</label>
-                    @foreach (var option in pollItem.Options)
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="name">Name der Umfrage</label>
+                <InputText id="name" @bind-Value="pollItem.Name" class="form-control"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="channel">Channel</label>
+                <InputSelect id="channel" @bind-Value="pollItem.ChannelId" class="form-select">
+                    @foreach (var channel in channels)
                     {
-                        <p>
-                            <InputText @bind-Value="option.Name" class="form-control"/>
-                        </p>
+                        <option value="@channel.Id">#@channel.Name</option>
                     }
-                </div>
-                <button type="button" @onclick="AddOption" class="btn btn-primary mb-1">Option hinzufügen</button>
-                <button type="button" @onclick="RemoveOption" class="btn btn-danger mb-1">Option entfernen</button>
-                <button type="submit" class="btn btn-success mb-1">Umfrage erstellen</button>
+                </InputSelect>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="text">Text der Umfrage</label>
+                <InputTextArea id="text" @bind-Value="pollItem.Text" class="form-control" rows="4"/>
             </div>
         </div>
+
+        <div class="form-check form-switch mt-3">
+            <InputCheckbox id="isMultipleChoice" @bind-Value="pollItem.isMultiChoice" class="form-check-input" role="switch"/>
+            <label class="form-check-label" for="isMultipleChoice">Mehrfachauswahl erlauben</label>
+        </div>
+        @* The old checkbox carried @bind-Value and an extra @onchange that flipped the same flag back. *@
+        <div class="form-check form-switch mt-2">
+            <InputCheckbox id="isExpiring" @bind-Value="pollItem.isExpiring" class="form-check-input" role="switch"/>
+            <label class="form-check-label" for="isExpiring">Umfrage läuft ab</label>
+        </div>
+
+        @if (pollItem.isExpiring)
+        {
+            <div class="field-grid mt-3">
+                <div class="field">
+                    <label class="field__label" for="expiryDate">Ablaufdatum</label>
+                    <InputDate id="expiryDate" @bind-Value="pollItem.ExpiryDate" class="form-control"/>
+                </div>
+                <div class="field">
+                    <label class="field__label" for="expiryTime">Ablaufzeit</label>
+                    <TimeInput type="time" id="expiryTime" @bind-Value="pollItem.ExpiryTime" class="form-control"/>
+                </div>
+            </div>
+            <div class="form-check form-switch mt-2">
+                <InputCheckbox id="NotifyCreatorOnEnd" @bind-Value="pollItem.NotifyCreatorOnExpiry" class="form-check-input" role="switch"/>
+                <label class="form-check-label" for="NotifyCreatorOnEnd">Ersteller benachrichtigen, wenn die Umfrage endet</label>
+            </div>
+        }
+
+        <div class="field mt-3">
+            <span class="field__label">Optionen</span>
+            @for (var i = 0; i < pollItem.Options.Count; i++)
+            {
+                var option = pollItem.Options[i];
+                var number = i + 1;
+                <div class="option-row">
+                    <InputText @bind-Value="option.Name" class="form-control" aria-label="@($"Option {number}")"/>
+                </div>
+            }
+            <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" @onclick="AddOption">Option hinzufügen</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled="@(pollItem.Options.Count <= 1)" @onclick="RemoveOption">
+                    Letzte Option entfernen
+                </button>
+            </div>
+        </div>
+
+        <div class="form-foot">
+            <button type="submit" class="btn btn-primary">Umfrage senden</button>
+        </div>
     </EditForm>
-</div>
+</Panel>
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private ClaimsPrincipal? _principal;
 
     private readonly PollItem pollItem = new();
+    private string statusMessage = "";
     private ulong userId;
     private HashSet<DiscordChannel> channels = new();
 
@@ -189,6 +205,7 @@
         command.Parameters.AddWithValue("dmcreatoronfinish", pollItem.NotifyCreatorOnExpiry);
         command.Parameters.AddWithValue("options", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(pollItem.Options));
         await command.ExecuteNonQueryAsync();
+        statusMessage = $"Umfrage „{pollItem.Name}“ wurde gesendet.";
     }
 
 
