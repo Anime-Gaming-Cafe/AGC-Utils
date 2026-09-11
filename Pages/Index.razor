@@ -77,12 +77,16 @@ else
                         {
                             <li>
                                 <div class="rows__main">
-                                    <p class="rows__title rows__title--bad">
+                                    <p class="rows__title">
                                         <span class="tnum">@warns.Count</span>
                                         @(warns.Count == 1 ? "aktive Verwarnung" : "aktive Verwarnungen")
                                     </p>
                                 </div>
                                 <div class="rows__side">
+                                    @if (warns.Any(w => w.IsPermanent))
+                                    {
+                                        <StatusPill Text="Dauerhaft" Tone="StatusPill.PillTone.Bad"/>
+                                    }
                                     <a class="btn btn-secondary btn-sm" href="/verwarnungen">Ansehen</a>
                                 </div>
                             </li>

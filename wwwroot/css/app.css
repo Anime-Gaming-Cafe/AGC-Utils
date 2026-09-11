@@ -1081,7 +1081,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 }
 
 .rows__title { font-weight: 600; }
-.rows__title--bad { color: var(--bad-text); }
 
 .rows__text {
     color: var(--fg-muted);
