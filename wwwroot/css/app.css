@@ -1168,9 +1168,15 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .question-list > .field:first-child { padding-top: 0; }
 .question-list > .field + .field { border-top: 1px solid var(--border); }
 
-/* A follow-up field: indented under the question it belongs to. The separator above it already
-   comes from the rule above; this only shifts it right so it reads as a child, not a peer. */
+/* A follow-up field: indented under the question it belongs to, pulled up close with no divider -
+   it reads as part of that question, not the next item in the list. */
 .question-list > .field--followup { padding-left: var(--s-5); }
+
+.question-list > .field + .field--followup {
+    border-top: none;
+    margin-top: calc(var(--s-4) * -1);
+    padding-top: var(--s-2);
+}
 
 .form-foot {
     align-items: center;
