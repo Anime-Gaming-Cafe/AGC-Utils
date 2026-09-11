@@ -385,6 +385,64 @@ public static class LevelUtils
         return true;
     }
 
+    public static async Task<bool> AddBlockedRole(ulong roleId)
+    {
+        var blockedRoles = await BlockedRoles();
+        if (blockedRoles.Contains(roleId)) return false;
+
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+
+        await using var cmd = db.CreateCommand("INSERT INTO level_excludedroles (roleid) VALUES (@roleid)");
+        cmd.Parameters.AddWithValue("@roleid", (long)roleId);
+        await cmd.ExecuteNonQueryAsync();
+
+        return true;
+    }
+
+    public static async Task<bool> RemoveBlockedRole(ulong roleId)
+    {
+        var blockedRoles = await BlockedRoles();
+        if (!blockedRoles.Contains(roleId)) return false;
+
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+
+        await using var cmd = db.CreateCommand("DELETE FROM level_excludedroles WHERE roleid = @roleid");
+        cmd.Parameters.AddWithValue("@roleid", (long)roleId);
+        await cmd.ExecuteNonQueryAsync();
+
+        return true;
+    }
+
+    public static async Task SetLevelUpChannelId(ulong channelId)
+    {
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            db.CreateCommand("UPDATE levelingsettings SET levelupchannelid = @channelid WHERE guildid = @guildid");
+        cmd.Parameters.AddWithValue("@channelid", (long)channelId);
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public static async Task SetLevelUpMessage(string message)
+    {
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            db.CreateCommand("UPDATE levelingsettings SET levelupmessage = @message WHERE guildid = @guildid");
+        cmd.Parameters.AddWithValue("@message", message);
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public static async Task SetLevelUpRewardMessage(string message)
+    {
+        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            db.CreateCommand("UPDATE levelingsettings SET levelupmessagereward = @message WHERE guildid = @guildid");
+        cmd.Parameters.AddWithValue("@message", message);
+        cmd.Parameters.AddWithValue("@guildid", (long)levelguildid);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     public static async Task<bool> IsRewardRole(ulong roleId)
     {
         var rewards = await GetLevelRewards();

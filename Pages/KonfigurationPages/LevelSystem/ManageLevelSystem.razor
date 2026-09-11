@@ -1,0 +1,488 @@
+@page "/konfiguration/levelsystem"
+@using AGC_Management.Entities
+@using AGC_Management.Utils
+@using DisCatSharp.Enums
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+
+<PageHeader Title="Levelsystem"
+            Lead="XP-Vergabe, Belohnungsrollen und Ausnahmen für das Levelsystem."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Levelsystem wird geladen"
+                Description="Einstellungen, Belohnungsrollen und Ausnahmen werden abgefragt."/>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+    }
+
+    <Panel Title="Globale Einstellungen">
+        <div class="field-grid">
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ls-text-active" @bind="textActive"/>
+                    <label class="form-check-label" for="ls-text-active">Text-XP aktiviert</label>
+                </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ls-text-multi">Text-Multiplikator</label>
+                <input id="ls-text-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!textActive)" @bind="textMultiplier"/>
+            </div>
+
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ls-vc-active" @bind="vcActive"/>
+                    <label class="form-check-label" for="ls-vc-active">Voice-XP aktiviert</label>
+                </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ls-vc-multi">Voice-Multiplikator</label>
+                <input id="ls-vc-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!vcActive)" @bind="vcMultiplier"/>
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="ls-channel">Levelup-Channel</label>
+                <select id="ls-channel" class="form-select" @bind="levelUpChannelId">
+                    <option value="0">Kein Channel</option>
+                    @foreach (var channel in textChannels)
+                    {
+                        <option value="@channel.Id">#@channel.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="field field--wide">
+                <label class="field__label" for="ls-message">Levelup-Nachricht</label>
+                <textarea id="ls-message" class="form-control" rows="2" @bind="levelUpMessage"></textarea>
+                <span class="field__hint">Platzhalter: {usermention}, {username}, {level}</span>
+            </div>
+
+            <div class="field field--wide">
+                <label class="field__label" for="ls-reward-message">Levelup-Belohnungs-Nachricht</label>
+                <textarea id="ls-reward-message" class="form-control" rows="2" @bind="levelUpRewardMessage"></textarea>
+                <span class="field__hint">Platzhalter: {usermention}, {username}, {level}, {rolemention}, {rolename}</span>
+            </div>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="SaveGlobalSettings">Einstellungen speichern</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Belohnungsrollen" Lead="Rolle wird automatisch vergeben, sobald ein Mitglied das Level erreicht." Flush="@(rewardRoles.Count > 0)">
+        @if (rewardRoles.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch keine Belohnungsrollen" Description="Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var reward in rewardRoles)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">Level @reward.Level</p>
+                            <p class="rows__text">@RoleName(reward.RoleId)</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveRewardRole(reward)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Neue Belohnungsrolle">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="ls-reward-role">Rolle</label>
+                <select id="ls-reward-role" class="form-select" @bind="newRewardRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in assignableRoles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ls-reward-level">Ab Level</label>
+                <input id="ls-reward-level" type="number" min="1" class="form-control" @bind="newRewardLevel"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddRewardRole">Belohnungsrolle hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Multiplikator-Rollen" Lead="Mitglieder mit dieser Rolle erhalten XP mit diesem Faktor multipliziert." Flush="@(overrideRoles.Count > 0)">
+        @if (overrideRoles.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch keine Multiplikator-Rollen" Description="Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var overrideRole in overrideRoles)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@RoleName(overrideRole.RoleId)</p>
+                            <p class="rows__text">@(overrideRole.Multiplicator)x</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveOverrideRole(overrideRole)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Neue Multiplikator-Rolle">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="ls-override-role">Rolle</label>
+                <select id="ls-override-role" class="form-select" @bind="newOverrideRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in assignableRoles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ls-override-multi">Multiplikator</label>
+                <input id="ls-override-multi" type="number" step="0.01" min="0.01" class="form-control" @bind="newOverrideMultiplier"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddOverrideRole">Multiplikator-Rolle hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Blockierte Channels" Lead="In diesen Channels wird keine Text-XP vergeben." Flush="@(blockedChannelIds.Count > 0)">
+        @if (blockedChannelIds.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine blockierten Channels" Description="Lege unten den ersten an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var channelId in blockedChannelIds)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@ChannelName(channelId)</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveBlockedChannel(channelId)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Channel blockieren">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="ls-blocked-channel">Channel</label>
+                <select id="ls-blocked-channel" class="form-select" @bind="newBlockedChannelId">
+                    <option value="0">Channel wählen</option>
+                    @foreach (var channel in textChannels)
+                    {
+                        <option value="@channel.Id">#@channel.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddBlockedChannel">Channel blockieren</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Blockierte Rollen" Lead="Mitglieder mit einer dieser Rollen erhalten gar keine XP mehr, weder Text noch Voice." Flush="@(blockedRoleIds.Count > 0)">
+        @if (blockedRoleIds.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine blockierten Rollen" Description="Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var roleId in blockedRoleIds)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@RoleName(roleId)</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveBlockedRole(roleId)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Rolle blockieren">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="ls-blocked-role">Rolle</label>
+                <select id="ls-blocked-role" class="form-select" @bind="newBlockedRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in assignableRoles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddBlockedRole">Rolle blockieren</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private string statusMessage = "";
+    private string statusTone = "ok";
+
+    private bool textActive;
+    private float textMultiplier = 1f;
+    private bool vcActive;
+    private float vcMultiplier = 1f;
+    private ulong levelUpChannelId;
+    private string levelUpMessage = "";
+    private string levelUpRewardMessage = "";
+
+    private List<DiscordChannel> textChannels = new();
+    private List<DiscordRole> assignableRoles = new();
+
+    private List<Reward> rewardRoles = new();
+    private ulong newRewardRoleId;
+    private int newRewardLevel = 1;
+
+    private List<MultiplicatorOverrides> overrideRoles = new();
+    private ulong newOverrideRoleId;
+    private float newOverrideMultiplier = 1f;
+
+    private List<ulong> blockedChannelIds = new();
+    private ulong newBlockedChannelId;
+
+    private List<ulong> blockedRoleIds = new();
+    private ulong newBlockedRoleId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        var guild = CurrentApplication.TargetGuild;
+
+        textChannels = guild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+
+        assignableRoles = guild.Roles.Values
+            .Where(r => !r.IsManaged && r.Id != guild.Id)
+            .OrderByDescending(r => r.Position)
+            .ToList();
+
+        textActive = await LevelUtils.IsLevelingActive(XpRewardType.Message);
+        textMultiplier = await LevelUtils.GetMessageXpMultiplier();
+        vcActive = await LevelUtils.IsLevelingActive(XpRewardType.Voice);
+        vcMultiplier = await LevelUtils.GetVcXpMultiplier();
+        levelUpChannelId = await LevelUtils.GetLevelUpChannelId();
+        levelUpMessage = await LevelUtils.GetLevelUpMessage();
+        levelUpRewardMessage = await LevelUtils.GetLevelUpRewardMessage();
+
+        rewardRoles = await LevelUtils.GetLevelRewards();
+        overrideRoles = await LevelUtils.GetMultiplicatorOverrides();
+        blockedChannelIds = await LevelUtils.BlockedChannels();
+        blockedRoleIds = await LevelUtils.BlockedRoles();
+    }
+
+    private string RoleName(ulong roleId)
+    {
+        var role = CurrentApplication.TargetGuild.GetRole(roleId);
+        return role is null ? $"Rolle gelöscht ({roleId})" : role.Name;
+    }
+
+    private string ChannelName(ulong channelId)
+    {
+        var channel = CurrentApplication.TargetGuild.GetChannel(channelId);
+        return channel is null ? $"Channel gelöscht ({channelId})" : "#" + channel.Name;
+    }
+
+    private async Task SaveGlobalSettings()
+    {
+        await LevelUtils.SetMultiplier(XpRewardType.Message, textActive ? textMultiplier : 0);
+        await LevelUtils.SetMultiplier(XpRewardType.Voice, vcActive ? vcMultiplier : 0);
+        await LevelUtils.SetLevelUpChannelId(levelUpChannelId);
+        await LevelUtils.SetLevelUpMessage(levelUpMessage);
+        await LevelUtils.SetLevelUpRewardMessage(levelUpRewardMessage);
+
+        Say("Einstellungen gespeichert.", "ok");
+        await LoadAll();
+    }
+
+    private async Task AddRewardRole()
+    {
+        if (newRewardRoleId == 0)
+        {
+            Say("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        var role = CurrentApplication.TargetGuild.GetRole(newRewardRoleId);
+        if (role is null || role.IsManaged)
+        {
+            Say("Die Rolle ist eine Integrationsrolle und kann nicht verwendet werden.", "bad");
+            return;
+        }
+
+        if (await LevelUtils.IsRewardRole(newRewardRoleId))
+        {
+            Say("Die Rolle wird bereits als Belohnungsrolle verwendet.", "bad");
+            return;
+        }
+
+        if (await LevelUtils.IsRewardLevel(newRewardLevel))
+        {
+            Say("Das Level wird bereits als Belohnungslevel verwendet.", "bad");
+            return;
+        }
+
+        await LevelUtils.AddRewardRole(newRewardRoleId, newRewardLevel);
+        newRewardRoleId = 0;
+        newRewardLevel = 1;
+        Say("Belohnungsrolle wurde hinzugefügt.", "ok");
+        await LoadAll();
+    }
+
+    private async Task RemoveRewardRole(Reward reward)
+    {
+        await LevelUtils.RemoveRewardRole(reward.RoleId, reward.Level);
+        Say("Belohnungsrolle wurde entfernt.", "ok");
+        await LoadAll();
+    }
+
+    private async Task AddOverrideRole()
+    {
+        if (newOverrideRoleId == 0)
+        {
+            Say("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        var role = CurrentApplication.TargetGuild.GetRole(newOverrideRoleId);
+        if (role is null || role.IsManaged)
+        {
+            Say("Die Rolle ist eine Integrationsrolle und kann nicht verwendet werden.", "bad");
+            return;
+        }
+
+        if (await LevelUtils.IsOverrideRole(newOverrideRoleId))
+        {
+            Say("Die Rolle wird bereits als Multiplikator-Rolle verwendet.", "bad");
+            return;
+        }
+
+        if (newOverrideMultiplier <= 0)
+        {
+            Say("Der Multiplikator muss größer als 0 sein.", "bad");
+            return;
+        }
+
+        await LevelUtils.AddOverrideRole(newOverrideRoleId, newOverrideMultiplier);
+        newOverrideRoleId = 0;
+        newOverrideMultiplier = 1f;
+        Say("Multiplikator-Rolle wurde hinzugefügt.", "ok");
+        await LoadAll();
+    }
+
+    private async Task RemoveOverrideRole(MultiplicatorOverrides overrideRole)
+    {
+        await LevelUtils.RemoveOverrideRole(overrideRole.RoleId);
+        Say("Multiplikator-Rolle wurde entfernt.", "ok");
+        await LoadAll();
+    }
+
+    private async Task AddBlockedChannel()
+    {
+        if (newBlockedChannelId == 0)
+        {
+            Say("Bitte einen Channel wählen.", "bad");
+            return;
+        }
+
+        if (await LevelUtils.IsBlacklistedChannel(newBlockedChannelId))
+        {
+            Say("Der Channel ist bereits blockiert.", "bad");
+            return;
+        }
+
+        await LevelUtils.AddBlacklistedChannel(newBlockedChannelId);
+        newBlockedChannelId = 0;
+        Say("Channel wurde blockiert.", "ok");
+        await LoadAll();
+    }
+
+    private async Task RemoveBlockedChannel(ulong channelId)
+    {
+        await LevelUtils.RemoveBlacklistedChannel(channelId);
+        Say("Channel wurde freigegeben.", "ok");
+        await LoadAll();
+    }
+
+    private async Task AddBlockedRole()
+    {
+        if (newBlockedRoleId == 0)
+        {
+            Say("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        var role = CurrentApplication.TargetGuild.GetRole(newBlockedRoleId);
+        if (role is null || role.IsManaged)
+        {
+            Say("Die Rolle ist eine Integrationsrolle und kann nicht verwendet werden.", "bad");
+            return;
+        }
+
+        if (blockedRoleIds.Contains(newBlockedRoleId))
+        {
+            Say("Die Rolle ist bereits blockiert.", "bad");
+            return;
+        }
+
+        await LevelUtils.AddBlockedRole(newBlockedRoleId);
+        newBlockedRoleId = 0;
+        Say("Rolle wurde blockiert.", "ok");
+        await LoadAll();
+    }
+
+    private async Task RemoveBlockedRole(ulong roleId)
+    {
+        await LevelUtils.RemoveBlockedRole(roleId);
+        Say("Rolle wurde freigegeben.", "ok");
+        await LoadAll();
+    }
+
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+}

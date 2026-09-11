@@ -194,3 +194,6 @@ Before adding a page-local variant of one of these, change the component instead
   accent. It exists to show the team what members will see, so fidelity to Discord wins over the palette there.
 - **The signed-in user's own row on the leaderboard** carries the accent tint. It is that user's selection on
   the list, which is one of the accent's four places.
+- **The active-warning count in "Für dich"** (`rows__title--bad`) is `--bad-text` on plain row text, not a
+  pill. Deliberate call: it is the one summary line whose whole point is "this needs your attention", so the
+  colour is on the sentence itself, not tucked into a badge next to it.
