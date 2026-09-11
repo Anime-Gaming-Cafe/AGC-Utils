@@ -337,6 +337,15 @@ else
             return;
         }
 
+        var invalidRange = questions.FirstOrDefault(q =>
+            q.Type == TeamApplicationQuestionType.Number && q.NumberDisplay != NumberDisplay.Text &&
+            q.MaxValue <= q.MinValue);
+        if (invalidRange != null)
+        {
+            ToastService.Notify("Schieberegler und Dropdown brauchen einen gültigen Wertebereich (größter Wert über kleinstem Wert).", "bad");
+            return;
+        }
+
         await TeamApplicationService.PublishDraftAsync(PositionId);
         await LoadAll();
         RebuildSnapshot();

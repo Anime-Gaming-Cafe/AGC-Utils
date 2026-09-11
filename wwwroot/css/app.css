@@ -263,15 +263,28 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .panel--flush > .panel__body { padding: 0; }
 
-/* A follow-up question, rendered inside its trigger's own panel body instead of as a separate
-   numbered "Frage N". The left border is the same hierarchy signal as the application-row status
-   edge (see DESIGN.md, "Exceptions on record") - it marks "child of", not decoration. */
-.panel--nested {
-    background-color: var(--surface-sunken);
-    border-left: 3px solid var(--border-strong);
+/* A follow-up question: not a boxed panel of its own, just a divided, indented continuation of
+   its trigger's own card, since it belongs to that question rather than standing next to it. */
+.followup {
+    border-top: 1px solid var(--border);
+    margin-top: var(--s-4);
+    padding: var(--s-4) 0 0 var(--s-5);
 }
 
-.panel--nested .panel__title { font-size: var(--f-md); }
+.followup__head {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    justify-content: space-between;
+    margin-bottom: var(--s-3);
+}
+
+.followup__lead {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    margin: 0;
+}
 
 .section-title {
     font-size: var(--f-md);
@@ -442,6 +455,23 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .form-range:focus-visible {
     outline: 2px solid var(--accent-strong);
     outline-offset: 2px;
+}
+
+/* A Number question rendered as a slider: the live value sits next to the track. The output
+   updates on drag via a plain inline oninput (no server round-trip per pixel); @onchange still
+   commits the value to the model once the drag ends. */
+.range-field {
+    align-items: center;
+    display: flex;
+    gap: var(--s-3);
+}
+
+.range-field .form-range { flex: 1; }
+
+.range-field output {
+    color: var(--fg-muted);
+    min-width: 3ch;
+    text-align: right;
 }
 
 .field { margin-bottom: var(--s-4); }

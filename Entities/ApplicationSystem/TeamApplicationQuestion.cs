@@ -29,6 +29,11 @@ public class TeamApplicationQuestion
     public string ConditionQuestionId { get; set; } = "";
     public string ConditionValue { get; set; } = "";
 
+    // Only meaningful for Type == Number. Slider/Dropdown render the same numeric answer as a
+    // different widget instead of a free-text box; both need MinValue/MaxValue to be a real range.
+    public NumberDisplay NumberDisplay { get; set; } = NumberDisplay.Text;
+    public int NumberStep { get; set; } = 1;
+
     public bool IsChoice => Type is TeamApplicationQuestionType.SingleChoice
         or TeamApplicationQuestionType.MultipleChoice
         or TeamApplicationQuestionType.Dropdown;

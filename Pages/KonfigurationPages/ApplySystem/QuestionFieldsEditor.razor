@@ -1,0 +1,179 @@
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@* The actual question fields, no wrapper chrome. Used by QuestionEditor for both a top-level
+   question (inside a full Panel) and a nested follow-up (inside a plain, unboxed indent) - the
+   fields themselves are identical either way. *@
+
+<div class="field-grid">
+    <div class="field field--wide">
+        <label class="field__label" for="q-text-@Question.QuestionId">Fragetext</label>
+        <input id="q-text-@Question.QuestionId" class="form-control" @bind="Question.Text" @bind:after="Changed"/>
+    </div>
+    <div class="field">
+        <label class="field__label" for="q-type-@Question.QuestionId">Typ</label>
+        <select id="q-type-@Question.QuestionId" class="form-select" @bind="Question.Type" @bind:after="Changed">
+            @foreach (var type in Enum.GetValues<TeamApplicationQuestionType>())
+            {
+                <option value="@type">@TypeLabel(type)</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label class="field__label" for="q-desc-@Question.QuestionId">Hilfetext (optional)</label>
+        <input id="q-desc-@Question.QuestionId" class="form-control" @bind="Question.Description" @bind:after="Changed"/>
+    </div>
+
+    @if (Question.SupportsLength)
+    {
+        <div class="field">
+            <label class="field__label" for="q-min-@Question.QuestionId">Minimale Länge</label>
+            <input id="q-min-@Question.QuestionId" type="number" min="0" class="form-control" @bind="Question.MinLength" @bind:after="Changed"/>
+        </div>
+        <div class="field">
+            <label class="field__label" for="q-max-@Question.QuestionId">Maximale Länge</label>
+            <input id="q-max-@Question.QuestionId" type="number" min="0" class="form-control" @bind="Question.MaxLength" @bind:after="Changed"/>
+            <span class="field__hint">0 heißt ohne Grenze.</span>
+        </div>
+    }
+
+    @if (Question.SupportsRange)
+    {
+        <div class="field">
+            <label class="field__label" for="q-vmin-@Question.QuestionId">Kleinster Wert</label>
+            <input id="q-vmin-@Question.QuestionId" type="number" class="form-control" @bind="Question.MinValue" @bind:after="Changed"/>
+        </div>
+        <div class="field">
+            <label class="field__label" for="q-vmax-@Question.QuestionId">Größter Wert</label>
+            <input id="q-vmax-@Question.QuestionId" type="number" class="form-control" @bind="Question.MaxValue" @bind:after="Changed"/>
+        </div>
+        <div class="field">
+            <label class="field__label" for="q-numdisplay-@Question.QuestionId">Darstellung</label>
+            <select id="q-numdisplay-@Question.QuestionId" class="form-select" @bind="Question.NumberDisplay" @bind:after="Changed">
+                <option value="@NumberDisplay.Text">Freitext</option>
+                <option value="@NumberDisplay.Slider">Schieberegler</option>
+                <option value="@NumberDisplay.Dropdown">Dropdown</option>
+            </select>
+        </div>
+        @if (Question.NumberDisplay != NumberDisplay.Text)
+        {
+            <div class="field">
+                <label class="field__label" for="q-numstep-@Question.QuestionId">Schrittweite</label>
+                <input id="q-numstep-@Question.QuestionId" type="number" min="1" class="form-control" @bind="Question.NumberStep" @bind:after="Changed"/>
+                <span class="field__hint">Kleinster und größter Wert kommen aus den Feldern oben.</span>
+            </div>
+        }
+    }
+
+    @if (Question.SupportsSelectionLimits)
+    {
+        <div class="field">
+            <label class="field__label" for="q-smin-@Question.QuestionId">Mindestens auswählen</label>
+            <input id="q-smin-@Question.QuestionId" type="number" min="0" class="form-control" @bind="Question.MinSelections" @bind:after="Changed"/>
+        </div>
+        <div class="field">
+            <label class="field__label" for="q-smax-@Question.QuestionId">Höchstens auswählen</label>
+            <input id="q-smax-@Question.QuestionId" type="number" min="0" class="form-control" @bind="Question.MaxSelections" @bind:after="Changed"/>
+        </div>
+    }
+
+    @if (EligibleTriggers.Count > 0)
+    {
+        <div class="field">
+            <label class="field__label" for="q-condq-@Question.QuestionId">Abhängig von</label>
+            <select id="q-condq-@Question.QuestionId" class="form-select"
+                    @bind="Question.ConditionQuestionId" @bind:after="ConditionQuestionChanged">
+                <option value="">Immer sichtbar</option>
+                @foreach (var trigger in EligibleTriggers)
+                {
+                    <option value="@trigger.QuestionId">@trigger.Text</option>
+                }
+            </select>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Question.ConditionQuestionId))
+        {
+            var triggerQuestion = EligibleTriggers.FirstOrDefault(t => t.QuestionId == Question.ConditionQuestionId);
+            <div class="field">
+                <label class="field__label" for="q-condv-@Question.QuestionId">Wert</label>
+                <select id="q-condv-@Question.QuestionId" class="form-select"
+                        @bind="Question.ConditionValue" @bind:after="Changed">
+                    <option value="">Wert wählen</option>
+                    @if (triggerQuestion != null)
+                    {
+                        @foreach (var option in triggerQuestion.Options)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    }
+                </select>
+                <span class="field__hint">Nur sichtbar, wenn „@triggerQuestion?.Text“ mit diesem Wert beantwortet wurde.</span>
+            </div>
+        }
+    }
+</div>
+
+@if (Question.IsChoice)
+{
+    <div class="field mt-3">
+        <span class="field__label">Optionen</span>
+        @for (var optionIndex = 0; optionIndex < Question.Options.Count; optionIndex++)
+        {
+            var current = optionIndex;
+            <div class="option-row">
+                <input class="form-control" aria-label="@($"Option {current + 1}")"
+                       @bind="Question.Options[current]" @bind:after="Changed"/>
+                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveOption(current)">Entfernen</button>
+            </div>
+        }
+        <button type="button" class="btn btn-ghost btn-sm" @onclick="AddOption">Option hinzufügen</button>
+        @if (Question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2)
+        {
+            <span class="field__hint">Auswahlfragen brauchen mindestens zwei Optionen.</span>
+        }
+    </div>
+}
+
+<div class="form-check form-switch mt-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="q-req-@Question.QuestionId"
+           @bind="Question.Required" @bind:after="Changed"/>
+    <label class="form-check-label" for="q-req-@Question.QuestionId">Pflichtfeld</label>
+</div>
+
+@code {
+    [Parameter] [EditorRequired] public TeamApplicationQuestion Question { get; set; } = null!;
+    [Parameter] [EditorRequired] public List<TeamApplicationQuestion> EligibleTriggers { get; set; } = new();
+    [Parameter] public EventCallback OnFieldChanged { get; set; }
+    [Parameter] public EventCallback OnConditionChanged { get; set; }
+
+    private static string TypeLabel(TeamApplicationQuestionType type) => type switch
+    {
+        TeamApplicationQuestionType.ShortText => "Freitext kurz",
+        TeamApplicationQuestionType.LongText => "Freitext lang",
+        TeamApplicationQuestionType.SingleChoice => "Einfachauswahl",
+        TeamApplicationQuestionType.MultipleChoice => "Mehrfachauswahl",
+        TeamApplicationQuestionType.Number => "Zahl",
+        TeamApplicationQuestionType.Date => "Datum",
+        TeamApplicationQuestionType.Dropdown => "Dropdown-Auswahl",
+        _ => type.ToString()
+    };
+
+    private async Task Changed() => await OnFieldChanged.InvokeAsync();
+
+    private async Task AddOption()
+    {
+        Question.Options.Add(string.Empty);
+        await Changed();
+    }
+
+    private async Task RemoveOption(int index)
+    {
+        Question.Options.RemoveAt(index);
+        await Changed();
+    }
+
+    private async Task ConditionQuestionChanged()
+    {
+        Question.ConditionValue = "";
+        await OnConditionChanged.InvokeAsync();
+    }
+}

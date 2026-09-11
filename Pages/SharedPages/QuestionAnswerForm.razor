@@ -37,8 +37,35 @@
                     break;
 
                 case TeamApplicationQuestionType.Number:
-                    <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
-                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                    @switch (answer.Question.NumberDisplay)
+                    {
+                        case NumberDisplay.Slider:
+                            <div class="range-field">
+                                <input type="range" id="@answer.Question.QuestionId" class="form-range"
+                                       min="@answer.Question.MinValue" max="@answer.Question.MaxValue" step="@answer.Question.NumberStep"
+                                       value="@RangeValue(answer)"
+                                       oninput="this.nextElementSibling.textContent=this.value"
+                                       @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                                <output class="tnum">@RangeValue(answer)</output>
+                            </div>
+                            break;
+
+                        case NumberDisplay.Dropdown:
+                            <select id="@answer.Question.QuestionId" class="form-select" value="@answer.Text"
+                                    @onchange="e => SetText(answer, e.Value?.ToString())">
+                                <option value="">Bitte wählen</option>
+                                @foreach (var value in NumberRangeValues(answer.Question))
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </select>
+                            break;
+
+                        default:
+                            <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
+                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                            break;
+                    }
                     break;
 
                 case TeamApplicationQuestionType.Date:
@@ -109,6 +136,18 @@
         if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
         if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
         return "";
+    }
+
+    private static string RangeValue(QuestionAnswerVm answer) =>
+        string.IsNullOrEmpty(answer.Text) ? answer.Question.MinValue.ToString() : answer.Text;
+
+    // Capped so a misconfigured huge range (or a step of 0) can't generate thousands of options.
+    private static IEnumerable<long> NumberRangeValues(TeamApplicationQuestion question)
+    {
+        var step = question.NumberStep <= 0 ? 1 : question.NumberStep;
+        var count = 0;
+        for (var value = question.MinValue; value <= question.MaxValue && count < 500; value += step, count++)
+            yield return value;
     }
 
     private static string? SelectionHint(TeamApplicationQuestion question)
