@@ -79,9 +79,9 @@ else
                         OnAction="AddQuestion"/>
         }
 
-        @{ var topLevelQuestions = questions.Where(IsTopLevel).ToList(); }
-        @for (var index = 0; index < topLevelQuestions.Count; index++)
+        @for (var index = 0; index < TopLevelQuestions.Count; index++)
         {
+            var topLevelQuestions = TopLevelQuestions;
             var question = topLevelQuestions[index];
             var currentIndex = index;
 
@@ -215,6 +215,8 @@ else
     // inside its trigger's own panel, so a trigger-of-a-trigger has nowhere to nest into).
     private static bool IsTopLevel(TeamApplicationQuestion question) =>
         string.IsNullOrEmpty(question.ConditionQuestionId);
+
+    private List<TeamApplicationQuestion> TopLevelQuestions => questions.Where(IsTopLevel).ToList();
 
     private List<TeamApplicationQuestion> EligibleTriggers(TeamApplicationQuestion current) =>
         questions.Where(q => q.QuestionId != current.QuestionId && IsTopLevel(q) && q.IsChoice).ToList();
