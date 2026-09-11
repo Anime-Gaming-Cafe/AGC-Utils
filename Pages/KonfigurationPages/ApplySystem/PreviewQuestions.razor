@@ -4,6 +4,7 @@
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
 @inject UserService UserService
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
 <PageHeader Title="Vorschau: Fragenkatalog"
@@ -36,20 +37,36 @@ else if (answers.Count == 0)
                 Description="@($"Version {Version} des Fragenkatalogs enthält keine Fragen.")"
                 ActionText="Zurück zum Fragenkatalog" ActionHref="@($"/konfiguration/applysystem/questions/{PositionId}")"/>
 }
+else if (submitted)
+{
+    <StateBlock Title="Test Ok!"
+                Description="Das war nur ein Test: es wurde nichts gespeichert, es ist keine Bewerbung eingegangen und niemand wurde benachrichtigt."
+                ActionText="Zurück zum Fragenkatalog" ActionHref="@($"/konfiguration/applysystem/questions/{PositionId}")"/>
+}
 else
 {
     <div class="notice notice--info mb-3">
-        So sieht dieses Formular für Bewerbende aus. Eingaben hier werden nicht gespeichert, es wird keine
-        Bewerbung abgeschickt.
+        So sieht dieses Formular für Bewerbende aus, 1:1 inklusive Validierung und Abschicken-Bestätigung.
+        Es wird nichts gespeichert und keine Bewerbung abgeschickt.
     </div>
 
     <Panel>
-        <QuestionAnswerForm Answers="answers"/>
+        <QuestionAnswerForm @ref="questionForm" Answers="answers"/>
 
-        <div class="form-foot">
-            <button type="button" class="btn btn-primary" disabled>Bewerbung abschicken</button>
-            <span class="meta">Nur Vorschau, dieser Button ist deaktiviert.</span>
-        </div>
+        @if (confirmSubmit)
+        {
+            <ConfirmInline Title="Bist du sicher, dass du die Bewerbung abschicken möchtest?"
+                           ConfirmText="Ja, abschicken"
+                           OnConfirm="Submit" OnCancel="() => confirmSubmit = false">
+                <p>Ich verstehe, dass die Bewerbung nach dem Absenden nicht mehr bearbeitet werden kann.</p>
+            </ConfirmInline>
+        }
+        else
+        {
+            <div class="form-foot">
+                <button type="button" class="btn btn-primary" @onclick="RequestSubmit">Bewerbung abschicken</button>
+            </div>
+        }
     </Panel>
 }
 
@@ -63,8 +80,11 @@ else
 
     private bool loaded;
     private bool mayManage;
+    private bool confirmSubmit;
+    private bool submitted;
     private TeamApplicationPosition? position;
     private List<QuestionAnswerVm> answers = new();
+    private QuestionAnswerForm questionForm = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,5 +105,21 @@ else
         }
 
         loaded = true;
+    }
+
+    // Same order as the real form: the confirmation shows first, validation only runs once
+    // "Ja, abschicken" is actually clicked - a preview that skipped either step would not show
+    // an admin what an applicant really runs into.
+    private void RequestSubmit() => confirmSubmit = true;
+
+    private void Submit()
+    {
+        if (!questionForm.ValidateAll())
+        {
+            ToastService.Notify("Bitte korrigiere die markierten Antworten.", "bad");
+            return;
+        }
+
+        submitted = true;
     }
 }

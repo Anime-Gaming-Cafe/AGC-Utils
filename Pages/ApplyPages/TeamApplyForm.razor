@@ -81,15 +81,20 @@ else
     <Panel Class="mt-3">
         <QuestionAnswerForm @ref="questionForm" Answers="answers"/>
 
-        <div class="form-foot">
-            <button type="button" class="btn btn-primary" disabled="@submitting" @onclick="Submit">
-                @if (submitting)
-                {
-                    <span class="spinner spinner--sm me-2" aria-hidden="true"></span>
-                }
-                Bewerbung abschicken
-            </button>
-        </div>
+        @if (confirmSubmit)
+        {
+            <ConfirmInline Title="Bist du sicher, dass du die Bewerbung abschicken möchtest?"
+                           ConfirmText="Ja, abschicken" Busy="submitting"
+                           OnConfirm="Submit" OnCancel="() => confirmSubmit = false">
+                <p>Ich verstehe, dass die Bewerbung nach dem Absenden nicht mehr bearbeitet werden kann.</p>
+            </ConfirmInline>
+        }
+        else
+        {
+            <div class="form-foot">
+                <button type="button" class="btn btn-primary" @onclick="() => confirmSubmit = true">Bewerbung abschicken</button>
+            </div>
+        }
     </Panel>
 }
 
@@ -113,6 +118,7 @@ else
 
     private bool loaded;
     private bool submitting;
+    private bool confirmSubmit;
     private Stage stage = Stage.NotFound;
 
     private TeamApplicationPosition? position;
