@@ -27,7 +27,7 @@
         <PackageReference Include="BCrypt.Net-Next" Version="4.2.0"/>
         <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets" Version="10.0.12"/>
         <PackageReference Include="Blazor.Bootstrap" Version="4.0.0"/>
-        <PackageReference Include="DisCatSharp" Version="10.7.1-nightly-030" />
+        <PackageReference Include="DisCatSharp" Version="10.7.1-nightly-031" />
         <PackageReference Include="DisCatSharp.Analyzer" Version="1.0.6.1">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
