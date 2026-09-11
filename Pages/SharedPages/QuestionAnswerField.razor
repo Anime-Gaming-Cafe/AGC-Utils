@@ -52,7 +52,7 @@
                 case NumberDisplay.Dropdown:
                     <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
                             @onchange="e => SetText(e.Value?.ToString())">
-                        <option value="">Bitte wählen</option>
+                        <option value="" disabled hidden>Bitte wählen</option>
                         @foreach (var value in NumberRangeValues(Answer.Question))
                         {
                             <option value="@value">@value</option>
@@ -75,7 +75,7 @@
         case TeamApplicationQuestionType.Dropdown:
             <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
                     @onchange="e => SetText(e.Value?.ToString())">
-                <option value="">Bitte wählen</option>
+                <option value="" disabled hidden>Bitte wählen</option>
                 @foreach (var option in Answer.Question.Options)
                 {
                     <option value="@option">@option</option>
