@@ -1,116 +1,85 @@
-﻿@page "/teamarea/applysystem/legacy/application/{applicationid}"
+@page "/teamarea/applysystem/legacy/application/{applicationid}"
 @using AGC_Management.Entities
-@using AGC_Management.Controller
 @using AGC_Management.Utils
-@inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
-<div class="alert alert-info-glass mt-3" role="alert">
-    Dies ist eine Ansicht des alten Bewerbungssystems. Sie ist schreibgeschützt: Status und "Gesehen von"
-    lassen sich hier nicht mehr ändern. Neue Bewerbungen laufen über das aktuelle System.
-</div>
+<PageHeader Title="@(application != null ? userName : "Alte Bewerbung")"
+            Lead="Altsystem, nur lesend."
+            BackHref="/teamarea/applysystem/legacy/applications" BackText="Alte Bewerbungen"/>
 
-
-<h3 class="text-center mt-5">Bewerbungsdetails</h3>
-
-
-@if (found)
+@if (!loaded)
 {
-    <h1 class="text-center mt-5">Bewerbungsdetails von @getusernamefromid(application.UserId)</h1>
-    <div class="container mt-5 mb-5">
-        <div class="glass-card mb-3">
-            <div class="card-header glass-effect-bg">
-                Bewerbungsdetails
-            </div>
-            <ul class="list-group  list-group-flush">
-
-                <li class="list-group-item">Nutzername: <strong>@getusernamefromid(application.UserId)</strong></li>
-                <li class="list-group-item">NutzerID: <strong>@application.UserId</strong></li>
-                <li class="list-group-item">Nutzer erstellt am: <strong>@getusercreatedtime(application.UserId)</strong></li>
-                <li class="list-group-item">Beigetreten: <strong>@getuserjointime(application.UserId)</strong></li>
-                <li class="list-group-item">
-                    <strong>
-                        <span class="mb-1">
-                            <div class="alert @GetCSSStatusFromInt(application.Status)" role="alert">
-                                @GetStatusFromInt(application.Status)
-                            </div>
-                        </span>
-                    </strong>
-                </li>
-                <li class="list-group-item">Level: <strong>@GetLevel((ulong)application.UserId)</strong></li>
-
-                <li class="list-group-item">Zeit der Bewerbungseinreichung: <strong>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.Timestamp)</strong></li>
-            </ul>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bewerbung wird geladen"
+                Description="Die Bewerbung aus dem alten System wird abgefragt."/>
+}
+else if (application == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Bewerbung nicht gefunden"
+                Description="Im alten System gibt es keine Bewerbung mit dieser ID."
+                ActionText="Zu den alten Bewerbungen"
+                ActionHref="/teamarea/applysystem/legacy/applications"/>
+}
+else
+{
+    <div class="detail-grid">
+        <div>
+            @* Was a 25-row read-only textarea, which looked editable and was not. *@
+            <Panel Title="Bewerbungstext">
+                <p class="qa__a">@ToolSet.GettextfromBase64(application.Bewerbungstext)</p>
+            </Panel>
         </div>
-        <div class="d-flex justify-content-center mb-3">
-            <div class="form-group w-100">
-                <p>Bewerbungstext</p>
-                <textarea class="form-control glassy-input" id="applymessage" rows="25" readonly>@ToolSet.GettextfromBase64(application.Bewerbungstext)</textarea>
-
-            </div>
+        <div>
+            <Panel Title="Bewerber">
+                <dl class="facts">
+                    <dt>Status</dt>
+                    <dd><StatusPill Text="@StatusLabel(application.Status)" Tone="@StatusTone(application.Status)"/></dd>
+                    <dt>Position</dt>
+                    <dd>@application.PositionName</dd>
+                    <dt>Eingereicht</dt>
+                    <dd class="tnum">@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.Timestamp)</dd>
+                    <dt>Level heute</dt>
+                    <dd class="tnum">@level</dd>
+                    <dt>Beigetreten</dt>
+                    <dd class="tnum">@joinedAt</dd>
+                    <dt>Account seit</dt>
+                    <dd class="tnum">@createdAt</dd>
+                    <dt>Nutzer-ID</dt>
+                    <dd class="mono">@application.UserId</dd>
+                </dl>
+            </Panel>
         </div>
     </div>
 }
-else if (!loaded)
-{
-    <div class="container mt-5">
-        <div class="alert alert-info-glass" role="alert">
-            <h4 class="alert-heading">Lade Bewerbung</h4>
-            <p>Die Bewerbung mit der ID: <strong>@applicationid</strong> wird geladen.</p>
-            <hr>
-            <p class="mb-0">Bitte warte einen Moment.</p>
-        </div>
-    </div>
-}
-else if (!found && loaded)
-{
-    <div class="container mt-5">
-        <div class="alert alert-danger-glass" role="alert">
-            <h4 class="alert-heading">Fehler</h4>
-            <p>Die Bewerbung mit der ID: <strong>@applicationid</strong> konnte nicht gefunden werden.</p>
-            <hr>
-            <p class="mb-0">Bitte überprüfen Sie die ID und versuchen Sie es erneut.</p>
-        </div>
-    </div>
-}
-
 
 @code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-    private ClaimsPrincipal? _principal;
+    [Parameter] public string applicationid { get; set; } = "";
 
-    [Parameter] public string applicationid { get; set; }
-    private bool found;
     private bool loaded;
     private Application? application;
+    private string userName = "";
+    private int level;
+    private string joinedAt = "unbekannt";
+    private string createdAt = "unbekannt";
 
-
-    private int GetLevel(ulong userid)
+    protected override async Task OnInitializedAsync()
     {
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        using var command = db.CreateCommand();
-        command.CommandText = "SELECT current_level FROM levelingdata WHERE userid = @userid";
-        command.Parameters.AddWithValue("userid", (long)userid);
-        using var reader = command.ExecuteReader();
-        if (reader.Read())
-        {
-            return reader.GetInt32(0);
-        }
-
-        return 0;
+        await LoadApplication();
+        loaded = true;
     }
-
 
     private async Task LoadApplication()
     {
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = db.CreateCommand();
-        command.CommandText = "SELECT bewerbungsid, userid, positionname, status, timestamp, bewerbungstext, seenby FROM bewerbungen WHERE bewerbungsid = @applicationid";
-        command.Parameters.AddWithValue("applicationid", applicationid);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (await reader.ReadAsync())
+        await using (var command = db.CreateCommand())
         {
-            var apply = new Application
+            command.CommandText = "SELECT bewerbungsid, userid, positionname, status, timestamp, bewerbungstext, seenby FROM bewerbungen WHERE bewerbungsid = @applicationid";
+            command.Parameters.AddWithValue("applicationid", applicationid);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return;
+
+            application = new Application
             {
                 BewerbungsId = reader.GetString(0),
                 UserId = reader.GetInt64(1),
@@ -119,94 +88,32 @@ else if (!found && loaded)
                 Timestamp = reader.GetInt64(4),
                 Bewerbungstext = reader.GetString(5)
             };
-            application = apply;
-            found = true;
-        }
-    }
-
-
-
-    private string GetStatusFromInt(int status)
-    {
-        return status switch
-        {
-            0 => "Ungelesen",
-            1 => "Gelesen",
-            2 => "Vorgemerkt",
-            3 => "Angenommen",
-            4 => "Abgelehnt",
-            _ => "Ungelesen"
-        };
-    }
-
-    private string GetCSSStatusFromInt(int status)
-    {
-        return status switch
-        {
-            0 => "alert-danger-glass",
-            1 => "alert-info-glass",
-            2 => "alert-warning-glass",
-            3 => "alert-success-glass",
-            4 => "alert-danger-glass",
-            _ => "Ungelesen"
-        };
-    }
-
-    private string getusercreatedtime(long id)
-    {
-        var users = CurrentApplication.DiscordClient.UserCache.Values.ToList();
-        foreach (var user in users)
-        {
-            if (user.Id == (ulong)id)
-            {
-                var ct = user.CreationTimestamp.ToUnixTimeSeconds();
-                return ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(ct);
-            }
         }
 
-        return "Unbekannt";
+        // These used to run synchronously inside the render, behind a fixed one second delay.
+        var userId = (ulong)application!.UserId;
+        userName = ToolSet.GetFormattedName(userId);
+        level = await LevelUtils.GetLevel(userId);
+
+        if (CurrentApplication.DiscordClient.UserCache.TryGetValue(userId, out var user))
+            createdAt = ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(user.CreationTimestamp.ToUnixTimeSeconds());
+        if (CurrentApplication.TargetGuild.Members.TryGetValue(userId, out var member))
+            joinedAt = ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(member.JoinedAt.ToUnixTimeSeconds());
     }
 
-    private string getuserjointime(long id)
+    private static string StatusLabel(int status) => status switch
     {
-        var users = CurrentApplication.TargetGuild.Members.Values.ToList();
-        foreach (var user in users)
-        {
-            if (user.Id == (ulong)id)
-            {
-                // respekt timezone
-                var jt = user.JoinedAt.ToUnixTimeSeconds();
-                return ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(jt);
-            }
-        }
+        1 => "Gelesen",
+        2 => "Vorgemerkt",
+        3 => "Angenommen",
+        4 => "Abgelehnt",
+        _ => "Ungelesen"
+    };
 
-        return "Unbekannt";
-    }
-
-
-    private string getusernamefromid(long id)
+    private static StatusPill.PillTone StatusTone(int status) => status switch
     {
-        var users = CurrentApplication.DiscordClient.UserCache.Values.ToList();
-        foreach (var user in users)
-        {
-            if (user.Id == (ulong)id)
-            {
-                return user.Username;
-            }
-        }
-
-        return id.ToString();
-    }
-
-
-
-    protected override async Task OnInitializedAsync()
-    {
-        _principal = AuthState is null ? null : (await AuthState).User;
-
-        await LoadApplication();
-        await Task.Delay(1000);
-        loaded = true;
-    }
-
+        3 => StatusPill.PillTone.Ok,
+        4 => StatusPill.PillTone.Bad,
+        _ => StatusPill.PillTone.Neutral
+    };
 }

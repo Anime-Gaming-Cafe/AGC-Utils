@@ -1,178 +1,125 @@
-﻿@page "/logs/levelsystem/xptransferlogs"
+@page "/logs/levelsystem/xptransferlogs"
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
-@inject IJSRuntime JSRuntime
-<h3>XP Transfer Logs</h3>
 
-@if (loaded && hasLogs)
+<PageHeader Title="XP-Transfers" Lead="Manuelle Übertragungen von XP zwischen Nutzern, neueste zuerst."
+            BackHref="/logs" BackText="Logging"/>
+
+@if (!loaded)
 {
-    <div class="dashboard-logs">
-        <table class="table table-responsive table-striped">
-            <thead>
-            <tr>
-                <th>Quellnutzer</th>
-                <th>Zielnutzer</th>
-                <th>Executor</th>
-                <th>Menge</th>
-                <th>Zeitstempel</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach (var log in displayedLogs)
-            {
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Transfer-Log wird geladen"
+                Description="Übertragungen und die Namen der Beteiligten werden abgefragt."/>
+}
+else if (logs.Count == 0)
+{
+    <StateBlock Title="Noch keine XP-Transfers protokolliert"
+                Description="Hier erscheinen Einträge, sobald ein Teammitglied XP von einem Nutzer auf einen anderen überträgt."/>
+}
+else
+{
+    <Panel Flush="true">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
                 <tr>
-                    <td @onclick="async () => await ShowToastAndCopyToClipboard(log.FromUserId.ToString())" title="@log.FromUserId.ToString()" class="wrap-text">@GetUsernameOrId(log.FromUserId).GetAwaiter().GetResult()</td>
-                    <td @onclick="async () => await ShowToastAndCopyToClipboard(log.ToUserId.ToString())" title="@log.ToUserId.ToString()" class="wrap-text">@GetUsernameOrId(log.ToUserId).GetAwaiter().GetResult()</td>
-                    <td @onclick="async () => await ShowToastAndCopyToClipboard(log.ExecutorId.ToString())" title="@log.ExecutorId.ToString()" class="wrap-text">@GetUsernameOrId(log.ExecutorId, true).GetAwaiter().GetResult()</td>
-                    <td class="wrap-text">@log.Amount XP</td>
-                    <td class="wrap-text">@Converter.GetDateFromTimestamp((long)log.UnixTime)</td>
+                    <th>Von</th>
+                    <th>An</th>
+                    <th>Ausgeführt von</th>
+                    <th class="text-end">Menge</th>
+                    <th>Zeitpunkt</th>
                 </tr>
-            }
-            </tbody>
-        </table>
-        <div class="pagination-lg">
-            <div class="page-info">Seite @currentPage von @totalPages</div>
-            <button class="btn btn-primary" @onclick="PreviousPage" disabled="@IsFirstPage">Vorherige Seite</button>
-            <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">Nächste Seite</button>
+                </thead>
+                <tbody>
+                @foreach (var log in PageItems)
+                {
+                    <tr>
+                        <td>
+                            <div>@log.FromName</div>
+                            <CopyId Value="@(log.FromUserId.ToString())"/>
+                        </td>
+                        <td>
+                            <div>@log.ToName</div>
+                            <CopyId Value="@(log.ToUserId.ToString())"/>
+                        </td>
+                        <td>
+                            <div>@log.ExecutorName</div>
+                            <CopyId Value="@(log.ExecutorId.ToString())"/>
+                        </td>
+                        <td class="tnum text-end">@log.Amount XP</td>
+                        <td class="tnum text-nowrap">@Converter.GetDateFromTimestamp(log.UnixTime)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         </div>
-    </div>
+    </Panel>
 
-    <Snackbar @ref="snackbar" Color="SnackbarColor.Dark">
-        <SnackbarBody>
-            User ID wurde in die Zwischenablage kopiert.
-            <SnackbarAction Clicked="@(() => snackbar.Hide())">Ok.</SnackbarAction>
-        </SnackbarBody>
-    </Snackbar>
+    <Pager Current="currentPage" CurrentChanged="p => currentPage = p" TotalPages="TotalPages" TotalItems="logs.Count"/>
 }
-else if (!loaded)
-{
-    <p>Loading... <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></p>
-}
-else if (!hasLogs && loaded)
-{
-    <h2>Es sind keine Logs vorhanden.</h2>
-}
-
 
 @code {
-    Snackbar snackbar;
     private bool loaded;
-    private bool hasLogs;
-    private readonly int itemsPerPage = 25;
-    private List<XpTransferLogDatabaseItem> logs = new();
-    private List<XpTransferLogDatabaseItem> displayedLogs => logs.Skip((currentPage - 1) * itemsPerPage).Take(itemsPerPage).ToList();
-
-    private bool IsFirstPage => currentPage == 1;
-    private bool IsLastPage => currentPage * itemsPerPage >= totalItems;
-
+    private const int PageSize = 25;
     private int currentPage = 1;
-    private int totalItems;
-    private int totalPages => (int)Math.Ceiling((double)totalItems / itemsPerPage);
+    private readonly List<XpTransferLogItem> logs = new();
+
+    private IEnumerable<XpTransferLogItem> PageItems => logs.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(logs.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLogs();
-        totalItems = logs.Count;
-
         loaded = true;
-    }
-
-    private async Task ShowToastAndCopyToClipboard(string userId)
-    {
-        await snackbar.Show();
-        await JSRuntime.InvokeVoidAsync("copyToClipboard", userId);
-    }
-
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        StateHasChanged();
-    }
-
-    private async Task<string> GetUsernameOrId(ulong userId, bool fetch = false)
-    {
-        try
-        {
-            var isCached = await ToolSet.IsUserInCache(userId);
-            if (isCached)
-            {
-                return CurrentApplication.DiscordClient.UserCache[userId].Username;
-            }
-
-            if (!fetch) return userId.ToString();
-            var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
-            return user.Username;
-        }
-        catch (Exception)
-        {
-            return userId.ToString();
-        }
-    }
-
-    private async Task<string> GetDateFromUnixtime(ulong unixTime)
-    {
-        var date = DateTimeOffset.FromUnixTimeSeconds((long)unixTime);
-        return date.ToString("dd.MM.yyyy HH:mm:ss");
     }
 
     private async Task LoadLogs()
     {
-        logs = new List<XpTransferLogDatabaseItem>();
-
-        // Load logs from database
         var connection = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT sourceuserid, destinationuserid, executorid, amount, timestamp FROM xptransferlogs ORDER BY timestamp DESC";
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        await using (var command = connection.CreateCommand(
+                         "SELECT sourceuserid, destinationuserid, executorid, amount, timestamp FROM xptransferlogs ORDER BY timestamp DESC"))
+        await using (var reader = await command.ExecuteReaderAsync())
         {
-            var fromUserId = reader.GetInt64(0);
-            var toUserId = reader.GetInt64(1);
-            var executorId = reader.GetInt64(2);
-            var amount = reader.GetInt32(3);
-            var timestamp = reader.GetInt64(4);
-
-
-            logs.Add(new XpTransferLogDatabaseItem
-            {
-                FromUserId = (ulong)fromUserId,
-                ToUserId = (ulong)toUserId,
-                ExecutorId = (ulong)executorId,
-                Amount = amount,
-                UnixTime = (ulong)timestamp
-            });
+            while (await reader.ReadAsync())
+                logs.Add(new XpTransferLogItem
+                {
+                    FromUserId = (ulong)reader.GetInt64(0),
+                    ToUserId = (ulong)reader.GetInt64(1),
+                    ExecutorId = (ulong)reader.GetInt64(2),
+                    Amount = reader.GetInt32(3),
+                    UnixTime = reader.GetInt64(4)
+                });
         }
 
-        hasLogs = logs.Count > 0;
-    }
-
-
-    private void PreviousPage()
-    {
-        if (currentPage > 1)
+        // Resolved once per load. The old page did a blocking lookup per cell and additionally forced a
+        // re-render after every render, which kept the circuit busy for as long as the page was open.
+        var names = new Dictionary<(ulong, bool), string>();
+        foreach (var log in logs)
         {
-            currentPage--;
+            log.FromName = await NameAsync(names, log.FromUserId, false);
+            log.ToName = await NameAsync(names, log.ToUserId, false);
+            log.ExecutorName = await NameAsync(names, log.ExecutorId, true);
         }
     }
 
-    private void NextPage()
+    private static async Task<string> NameAsync(Dictionary<(ulong, bool), string> names, ulong id, bool fetch)
     {
-        if (currentPage < totalPages)
-        {
-            currentPage++;
-        }
+        if (names.TryGetValue((id, fetch), out var name)) return name;
+
+        name = await ToolSet.ResolveUserNameAsync(id, fetch);
+        names[(id, fetch)] = name;
+        return name;
     }
 
-
-    // Entities
-
-    private class XpTransferLogDatabaseItem
+    private sealed class XpTransferLogItem
     {
-        public ulong FromUserId { get; set; }
-        public ulong ToUserId { get; set; }
-        public ulong ExecutorId { get; set; }
-        public int Amount { get; set; }
-        public ulong UnixTime { get; set; }
+        public ulong FromUserId { get; init; }
+        public ulong ToUserId { get; init; }
+        public ulong ExecutorId { get; init; }
+        public int Amount { get; init; }
+        public long UnixTime { get; init; }
+        public string FromName { get; set; } = "";
+        public string ToName { get; set; } = "";
+        public string ExecutorName { get; set; } = "";
     }
-
 }

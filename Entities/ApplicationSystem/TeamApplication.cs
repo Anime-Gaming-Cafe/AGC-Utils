@@ -22,7 +22,7 @@ public class TeamApplication
     public bool? DmDelivered { get; set; }
     public string DmError { get; set; } = "";
     public long WithdrawnAt { get; set; }
-    public List<ulong> SeenBy { get; set; } = [];
+    public List<TeamApplicationReader> Readers { get; set; } = [];
     public int LevelSnapshot { get; set; }
     public int XpSnapshot { get; set; }
     public long JoinedAtSnapshot { get; set; }

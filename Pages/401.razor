@@ -1,14 +1,19 @@
-﻿@page "/401"
+@page "/401"
 @inject NavigationManager NavigationManager
 
-<h3>401 - Unauthorized</h3>
-<p>Du bist nicht berechtigt, diese Seite zu sehen. Bitte logge dich ein.</p>
+<PageTitle>Anmeldung erforderlich</PageTitle>
 
-<button type="button" @onclick="StartOAuthLogin" class="btn btn-primary-glass"><i class="bi bi-discord"></i> Login mit Discord</button>
+<StateBlock Title="Anmeldung erforderlich"
+            Description="Diese Seite ist nur für angemeldete Mitglieder des Servers sichtbar."
+            ActionText="Mit Discord anmelden"
+            ActionHref="@oauthLoginUrl"
+            ActionTargetsServer="true"/>
 
 @code {
 
-    private void StartOAuthLogin()
+    private string oauthLoginUrl = "/login";
+
+    protected override void OnInitialized()
     {
         var scheme = NavigationManager.Uri.StartsWith("https") ? "https" : "http";
         var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
@@ -20,8 +25,7 @@
 
         returnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
         var dashboardUrl = BotConfig.GetConfig()["WebUI"]["DashboardURL"];
-        var oauthLoginUrl = $"{scheme}://{dashboardUrl}/login?returnUrl=/{Uri.EscapeDataString(returnUrl)}";
-        NavigationManager.NavigateTo(oauthLoginUrl, true);
+        oauthLoginUrl = $"{scheme}://{dashboardUrl}/login?returnUrl=/{Uri.EscapeDataString(returnUrl)}";
     }
 
 }

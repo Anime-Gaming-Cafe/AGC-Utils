@@ -1,168 +1,115 @@
-﻿@page "/logs/moderation/banlogs"
+@page "/logs/moderation/banlogs"
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter")]
-@inject IJSRuntime JSRuntime
-<h3>Bann Logs</h3>
+
+<PageHeader Title="Banns" Lead="Über den Bot ausgesprochene Banns, neueste zuerst."
+            BackHref="/logs" BackText="Logging"/>
 
 @if (!loaded)
 {
-    <h2>Loading... <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></h2>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bann-Log wird geladen"
+                Description="Einträge und Namen der Beteiligten werden abgefragt."/>
 }
-else if (!hasLogs && loaded)
+else if (logs.Count == 0)
 {
-    <h2>Es sind keine Logs vorhanden.</h2>
+    <StateBlock Title="Noch keine Banns protokolliert"
+                Description="Hier erscheinen Einträge, sobald über den Bot ein Bann ausgesprochen wird."/>
 }
 else
 {
-    <div style="max-width: 1200px" class="dashboard-logs">
-        <table class="table table-responsive table-striped">
-            <thead>
-            <tr>
-                <th>User</th>
-                <th>Moderator</th>
-                <th>Grund</th>
-                <th>Zeit</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach (var log in displayedLogs)
-            {
+    <Panel Flush="true">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
                 <tr>
-                    <td @onclick="async () => await ShowToastAndCopyToClipboard(log.UserId.ToString())" title="@log.UserId.ToString()" class="wrap-text">@GetUsernameOrId(log.UserId).GetAwaiter().GetResult()</td>
-                    <td @onclick="async () => await ShowToastAndCopyToClipboard(log.ExecutorId.ToString())" title="@log.ExecutorId.ToString()" class="wrap-text">@GetUsernameOrId(log.ExecutorId, true).GetAwaiter().GetResult()</td>
-                    <td class="wrap-text">@log.Reason</td>
-                    <td class="wrap-text">@Converter.GetDateFromTimestamp((long)log.UnixTime)</td>
+                    <th>Nutzer</th>
+                    <th>Moderator</th>
+                    <th>Grund</th>
+                    <th>Zeitpunkt</th>
                 </tr>
-            }
-            </tbody>
-        </table>
-        <div class="pagination-lg">
-            <div class="page-info">Seite @currentPage von @totalPages</div>
-            <button class="btn btn-primary" @onclick="PreviousPage" disabled="@IsFirstPage">Vorherige Seite</button>
-            <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">Nächste Seite</button>
+                </thead>
+                <tbody>
+                @foreach (var log in PageItems)
+                {
+                    <tr>
+                        <td>
+                            <div>@log.UserName</div>
+                            <CopyId Value="@(log.UserId.ToString())"/>
+                        </td>
+                        <td>
+                            <div>@log.ExecutorName</div>
+                            <CopyId Value="@(log.ExecutorId.ToString())"/>
+                        </td>
+                        <td>@log.Reason</td>
+                        <td class="tnum text-nowrap">@Converter.GetDateFromTimestamp(log.UnixTime)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         </div>
-    </div>
+    </Panel>
 
-    <Snackbar @ref="snackbar" Color="SnackbarColor.Dark">
-        <SnackbarBody>
-            User ID wurde in die Zwischenablage kopiert.
-            <SnackbarAction Clicked="@(() => snackbar.Hide())">Ok.</SnackbarAction>
-        </SnackbarBody>
-    </Snackbar>
+    <Pager Current="currentPage" CurrentChanged="p => currentPage = p" TotalPages="TotalPages" TotalItems="logs.Count"/>
 }
 
 @code {
-    private Snackbar snackbar;
     private bool loaded;
-    private bool hasLogs;
-    private readonly int itemsPerPage = 25;
-    private List<BanLogDatabaseItem> logs = new();
-    private List<BanLogDatabaseItem> displayedLogs => logs.Skip((currentPage - 1) * itemsPerPage).Take(itemsPerPage).ToList();
-
-    private bool IsFirstPage => currentPage == 1;
-    private bool IsLastPage => currentPage * itemsPerPage >= totalItems;
-
+    private const int PageSize = 25;
     private int currentPage = 1;
-    private int totalItems;
-    private int totalPages => (int)Math.Ceiling((double)totalItems / itemsPerPage);
+    private readonly List<BanLogItem> logs = new();
+
+    private IEnumerable<BanLogItem> PageItems => logs.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(logs.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLogs();
-        totalItems = logs.Count;
-
         loaded = true;
     }
 
     private async Task LoadLogs()
     {
-        logs = new List<BanLogDatabaseItem>();
-
-        // Load logs from database
         var connection = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT userid, executorid, reason, timestamp FROM banlogs ORDER BY timestamp DESC";
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        await using (var command = connection.CreateCommand(
+                         "SELECT userid, executorid, reason, timestamp FROM banlogs ORDER BY timestamp DESC"))
+        await using (var reader = await command.ExecuteReaderAsync())
         {
-            var toUserId = reader.GetInt64(0);
-            var executorId = reader.GetInt64(1);
-            var reason = reader.GetString(2);
-            var timestamp = reader.GetInt64(3);
-
-
-            logs.Add(new BanLogDatabaseItem
-            {
-                UserId = (ulong)toUserId,
-                ExecutorId = (ulong)executorId,
-                Reason = reason,
-                UnixTime = (ulong)timestamp
-            });
+            while (await reader.ReadAsync())
+                logs.Add(new BanLogItem
+                {
+                    UserId = (ulong)reader.GetInt64(0),
+                    ExecutorId = (ulong)reader.GetInt64(1),
+                    Reason = reader.IsDBNull(2) ? "Kein Grund angegeben" : reader.GetString(2),
+                    UnixTime = reader.GetInt64(3)
+                });
         }
 
-        hasLogs = logs.Count > 0;
-    }
-
-
-    private async Task ShowToastAndCopyToClipboard(string userId)
-    {
-        await snackbar.Show();
-        await JSRuntime.InvokeVoidAsync("copyToClipboard", userId);
-    }
-
-
-    private async Task<string> GetUsernameOrId(ulong userId, bool fetch = false)
-    {
-        try
+        // Resolved once per load. The old page did a blocking lookup per cell, on every render.
+        var names = new Dictionary<(ulong, bool), string>();
+        foreach (var log in logs)
         {
-            var isCached = await ToolSet.IsUserInCache(userId);
-            if (isCached)
-            {
-                return CurrentApplication.DiscordClient.UserCache[userId].Username;
-            }
-
-            if (!fetch) return userId.ToString();
-            var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
-            var ismig = user.IsMigrated;
-            if (ismig)
-            {
-                return user.Username;
-            }
-
-            return user.UsernameWithDiscriminator;
-        }
-        catch (Exception)
-        {
-            return userId.ToString();
+            log.UserName = await NameAsync(names, log.UserId, false);
+            log.ExecutorName = await NameAsync(names, log.ExecutorId, true);
         }
     }
 
-
-    private void PreviousPage()
+    private static async Task<string> NameAsync(Dictionary<(ulong, bool), string> names, ulong id, bool fetch)
     {
-        if (currentPage > 1)
-        {
-            currentPage--;
-        }
+        if (names.TryGetValue((id, fetch), out var name)) return name;
+
+        name = await ToolSet.ResolveUserNameAsync(id, fetch);
+        names[(id, fetch)] = name;
+        return name;
     }
 
-    private void NextPage()
+    private sealed class BanLogItem
     {
-        if (currentPage < totalPages)
-        {
-            currentPage++;
-        }
+        public ulong UserId { get; init; }
+        public ulong ExecutorId { get; init; }
+        public string Reason { get; init; } = "";
+        public long UnixTime { get; init; }
+        public string UserName { get; set; } = "";
+        public string ExecutorName { get; set; } = "";
     }
-
-
-    // entities
-
-    private class BanLogDatabaseItem
-    {
-        public ulong UserId { get; set; }
-        public ulong ExecutorId { get; set; }
-        public string Reason { get; set; } = "Kein Grund angegeben";
-        public ulong UnixTime { get; set; }
-    }
-
 }

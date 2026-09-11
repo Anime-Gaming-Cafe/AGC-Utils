@@ -6,9 +6,6 @@ using AGC_Management.Controller;
 using AGC_Management.Services;
 using AGC_Management.Utils;
 using BlazorBootstrap;
-using Blazorise;
-using Blazorise.Bootstrap;
-using Blazorise.Bootstrap5;
 using DisCatSharp;
 using DisCatSharp.Entities;
 using Discord.OAuth2;
@@ -17,7 +14,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Sentry;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -152,17 +148,6 @@ internal class Program : BaseCommandModule
             DebugMode = false;
         }
 
-        if (!DebugMode && !string.IsNullOrEmpty(BotConfig.GetConfig()["MainConfig"]["SentryDSN"]))
-        {
-            SentrySdk.Init(o =>
-            {
-                o.Dsn = BotConfig.GetConfig()["MainConfig"]["SentryDSN"];
-                o.Debug = true;
-                o.AutoSessionTracking = true;
-                o.IsGlobalModeEnabled = true;
-            });
-        }
-
         string DcApiToken = "";
         try
         {
@@ -178,7 +163,6 @@ internal class Program : BaseCommandModule
             }
             catch
             {
-                SentrySdk.CaptureMessage("Discord API Token could not be loaded.");
                 logger.Fatal(
                     "Der Discord API Token konnte nicht geladen werden.");
                 logger.Fatal("Drücke eine beliebige Taste um das Programm zu beenden.");
@@ -197,8 +181,6 @@ internal class Program : BaseCommandModule
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddBlazorBootstrap();
         builder.Services.AddSingleton<UserService>();
-        builder.Services.AddBlazorise(options => { options.Immediate = true; }).AddBootstrapProviders()
-            .AddBootstrap5Providers().AddBootstrap5Components().AddBootstrapComponents();
         builder.Services.AddSession(options =>
         {
             options.IdleTimeout = TimeSpan.FromMinutes(30);

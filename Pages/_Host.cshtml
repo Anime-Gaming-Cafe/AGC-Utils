@@ -1,24 +1,25 @@
-﻿@page "/"
+@page "/"
 @using AGC_Management.Utils
 @using Microsoft.AspNetCore.Components.Web
 @namespace AGC_Management.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="de" data-bs-theme="dark">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="color-scheme" content="dark"/>
     <base href="~/"/>
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css"/>
     <link href="_content/Blazor.Bootstrap/blazor.bootstrap.css" rel="stylesheet"/>
-    <link href="css/site.css" rel="stylesheet"/>
-    <link href="css/glass.css" rel="stylesheet"/>
     <link href="css/Inter.css" rel="stylesheet"/>
+    <link href="css/tokens.css" rel="stylesheet"/>
+    <link href="css/app.css" rel="stylesheet"/>
     <link href="AGC Management.styles.css" rel="stylesheet"/>
-    <link href="_content/Blazorise.Snackbar/blazorise.snackbar.css" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@latest/font/bootstrap-icons.css">
-    <link rel="icon" type="image/png" class="icon" href="@ToolSet.GetFaviconUrl()"/>
+    @* The accent is the colour the bot puts on its Discord embeds, so both always match. *@
+    <style>:root { --accent-rgb: @ToolSet.GetAccentRgb(); }</style>
+    <link rel="icon" type="image/png" href="@ToolSet.GetFaviconUrl()"/>
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered"/>
 </head>
 <body>
@@ -26,19 +27,18 @@
 
 <div id="blazor-error-ui">
     <environment include="Staging,Production">
-        An error has occurred. This application may no longer respond until reloaded.
+        Es ist ein Fehler aufgetreten. Die Seite reagiert möglicherweise nicht mehr, bis sie neu geladen wird.
     </environment>
     <environment include="Development">
-        An unhandled exception has occurred. See browser dev tools for details.
+        Eine unbehandelte Ausnahme ist aufgetreten. Details stehen in den Entwicklertools.
     </environment>
-    <a href="" class="reload">Reload</a>
-    <a class="dismiss">🗙</a>
+    <a href="" class="reload">Neu laden</a>
+    <a class="dismiss">Schließen</a>
 </div>
 
 <script src="_framework/blazor.server.js"></script>
 <script src="_content/Blazor.Bootstrap/blazor.bootstrap.js"></script>
 <script src="js/bootstrap.bundle.js"></script>
 <script src="js/helpers.js"></script>
-<script src="https://kit.fontawesome.com/2ab666b68c.js" crossorigin="anonymous"></script>
 </body>
 </html>

@@ -13,8 +13,12 @@
             </AuthorizeRouteView>
         </Found>
         <NotFound>
+            <PageTitle>Seite nicht gefunden</PageTitle>
             <LayoutView Layout="@typeof(MainLayout)">
-                <p>Seite nicht gefunden.</p>
+                <StateBlock Title="Seite nicht gefunden"
+                            Description="Unter dieser Adresse gibt es keine Seite. Vielleicht ist der Link veraltet."
+                            ActionText="Zur Startseite"
+                            ActionHref="/"/>
             </LayoutView>
         </NotFound>
     </Router>

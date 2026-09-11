@@ -69,7 +69,7 @@ Failed slash-command checks are swallowed and answered with an ephemeral error e
 
 ### Web dashboard
 
-Discord OAuth2 (`Discord.OAuth2.AspNetCore`) → cookie auth. `AuthUtils.RetrieveRole` maps the user's guild roles to an `Enums/Web/AccessLevel` name, which is stored as the `ClaimTypes.Role` claim; `RoleRefreshMiddleware` recomputes it on every request so role changes take effect without re-login. Razor pages gate with `@attribute [Authorize(Roles = "BotOwner, Administrator, …")]` and `<AuthorizeView Roles="…">` using those enum names. Blazor Server + Blazorise/BlazorBootstrap; `_Host` is the fallback page. The WebUI runs only when `[WebUI] Active = true`; `Program.RunAspAsync` also rewrites `Request.Host`/`Scheme` from `DashboardURL`/`UseHttps` so the OAuth `redirect_uri` is correct behind a proxy.
+Discord OAuth2 (`Discord.OAuth2.AspNetCore`) → cookie auth. `AuthUtils.RetrieveRole` maps the user's guild roles to an `Enums/Web/AccessLevel` name, which is stored as the `ClaimTypes.Role` claim; `RoleRefreshMiddleware` recomputes it on every request so role changes take effect without re-login. Razor pages gate with `@attribute [Authorize(Roles = "BotOwner, Administrator, …")]` and `<AuthorizeView Roles="…">` using those enum names. Blazor Server + BlazorBootstrap; `_Host` is the fallback page. The WebUI runs only when `[WebUI] Active = true`; `Program.RunAspAsync` also rewrites `Request.Host`/`Scheme` from `DashboardURL`/`UseHttps` so the OAuth `redirect_uri` is correct behind a proxy.
 
 ### Member cache
 
@@ -84,7 +84,7 @@ Discord only ships a subset of members and DisCatSharp clears `guild.Members` on
 - **User-facing strings are German; code and comments are English.** Keep new comments sparse and only where the logic is non-obvious.
 - File-scoped namespaces; usings wrapped in `#region` blocks at the top of files; common usings are in `Utils/GlobalUsings.cs`.
 - Discord ids are `ulong` in C# and `BIGINT` in Postgres — cast with `(long)id` when parameterizing.
-- Errors reach the dev via `ErrorReporting.SendErrorToDev` (posts to `ErrorTrackingChannelId`) and Sentry (only outside DebugMode). Logging is Serilog (`CurrentApplication.Logger`) to console and `logs/`.
+- Errors reach the dev via `ErrorReporting.SendErrorToDev` (posts to `ErrorTrackingChannelId`). There is no Sentry; DisCatSharp only pulls the package in transitively. Logging is Serilog (`CurrentApplication.Logger`) to console and `logs/`.
 
 ## Release / deploy
 

@@ -1,39 +1,21 @@
-﻿@page "/Konfiguration"
+@page "/Konfiguration"
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
-<h1>Administration</h1>
+<PageHeader Title="Administration"/>
 
-<div class="container mt-5 mb-5">
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <div class="card-body">
-                    <h5 class="card-title">Booster Farben</h5>
-                    <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                        <a href="/konfiguration/boostercolors" class="btn btn-primary-glass">Booster Farben verwalten</a>
-                    </AuthorizeView>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<Panel Title="Bewerbungssystem">
+    <ul class="nav-links">
+        <li><a href="/konfiguration/applysystem/positions">Positionen</a></li>
+        <li><a href="/konfiguration/applysystem/templates">Textbausteine und Bot-Texte</a></li>
+        <li><a href="/konfiguration/applysystem/modifypanelmessage">Bewerbungspanel</a></li>
+        <AuthorizeView Roles="BotOwner, Administrator">
+            <li><a href="/konfiguration/applysystem/permissions">Rechte-Matrix</a></li>
+        </AuthorizeView>
+    </ul>
+</Panel>
 
-<div class="container mt-5 mb-5">
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <div class="card-body">
-                    <h5 class="card-title">Bewerbungssystem</h5>
-                    <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                        <a href="/konfiguration/applysystem/positions" class="btn btn-primary-glass mt-2 mb-2">Positionen</a>
-                        <a href="/konfiguration/applysystem/templates" class="btn btn-primary-glass mt-2 mb-2">Textbausteine und Bot-Texte</a>
-                        <a href="/konfiguration/applysystem/modifypanelmessage" class="btn btn-primary-glass mt-2 mb-2">Panel senden und Text bearbeiten</a>
-                    </AuthorizeView>
-                    <AuthorizeView Roles="BotOwner, Administrator">
-                        <a href="/konfiguration/applysystem/permissions" class="btn btn-primary-glass mt-2 mb-2">Rechte-Matrix</a>
-                    </AuthorizeView>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<Panel Title="Booster Farben">
+    <ul class="nav-links">
+        <li><a href="/konfiguration/boostercolors">Booster Farben verwalten</a></li>
+    </ul>
+</Panel>

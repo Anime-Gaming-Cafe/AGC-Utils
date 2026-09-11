@@ -18,6 +18,48 @@ public static class ToolSet
 	public static string GetFaviconUrl() 
         => CurrentApplication.TargetGuild.IconUrl ?? "favicon.png";
 
+    /// <summary>
+    ///     The dashboard accent as space separated sRGB components for the --accent-rgb custom property,
+    ///     taken from the same colour the bot puts on every Discord embed.
+    /// </summary>
+    public static string GetAccentRgb()
+    {
+        try
+        {
+            var color = BotConfig.GetEmbedColor();
+            if (color.R == 0 && color.G == 0 && color.B == 0) return "47 132 162";
+
+            return $"{color.R} {color.G} {color.B}";
+        }
+        catch (Exception)
+        {
+            return "47 132 162";
+        }
+    }
+
+    /// <summary>
+    ///     Display name for log tables. A cached user costs nothing; an uncached one is only fetched when the
+    ///     caller asks, because a log of hundreds of rows must not turn into hundreds of REST calls.
+    ///     This replaces three copies that had drifted apart on how migrated usernames were shown.
+    /// </summary>
+    public static async Task<string> ResolveUserNameAsync(ulong userId, bool fetch = false)
+    {
+        try
+        {
+            if (CurrentApplication.DiscordClient.UserCache.TryGetValue(userId, out var cached))
+                return cached.IsMigrated ? cached.Username : cached.UsernameWithDiscriminator;
+
+            if (!fetch) return userId.ToString();
+
+            var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
+            return user.IsMigrated ? user.Username : user.UsernameWithDiscriminator;
+        }
+        catch (Exception)
+        {
+            return userId.ToString();
+        }
+    }
+
 	public static string GettextfromBase64(string base64)
     {
         var data = Convert.FromBase64String(base64);

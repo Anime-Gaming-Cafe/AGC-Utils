@@ -7,159 +7,167 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
-<h1>Bewerbung: @(position?.PositionName ?? PositionId)</h1>
+<PageHeader Title="@($"Bewerbung: {position?.PositionName ?? PositionId}")"
+            BackHref="/apply" BackText="Offene Positionen"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Formular wird geladen"
+                Description="Position, Bewerbungsphase und Fragen werden abgefragt."/>
 }
 else if (stage == Stage.NotFound)
 {
-    <div class="alert alert-danger-glass" role="alert">Diese Position gibt es nicht.</div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Position nicht gefunden"
+                Description="Diese Position gibt es nicht oder sie ist nicht mehr ausgeschrieben."
+                ActionText="Offene Positionen ansehen" ActionHref="/apply"/>
 }
 else if (stage == Stage.Closed)
 {
-    <div class="alert alert-warning-glass" role="alert">
-        <h4 class="alert-heading">@closedText</h4>
-        @if (nextOpensAt > 0)
-        {
-            <hr>
-            <p class="mb-0">@opensAtText @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(nextOpensAt)</p>
-        }
-    </div>
-    <a class="btn btn-secondary-glass" href="/apply">Zurück zur Übersicht</a>
+    <StateBlock Title="@closedText"
+                Description="@(nextOpensAt > 0
+                    ? $"{opensAtText} {ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(nextOpensAt)}."
+                    : "Sobald eine neue Bewerbungsphase startet, kannst du dich hier bewerben.")"
+                ActionText="Offene Positionen ansehen" ActionHref="/apply"/>
 }
 else if (stage == Stage.LevelGate)
 {
-    <div class="alert alert-warning-glass" role="alert">@levelGateText</div>
-    <a class="btn btn-secondary-glass" href="/apply">Zurück zur Übersicht</a>
+    @* Never names a level - neither the required one nor the applicant's own. *@
+    <StateBlock Title="Bewerbung noch nicht möglich"
+                Description="@levelGateText"
+                ActionText="Zurück zur Übersicht" ActionHref="/apply"/>
 }
 else if (stage == Stage.AlreadyApplied)
 {
-    <div class="alert alert-info-glass" role="alert">
-        Du hast dich in dieser Bewerbungsphase bereits auf diese Position beworben.
-    </div>
-    <a class="btn btn-primary-glass" href="/apply/status">Meine Bewerbungen</a>
+    <StateBlock Title="Du hast dich bereits beworben"
+                Description="In dieser Bewerbungsphase liegt schon eine Bewerbung von dir für diese Position vor."
+                ActionText="Meine Bewerbungen" ActionHref="/apply/status"/>
 }
 else if (stage == Stage.NoQuestions)
 {
-    <div class="alert alert-warning-glass" role="alert">
-        Für diese Position ist aktuell kein Fragenkatalog hinterlegt. Bitte melde dich beim Team.
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Formular nicht verfügbar"
+                Description="Für diese Position ist aktuell kein Fragenkatalog hinterlegt. Bitte melde dich beim Team."
+                ActionText="Offene Positionen ansehen" ActionHref="/apply"/>
 }
 else if (stage == Stage.Submitted)
 {
-    <div class="alert alert-success-glass" role="alert">
-        <h4 class="alert-heading">Bewerbung abgeschickt</h4>
-        <hr>
-        <p class="mb-0">
-            Wir haben dir eine Bestätigung per DM geschickt. Den Stand deiner Bewerbung siehst du jederzeit
-            unter "Meine Bewerbungen".
-        </p>
-    </div>
-    <a class="btn btn-primary-glass" href="/apply/status">Meine Bewerbungen</a>
+    <StateBlock Title="Bewerbung abgeschickt"
+                Description="Wir haben dir eine Bestätigung per DM geschickt. Den Stand siehst du jederzeit unter Meine Bewerbungen."
+                ActionText="Meine Bewerbungen" ActionHref="/apply/status"/>
 }
 else
 {
     @if (opening is { Bypassed: true })
     {
-        <div class="alert alert-warning-glass" role="alert">
-            Für diese Position ist "Bewerbungen immer erlauben" aktiv. Phase, Mindestlevel und die Regel
-            "eine Bewerbung pro Phase" werden übersprungen.
+        <div class="notice notice--warn">
+            <p class="notice__title">Testmodus aktiv</p>
+            <p>
+                Für diese Position ist "Bewerbungseinsendung immer erlauben" gesetzt. Phase, Mindestlevel und die
+                Regel "eine Bewerbung pro Phase" werden übersprungen.
+            </p>
         </div>
     }
 
     @if (grant != null)
     {
-        <div class="alert alert-info-glass" role="alert">
+        <div class="notice notice--ok">
             Für dich wurde eine erneute Bewerbung in dieser Phase freigeschaltet.
         </div>
     }
 
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="alert alert-danger-glass" role="alert">@statusMessage</div>
-    }
-
-    @foreach (var answer in answers)
-    {
-        <div class="glass-card mt-3 p-3">
-            <label class="form-label">
-                <strong>@answer.Question.Text</strong>
-                @if (answer.Question.Required)
-                {
-                    <span class="text-danger"> *</span>
-                }
-            </label>
-
-            @if (!string.IsNullOrWhiteSpace(answer.Question.Description))
+    <Panel Class="mt-3">
+        <div class="question-list">
+            @foreach (var answer in answers)
             {
-                <p class="text-muted">@answer.Question.Description</p>
-            }
+                <div class="field">
+                    <label class="field__label" for="@(answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : answer.Question.QuestionId)">
+                        @answer.Question.Text
+                        @if (answer.Question.Required)
+                        {
+                            <span class="field__req" aria-label="Pflichtfeld">*</span>
+                        }
+                    </label>
 
-            @switch (answer.Question.Type)
-            {
-                case TeamApplicationQuestionType.ShortText:
-                    <input class="form-control glassy-input" value="@answer.Text"
-                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                    break;
-
-                case TeamApplicationQuestionType.LongText:
-                    <textarea class="form-control glassy-input" rows="8" value="@answer.Text"
-                              @onchange="e => SetText(answer, e.Value?.ToString())"></textarea>
-                    <small class="text-muted">@answer.Text.Trim().Length Zeichen@(LengthHint(answer.Question))</small>
-                    break;
-
-                case TeamApplicationQuestionType.Number:
-                    <input type="number" class="form-control glassy-input" value="@answer.Text"
-                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                    break;
-
-                case TeamApplicationQuestionType.SingleChoice:
-                    @for (var i = 0; i < answer.Question.Options.Count; i++)
+                    @if (!string.IsNullOrWhiteSpace(answer.Question.Description))
                     {
-                        var current = answer.Question.Options[i];
-                        var inputId = $"{answer.Question.QuestionId}-{i}";
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" id="@inputId"
-                                   name="@answer.Question.QuestionId" checked="@(answer.Text == current)"
-                                   @onchange="() => SetText(answer, current)"/>
-                            <label class="form-check-label" for="@inputId">@current</label>
-                        </div>
+                        <span class="field__hint mb-2">@answer.Question.Description</span>
                     }
-                    break;
 
-                case TeamApplicationQuestionType.MultipleChoice:
-                    @for (var i = 0; i < answer.Question.Options.Count; i++)
+                    @switch (answer.Question.Type)
                     {
-                        var current = answer.Question.Options[i];
-                        var inputId = $"{answer.Question.QuestionId}-{i}";
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="@inputId"
-                                   checked="@answer.Selected.Contains(current)"
-                                   @onchange="e => ToggleOption(answer, current, e.Value is true)"/>
-                            <label class="form-check-label" for="@inputId">@current</label>
-                        </div>
-                    }
-                    @if (SelectionHint(answer.Question) is { } hint)
-                    {
-                        <small class="text-muted">@hint</small>
-                    }
-                    break;
-            }
+                        case TeamApplicationQuestionType.ShortText:
+                            <input id="@answer.Question.QuestionId" class="form-control" value="@answer.Text"
+                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                            break;
 
-            @if (!string.IsNullOrWhiteSpace(answer.Error))
-            {
-                <div class="validation-message mt-2">@answer.Error</div>
+                        case TeamApplicationQuestionType.LongText:
+                            <textarea id="@answer.Question.QuestionId" class="form-control" rows="7" value="@answer.Text"
+                                      @onchange="e => SetText(answer, e.Value?.ToString())"></textarea>
+                            <span class="field__hint tnum">@answer.Text.Trim().Length Zeichen@(LengthHint(answer.Question))</span>
+                            break;
+
+                        case TeamApplicationQuestionType.Number:
+                            <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
+                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                            break;
+
+                        case TeamApplicationQuestionType.SingleChoice:
+                            @for (var i = 0; i < answer.Question.Options.Count; i++)
+                            {
+                                var current = answer.Question.Options[i];
+                                var inputId = $"{answer.Question.QuestionId}-{i}";
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="@inputId"
+                                           name="@answer.Question.QuestionId" checked="@(answer.Text == current)"
+                                           @onchange="() => SetText(answer, current)"/>
+                                    <label class="form-check-label" for="@inputId">@current</label>
+                                </div>
+                            }
+                            break;
+
+                        case TeamApplicationQuestionType.MultipleChoice:
+                            @for (var i = 0; i < answer.Question.Options.Count; i++)
+                            {
+                                var current = answer.Question.Options[i];
+                                var inputId = $"{answer.Question.QuestionId}-{i}";
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="@inputId"
+                                           checked="@answer.Selected.Contains(current)"
+                                           @onchange="e => ToggleOption(answer, current, e.Value is true)"/>
+                                    <label class="form-check-label" for="@inputId">@current</label>
+                                </div>
+                            }
+                            @if (SelectionHint(answer.Question) is { } hint)
+                            {
+                                <span class="field__hint">@hint</span>
+                            }
+                            break;
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(answer.Error))
+                    {
+                        <span class="field__error" role="alert">@answer.Error</span>
+                    }
+                </div>
             }
         </div>
-    }
 
-    <button class="btn btn-primary-glass mt-3 mb-5" disabled="@submitting" @onclick="Submit">
-        Bewerbung abschicken
-    </button>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@submitting" @onclick="Submit">
+                @if (submitting)
+                {
+                    <span class="spinner spinner--sm me-2" aria-hidden="true"></span>
+                }
+                Bewerbung abschicken
+            </button>
+            @if (!string.IsNullOrWhiteSpace(statusMessage))
+            {
+                <span class="field__error" role="alert">@statusMessage</span>
+            }
+        </div>
+    </Panel>
 }
 
 @code {

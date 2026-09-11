@@ -7,146 +7,158 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<h1>Textbausteine und Bot-Texte</h1>
+<PageHeader Title="Textbausteine und Bot-Texte" BackHref="/konfiguration" BackText="Administration"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Texte werden geladen"
+                Description="Vorlagen, Platzhalter und die Bot-Texte werden abgefragt."/>
 }
 else if (!mayManage)
 {
-    <div class="alert alert-danger-glass mt-3" role="alert">
-        Du hast keine Berechtigung, die Textbausteine zu verwalten.
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Textbausteine verwalten darf, wer das Recht „Fragenkatalog verwalten“ hat. Rechte vergibt ein Administrator in der Rechte-Matrix."/>
 }
 else
 {
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
     }
 
-    <div class="alert alert-info-glass mt-2" role="alert">
-        <h4 class="alert-heading">Verfügbare Platzhalter</h4>
-        <hr>
-        <p class="mb-2">
-            Eingebaut: @string.Join(" ", TeamApplicationTemplateResolver.BuiltIn)
-        </p>
-        <p class="mb-0">
-            Eigene: @(placeholders.Count == 0 ? "noch keine" : string.Join(" ", placeholders.Keys.Select(k => "{" + k + "}")))
-        </p>
+    <div class="notice mb-3">
+        <p class="notice__title">Platzhalter</p>
+        <p class="mb-2">Diese werden in jeder Vorlage und jedem Bot-Text beim Versand ersetzt.</p>
+        <div class="chip-list">
+            @foreach (var builtIn in TeamApplicationTemplateResolver.BuiltIn)
+            {
+                <code>@builtIn</code>
+            }
+            @foreach (var key in placeholders.Keys)
+            {
+                <code>{@key}</code>
+            }
+        </div>
     </div>
 
-    <!-- Vorlagen fuer Entscheidungen -->
-    <h3 class="mt-4">Vorlagen für Entscheidungen</h3>
-    @foreach (var template in templates)
+    <h2 class="section-title">Vorlagen für Entscheidungen</h2>
+
+    @if (templates.Count == 0)
     {
-        <div class="glass-card mt-3 p-3">
-            <div class="row g-2">
-                <div class="col-12 col-md-5">
-                    <label class="form-label">Name</label>
-                    <input class="form-control glassy-input" @bind="template.Name"/>
-                </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label">Art</label>
-                    <select class="form-select glassy-input" @bind="template.Kind">
-                        <option value="@TeamApplicationTemplateKind.Accept">Zusage</option>
-                        <option value="@TeamApplicationTemplateKind.Reject">Absage</option>
-                    </select>
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label">Position</label>
-                    <select class="form-select glassy-input" value="@(template.PositionId ?? "")"
-                            @onchange="e => template.PositionId = EmptyToNull(e.Value?.ToString())">
-                        <option value="">Alle Positionen</option>
-                        @foreach (var position in positions)
-                        {
-                            <option value="@position.PositionId">@position.PositionName</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Text</label>
-                    <textarea class="form-control glassy-input" rows="4" @bind="template.Text"></textarea>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap gap-2 mt-3">
-                <button class="btn btn-primary-glass" @onclick="() => SaveTemplate(template)">Speichern</button>
-                <button class="btn btn-danger-glass" @onclick="() => DeleteTemplate(template)">Löschen</button>
-            </div>
-        </div>
+        <StateBlock Title="Noch keine Vorlage"
+                    Description="Vorlagen stehen im Entscheiden-Dialog jeder Bewerbung zur Auswahl und sparen das Tippen wiederkehrender Zu- und Absagen."
+                    ActionText="Vorlage anlegen"
+                    OnAction="AddTemplate"/>
     }
-    <button class="btn btn-primary-glass mt-3" @onclick="AddTemplate">Vorlage hinzufügen</button>
-
-    <!-- Eigene Platzhalter -->
-    <div class="glass-card mt-4 p-3">
-        <h3>Eigene Platzhalter</h3>
-        <p class="text-muted">
-            Ein Platzhalter ist ein Textbaustein, der in jeder Vorlage und in jedem Bot-Text als
-            <code>{schluessel}</code> eingesetzt werden kann.
-        </p>
-
-        @foreach (var placeholder in placeholders.ToList())
+    else
+    {
+        @foreach (var template in templates)
         {
-            var key = placeholder.Key;
-            <div class="row g-2 align-items-end mb-2">
-                <div class="col-12 col-md-3">
-                    <code>{@key}</code>
-                </div>
-                <div class="col-12 col-md-7">
-                    <input class="form-control glassy-input" value="@placeholders[key]"
-                           @onchange="e => placeholders[key] = e.Value?.ToString() ?? string.Empty"/>
-                </div>
-                <div class="col-12 col-md-2 d-flex gap-2">
-                    <button class="btn btn-primary-glass btn-sm" @onclick="() => SavePlaceholder(key)">Speichern</button>
-                    <button class="btn btn-danger-glass btn-sm" @onclick="() => DeletePlaceholder(key)">Löschen</button>
-                </div>
-            </div>
+            <Panel Title="@(string.IsNullOrWhiteSpace(template.Name) ? "Unbenannte Vorlage" : template.Name)">
+                <Actions>
+                    <StatusPill Text="@(template.Kind == TeamApplicationTemplateKind.Accept ? "Zusage" : "Absage")"/>
+                </Actions>
+                <ChildContent>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label class="field__label" for="t-name-@template.TemplateId">Name</label>
+                            <input id="t-name-@template.TemplateId" class="form-control" @bind="template.Name"/>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="t-kind-@template.TemplateId">Art</label>
+                            <select id="t-kind-@template.TemplateId" class="form-select" @bind="template.Kind">
+                                <option value="@TeamApplicationTemplateKind.Accept">Zusage</option>
+                                <option value="@TeamApplicationTemplateKind.Reject">Absage</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="t-pos-@template.TemplateId">Position</label>
+                            <select id="t-pos-@template.TemplateId" class="form-select" value="@(template.PositionId ?? "")"
+                                    @onchange="e => template.PositionId = EmptyToNull(e.Value?.ToString())">
+                                <option value="">Alle Positionen</option>
+                                @foreach (var position in positions)
+                                {
+                                    <option value="@position.PositionId">@position.PositionName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field field--wide">
+                            <label class="field__label" for="t-text-@template.TemplateId">Text</label>
+                            <textarea id="t-text-@template.TemplateId" class="form-control" rows="4" @bind="template.Text"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-foot">
+                        <button type="button" class="btn btn-secondary" @onclick="() => SaveTemplate(template)">Speichern</button>
+                        <button type="button" class="btn btn-danger ms-auto" @onclick="() => DeleteTemplate(template)">Löschen</button>
+                    </div>
+                </ChildContent>
+            </Panel>
         }
 
-        <div class="row g-2 align-items-end mt-3">
-            <div class="col-12 col-md-3">
-                <label class="form-label">Schlüssel</label>
-                <input class="form-control glassy-input" @bind="newPlaceholderKey" placeholder="z.B. regeln"/>
+        <button type="button" class="btn btn-primary mt-3" @onclick="AddTemplate">Vorlage hinzufügen</button>
+    }
+
+    <Panel Title="Eigene Platzhalter" Class="mt-4"
+           Lead="Ein fester Textbaustein, der in Vorlagen und Bot-Texten als {schluessel} eingesetzt wird.">
+        @if (placeholders.Count == 0)
+        {
+            <p class="meta mb-3">Noch keine eigenen Platzhalter.</p>
+        }
+        else
+        {
+            @foreach (var placeholder in placeholders.ToList())
+            {
+                var key = placeholder.Key;
+                <div class="field">
+                    <label class="field__label" for="ph-@key"><code>{@key}</code></label>
+                    <div class="option-row">
+                        <input id="ph-@key" class="form-control" value="@placeholders[key]"
+                               @onchange="e => placeholders[key] = e.Value?.ToString() ?? string.Empty"/>
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="() => SavePlaceholder(key)">Speichern</button>
+                        <button type="button" class="btn btn-ghost btn-sm" @onclick="() => DeletePlaceholder(key)">Löschen</button>
+                    </div>
+                </div>
+            }
+        }
+
+        <div class="field-grid mt-3">
+            <div class="field">
+                <label class="field__label" for="ph-new-key">Schlüssel</label>
+                <input id="ph-new-key" class="form-control" @bind="newPlaceholderKey" placeholder="schluessel"/>
             </div>
-            <div class="col-12 col-md-7">
-                <label class="form-label">Text</label>
-                <input class="form-control glassy-input" @bind="newPlaceholderText"/>
-            </div>
-            <div class="col-12 col-md-2">
-                <button class="btn btn-primary-glass w-100" @onclick="AddPlaceholder">Anlegen</button>
+            <div class="field">
+                <label class="field__label" for="ph-new-text">Text</label>
+                <input id="ph-new-text" class="form-control" @bind="newPlaceholderText"/>
             </div>
         </div>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="AddPlaceholder">Platzhalter anlegen</button>
+        </div>
+    </Panel>
 
-    <!-- Standardtexte des Bots -->
-    <div class="glass-card mt-4 p-3">
-        <h3>Bot-Texte</h3>
-        <p class="text-muted">
-            Diese Texte verschickt der Bot automatisch. Sie unterstützen dieselben Platzhalter.
-        </p>
-
+    <Panel Title="Bot-Texte" Lead="Diese Texte verschickt der Bot automatisch. Sie unterstützen dieselben Platzhalter.">
         @foreach (var setting in settingFields)
         {
-            <div class="mb-3">
-                <label class="form-label">@setting.Label</label>
+            <div class="field">
+                <label class="field__label" for="st-@setting.Key">@setting.Label</label>
                 @if (setting.Multiline)
                 {
-                    <textarea class="form-control glassy-input" rows="3" value="@settings[setting.Key]"
+                    <textarea id="st-@setting.Key" class="form-control" rows="3" value="@settings[setting.Key]"
                               @onchange="e => settings[setting.Key] = e.Value?.ToString() ?? string.Empty"></textarea>
                 }
                 else
                 {
-                    <input class="form-control glassy-input" value="@settings[setting.Key]"
+                    <input id="st-@setting.Key" class="form-control" value="@settings[setting.Key]"
                            @onchange="e => settings[setting.Key] = e.Value?.ToString() ?? string.Empty"/>
                 }
             </div>
         }
-
-        <button class="btn btn-primary-glass" @onclick="SaveSettings">Bot-Texte speichern</button>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="SaveSettings">Bot-Texte speichern</button>
+        </div>
+    </Panel>
 }
 
 @code {
@@ -157,6 +169,7 @@ else
     private bool loaded;
     private bool mayManage;
     private string statusMessage = "";
+    private string statusTone = "ok";
 
     private List<TeamApplicationPosition> positions = new();
     private List<TeamApplicationTemplate> templates = new();
@@ -206,12 +219,18 @@ else
 
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
     private async Task<bool> EnsurePermission()
     {
         if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions))
             return true;
 
-        statusMessage = "Keine Berechtigung.";
+        Say("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -222,7 +241,7 @@ else
         var template = new TeamApplicationTemplate { Name = "Neue Vorlage" };
         await TeamApplicationService.UpsertTemplateAsync(template);
         templates.Add(template);
-        statusMessage = "Vorlage hinzugefügt.";
+        Say("Vorlage angelegt.", "ok");
     }
 
     private async Task SaveTemplate(TeamApplicationTemplate template)
@@ -230,7 +249,7 @@ else
         if (!await EnsurePermission()) return;
 
         await TeamApplicationService.UpsertTemplateAsync(template);
-        statusMessage = "Vorlage gespeichert.";
+        Say("Vorlage gespeichert.", "ok");
     }
 
     private async Task DeleteTemplate(TeamApplicationTemplate template)
@@ -239,7 +258,7 @@ else
 
         await TeamApplicationService.DeleteTemplateAsync(template.TemplateId);
         templates.Remove(template);
-        statusMessage = "Vorlage gelöscht.";
+        Say("Vorlage gelöscht.", "ok");
     }
 
     private async Task AddPlaceholder()
@@ -249,7 +268,7 @@ else
         var key = TeamApplicationService.Slugify(newPlaceholderKey);
         if (string.IsNullOrEmpty(key))
         {
-            statusMessage = "Bitte einen gültigen Schlüssel angeben.";
+            Say("Bitte einen Schlüssel aus Buchstaben oder Ziffern angeben.", "bad");
             return;
         }
 
@@ -257,7 +276,7 @@ else
         placeholders[key] = newPlaceholderText;
         newPlaceholderKey = "";
         newPlaceholderText = "";
-        statusMessage = "Platzhalter angelegt.";
+        Say("Platzhalter angelegt.", "ok");
     }
 
     private async Task SavePlaceholder(string key)
@@ -265,7 +284,7 @@ else
         if (!await EnsurePermission()) return;
 
         await TeamApplicationService.UpsertPlaceholderAsync(key, placeholders[key]);
-        statusMessage = "Platzhalter gespeichert.";
+        Say("Platzhalter gespeichert.", "ok");
     }
 
     private async Task DeletePlaceholder(string key)
@@ -274,7 +293,7 @@ else
 
         await TeamApplicationService.DeletePlaceholderAsync(key);
         placeholders.Remove(key);
-        statusMessage = "Platzhalter gelöscht.";
+        Say("Platzhalter gelöscht.", "ok");
     }
 
     private async Task SaveSettings()
@@ -282,6 +301,6 @@ else
         if (!await EnsurePermission()) return;
 
         foreach (var (key, value) in settings) await TeamApplicationService.SetTextAsync(key, value);
-        statusMessage = "Bot-Texte gespeichert.";
+        Say("Bot-Texte gespeichert.", "ok");
     }
 }

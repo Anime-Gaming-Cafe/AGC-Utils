@@ -1,0 +1,1290 @@
+/* Application styles. Replaces the former glass.css + site.css.
+   Rules and reasoning live in DESIGN.md - do not add paint here that contradicts it. */
+
+/* ==========================================================================
+   1. Bootstrap bindings
+   Bootstrap 5.3 is driven by custom properties, so the design system is applied
+   once here instead of overpainting each component.
+   ========================================================================== */
+
+:root,
+[data-bs-theme="dark"] {
+    --bs-body-bg: var(--bg);
+    --bs-body-color: var(--fg);
+    --bs-body-font-family: var(--font);
+    --bs-body-font-size: var(--f-md);
+    --bs-emphasis-color: var(--fg);
+    --bs-secondary-color: var(--fg-muted);
+    --bs-tertiary-color: var(--fg-subtle);
+    --bs-secondary-bg: var(--surface);
+    --bs-tertiary-bg: var(--surface-raised);
+
+    --bs-border-color: var(--border);
+    --bs-border-color-translucent: var(--border);
+    --bs-border-radius: var(--r-control);
+    --bs-border-radius-sm: var(--r-control);
+    --bs-border-radius-lg: var(--r-surface);
+    --bs-border-radius-xl: var(--r-surface);
+    --bs-border-radius-pill: var(--r-control);
+
+    --bs-primary: var(--accent);
+    --bs-primary-rgb: var(--accent-rgb);
+    --bs-link-color: var(--fg);
+    --bs-link-hover-color: var(--fg);
+
+    --bs-code-color: var(--fg-muted);
+    --bs-highlight-bg: var(--surface-raised);
+
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--fg);
+    --bs-table-border-color: var(--border);
+    --bs-table-striped-bg: rgb(255 255 255 / 0.025);
+    --bs-table-hover-bg: rgb(255 255 255 / 0.04);
+
+    --bs-dropdown-bg: var(--surface-raised);
+    --bs-dropdown-border-color: var(--border-strong);
+    --bs-dropdown-color: var(--fg);
+    --bs-dropdown-link-color: var(--fg-muted);
+    --bs-dropdown-link-hover-color: var(--fg);
+    --bs-dropdown-link-hover-bg: rgb(255 255 255 / 0.06);
+    --bs-dropdown-header-color: var(--fg-subtle);
+    --bs-dropdown-border-radius: var(--r-surface);
+
+    --bs-form-invalid-color: var(--bad-text);
+    --bs-form-invalid-border-color: var(--bad);
+    --bs-form-valid-color: var(--ok-text);
+    --bs-form-valid-border-color: var(--ok);
+}
+
+/* ==========================================================================
+   2. Base
+   ========================================================================== */
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: var(--f-md);
+    line-height: 1.55;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--fg);
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0;
+}
+
+h1 { font-size: var(--f-2xl); }
+h2 { font-size: var(--f-xl); }
+h3 { font-size: var(--f-lg); }
+h4, h5, h6 { font-size: var(--f-md); }
+
+p { margin: 0 0 var(--s-3); }
+p:last-child { margin-bottom: 0; }
+
+a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--fg-subtle);
+    text-underline-offset: 2px;
+}
+
+a:hover { color: var(--fg); text-decoration-color: var(--fg); }
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: var(--s-4) 0;
+    opacity: 1;
+}
+
+small { font-size: var(--f-sm); }
+
+code, kbd, samp, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+}
+
+code {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--r-control);
+    color: var(--fg-muted);
+    padding: 1px 5px;
+}
+
+/* Numbers line up in tables, IDs and timestamps. */
+table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
+
+::selection {
+    background-color: var(--accent-tint-strong);
+    color: var(--fg);
+}
+
+/* --- Focus -----------------------------------------------------------------
+   Defined once, never removed. The previous system disabled it on every button. */
+:focus { outline: none; }
+
+:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
+    border-radius: var(--r-control);
+}
+
+.btn:focus,
+.btn:active:focus,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+    box-shadow: none;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--accent);
+    outline: 2px solid var(--accent-strong);
+    outline-offset: -1px;
+}
+
+/* ==========================================================================
+   3. Layout shell
+   ========================================================================== */
+
+.app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.app__main {
+    flex: 1;
+    min-width: 0;
+}
+
+.app__content {
+    margin: 0 auto;
+    max-width: var(--content-max);
+    padding: var(--s-5) var(--s-4) var(--s-7);
+}
+
+@media (min-width: 900px) {
+    .app__content { padding: var(--s-6) var(--s-5) var(--s-7); }
+}
+
+/* ==========================================================================
+   4. Page header
+   ========================================================================== */
+
+.page-header {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    justify-content: space-between;
+    margin-bottom: var(--s-5);
+    padding-bottom: var(--s-4);
+}
+
+.page-header__text { min-width: 0; }
+
+.page-header__lead {
+    color: var(--fg-muted);
+    margin: var(--s-2) 0 0;
+    max-width: 68ch;
+}
+
+.page-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.page-back {
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: var(--f-sm);
+    margin-bottom: var(--s-3);
+}
+
+.page-back { text-decoration: none; }
+.page-back:hover { color: var(--fg); text-decoration: none; }
+
+/* ==========================================================================
+   5. Panel - the one surface
+   ========================================================================== */
+
+.panel {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-surface);
+}
+
+.panel + .panel,
+.panel + .stack,
+.stack > * + * { margin-top: var(--s-4); }
+
+.panel__head {
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    justify-content: space-between;
+    padding: var(--s-3) var(--s-4);
+}
+
+.panel__title {
+    font-size: var(--f-md);
+    font-weight: 600;
+}
+
+.panel__lead {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    margin: var(--s-1) 0 0;
+}
+
+.panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.panel__body { padding: var(--s-4); }
+.panel__body > :last-child { margin-bottom: 0; }
+
+.panel--flush > .panel__body { padding: 0; }
+
+.section-title {
+    font-size: var(--f-md);
+    font-weight: 600;
+    margin: var(--s-6) 0 var(--s-3);
+}
+
+/* ==========================================================================
+   6. Buttons
+   ========================================================================== */
+
+.btn {
+    --bs-btn-border-radius: var(--r-control);
+    --bs-btn-font-size: var(--f-md);
+    --bs-btn-font-weight: 500;
+    --bs-btn-padding-x: var(--s-3);
+    --bs-btn-padding-y: 6px;
+    transition: background-color var(--t-fast) var(--ease),
+                border-color var(--t-fast) var(--ease),
+                color var(--t-fast) var(--ease);
+}
+
+.btn-sm {
+    --bs-btn-font-size: var(--f-sm);
+    --bs-btn-padding-x: var(--s-2);
+    --bs-btn-padding-y: 3px;
+}
+
+/* The accent's one job on this page. */
+.btn-primary {
+    --bs-btn-bg: var(--accent);
+    --bs-btn-border-color: var(--accent);
+    --bs-btn-color: var(--on-accent);
+    --bs-btn-hover-bg: var(--accent-hover);
+    --bs-btn-hover-border-color: var(--accent-hover);
+    --bs-btn-hover-color: var(--on-accent);
+    --bs-btn-active-bg: var(--accent-hover);
+    --bs-btn-active-border-color: var(--accent-hover);
+    --bs-btn-active-color: var(--on-accent);
+    --bs-btn-disabled-bg: var(--accent);
+    --bs-btn-disabled-border-color: var(--accent);
+    --bs-btn-disabled-color: var(--on-accent);
+}
+
+.btn-secondary {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--border-strong);
+    --bs-btn-color: var(--fg);
+    --bs-btn-hover-bg: var(--surface-raised);
+    --bs-btn-hover-border-color: var(--border-strong);
+    --bs-btn-hover-color: var(--fg);
+    --bs-btn-active-bg: var(--surface-raised);
+    --bs-btn-active-border-color: var(--border-strong);
+    --bs-btn-active-color: var(--fg);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: var(--border);
+    --bs-btn-disabled-color: var(--fg-subtle);
+}
+
+.btn-danger {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--bad);
+    --bs-btn-color: var(--bad-text);
+    --bs-btn-hover-bg: var(--bad-tint);
+    --bs-btn-hover-border-color: var(--bad);
+    --bs-btn-hover-color: var(--bad-text);
+    --bs-btn-active-bg: var(--bad-tint);
+    --bs-btn-active-border-color: var(--bad);
+    --bs-btn-active-color: var(--bad-text);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: var(--border);
+    --bs-btn-disabled-color: var(--fg-subtle);
+}
+
+.btn-ghost {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-color: var(--fg-muted);
+    --bs-btn-hover-bg: var(--surface-raised);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-hover-color: var(--fg);
+    --bs-btn-active-bg: var(--surface-raised);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-active-color: var(--fg);
+}
+
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+/* ==========================================================================
+   7. Forms
+   ========================================================================== */
+
+.form-control,
+.form-select {
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-control);
+    color: var(--fg);
+    font-size: var(--f-md);
+    padding: 6px var(--s-3);
+}
+
+.form-control::placeholder { color: var(--fg-subtle); }
+
+.form-control:disabled,
+.form-select:disabled {
+    background-color: var(--surface);
+    color: var(--fg-subtle);
+}
+
+.form-check-input {
+    background-color: var(--surface-sunken);
+    border-color: var(--border-strong);
+}
+
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.field { margin-bottom: var(--s-4); }
+.field:last-child { margin-bottom: 0; }
+
+.field__label {
+    color: var(--fg);
+    display: block;
+    font-size: var(--f-sm);
+    font-weight: 500;
+    margin-bottom: var(--s-1);
+}
+
+.field__req { color: var(--bad-text); }
+
+.field__hint {
+    color: var(--fg-muted);
+    display: block;
+    font-size: var(--f-sm);
+    margin-top: var(--s-1);
+}
+
+.field__error {
+    color: var(--bad-text);
+    display: block;
+    font-size: var(--f-sm);
+    margin-top: var(--s-1);
+}
+
+.field-grid {
+    display: grid;
+    gap: var(--s-3);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* ==========================================================================
+   8. Tables
+   ========================================================================== */
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    font-size: var(--f-md);
+    margin: 0;
+}
+
+.table > thead {
+    background-color: var(--surface-raised);
+}
+
+.table > thead th {
+    border-bottom: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    font-weight: 600;
+    padding: var(--s-2) var(--s-3);
+    white-space: nowrap;
+}
+
+.table > tbody td {
+    border-bottom: 1px solid var(--border);
+    padding: var(--s-2) var(--s-3);
+    vertical-align: middle;
+}
+
+.table > tbody tr:last-child td { border-bottom: 0; }
+
+/* ==========================================================================
+   9. Record list - the scannable list of decisions
+   ========================================================================== */
+
+.record-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.record {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: var(--r-surface);
+    transition: background-color var(--t-fast) var(--ease);
+}
+
+.record:hover { background-color: var(--surface-raised); }
+
+.record > a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    padding: var(--s-3) var(--s-4);
+}
+
+.record > a:hover { text-decoration: none; }
+
+/* The left edge carries the record's real status. It is a signal, not decoration
+   (DESIGN.md, "Exceptions on record"). */
+.record--new { border-left-color: var(--fg-muted); }
+.record--read { border-left-color: var(--border-strong); }
+.record--shortlisted { border-left-color: var(--border-strong); }
+.record--waiting { border-left-color: var(--warn); }
+.record--accepted { border-left-color: var(--ok); }
+.record--rejected { border-left-color: var(--bad); }
+.record--withdrawn { border-left-color: var(--fg-subtle); }
+
+.record__title {
+    font-size: var(--f-md);
+    font-weight: 600;
+}
+
+.record__meta {
+    color: var(--fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--f-sm);
+    gap: var(--s-1) var(--s-3);
+    margin-top: var(--s-1);
+}
+
+.record__foot {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    justify-content: space-between;
+    margin-top: var(--s-2);
+}
+
+/* --- Definition list used for facts ---------------------------------------- */
+.facts {
+    display: grid;
+    gap: var(--s-2) var(--s-4);
+    grid-template-columns: max-content 1fr;
+    margin: 0;
+}
+
+.facts dt {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    font-weight: 400;
+}
+
+.facts dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.qa { margin: 0; }
+
+.qa__q {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    font-weight: 500;
+}
+
+.qa__a {
+    margin: var(--s-1) 0 var(--s-4);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.qa__a:last-child { margin-bottom: 0; }
+
+.meta {
+    color: var(--fg-subtle);
+    font-size: var(--f-sm);
+}
+
+.avatar {
+    border-radius: 50%;
+    height: 22px;
+    width: 22px;
+}
+
+.avatar-row {
+    align-items: center;
+    display: flex;
+    gap: var(--s-1);
+}
+
+/* Overlapping keeps a long reader list short. The ring takes the colour of whatever is behind the
+   stack, so every avatar keeps its edge where it covers the next one. */
+.avatar-stack {
+    align-items: center;
+    display: inline-flex;
+}
+
+.avatar-stack .avatar {
+    border: 2px solid var(--avatar-ring, var(--surface));
+    box-sizing: content-box;
+    transition: border-color var(--t-fast) var(--ease);
+}
+
+.avatar-stack > * + * { margin-left: -7px; }
+.avatar-stack--md > * + * { margin-left: -11px; }
+
+.avatar-button {
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    line-height: 0;
+    padding: 0;
+}
+
+/* A tapped avatar is a selection, one of the four places the accent is allowed. */
+.avatar-button[aria-pressed="true"] .avatar { border-color: var(--accent); }
+
+.record:hover .avatar-stack { --avatar-ring: var(--surface-raised); }
+
+.seen-by {
+    --avatar-ring: var(--bg);
+    align-items: center;
+    border-top: 1px solid var(--border);
+    color: var(--fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--f-sm);
+    gap: var(--s-2) var(--s-3);
+    margin-top: var(--s-5);
+    padding-top: var(--s-4);
+}
+
+/* ==========================================================================
+   10. Status pill
+   ========================================================================== */
+
+.pill {
+    border: 1px solid transparent;
+    border-radius: var(--r-control);
+    display: inline-block;
+    font-size: var(--f-xs);
+    font-weight: 600;
+    line-height: 1.5;
+    padding: 1px var(--s-2);
+    white-space: nowrap;
+}
+
+.pill--neutral { background-color: var(--surface-raised); border-color: var(--border-strong); color: var(--fg-muted); }
+.pill--ok { background-color: var(--ok-tint); border-color: var(--ok); color: var(--ok-text); }
+.pill--warn { background-color: var(--warn-tint); border-color: var(--warn); color: var(--warn-text); }
+.pill--bad { background-color: var(--bad-tint); border-color: var(--bad); color: var(--bad-text); }
+
+/* ==========================================================================
+   11. Notices
+   ========================================================================== */
+
+.notice {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-left-width: 3px;
+    border-radius: var(--r-surface);
+    padding: var(--s-3) var(--s-4);
+}
+
+.notice + .notice,
+.notice + .panel,
+.panel + .notice { margin-top: var(--s-4); }
+
+.notice__title {
+    font-size: var(--f-md);
+    font-weight: 600;
+    margin-bottom: var(--s-2);
+}
+
+.notice--info { border-left-color: var(--fg-subtle); }
+.notice--ok { border-left-color: var(--ok); }
+.notice--warn { border-left-color: var(--warn); }
+.notice--bad { border-left-color: var(--bad); }
+
+/* ==========================================================================
+   12. State block - loading / empty / error
+   ========================================================================== */
+
+.state {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-6) var(--s-4);
+    text-align: center;
+}
+
+.state--inline {
+    align-items: flex-start;
+    flex-direction: row;
+    padding: var(--s-3) 0;
+    text-align: left;
+}
+
+.state__title {
+    font-size: var(--f-md);
+    font-weight: 600;
+}
+
+.state__text {
+    color: var(--fg-muted);
+    margin: 0;
+    max-width: 52ch;
+}
+
+.state__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    justify-content: center;
+    margin-top: var(--s-2);
+}
+
+.state--inline .state__actions { justify-content: flex-start; }
+
+.state--bad .state__title { color: var(--bad-text); }
+
+/* The only perpetual motion in the system: it reports real progress. */
+.spinner {
+    animation: spin 0.8s linear infinite;
+    border: 2px solid var(--border-strong);
+    border-radius: 50%;
+    border-top-color: var(--fg-muted);
+    display: inline-block;
+    height: 18px;
+    width: 18px;
+}
+
+.spinner--sm { height: 13px; width: 13px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 2s; }
+}
+
+/* ==========================================================================
+   13. Pager
+   ========================================================================== */
+
+.pager {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    justify-content: space-between;
+    margin-top: var(--s-4);
+}
+
+.pager__info {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+}
+
+.pager__controls {
+    display: flex;
+    gap: var(--s-2);
+}
+
+/* ==========================================================================
+   14. Inline confirm - this codebase has no modals, on purpose
+   ========================================================================== */
+
+.confirm {
+    background-color: var(--bad-tint);
+    border: 1px solid var(--bad);
+    border-radius: var(--r-surface);
+    margin-top: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+}
+
+.confirm__title {
+    color: var(--bad-text);
+    font-size: var(--f-md);
+    font-weight: 600;
+    margin-bottom: var(--s-2);
+}
+
+.confirm__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+}
+
+.confirm .btn-danger {
+    --bs-btn-bg: var(--bad);
+    --bs-btn-color: var(--fg);
+    --bs-btn-hover-bg: color-mix(in srgb, var(--bad) 85%, white);
+    --bs-btn-hover-color: var(--fg);
+}
+
+/* ==========================================================================
+   15. Icons
+   ========================================================================== */
+
+.icon {
+    display: inline-block;
+    fill: none;
+    flex: none;
+    height: 1em;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.75;
+    vertical-align: -0.125em;
+    width: 1em;
+}
+
+/* ==========================================================================
+   16. Top bar
+   One navigation level with at most six entries. The bar shares the content's
+   max width and side padding, so its left edge lines up with the page below.
+   ========================================================================== */
+
+.topbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+.topbar__inner {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    margin: 0 auto;
+    max-width: var(--content-max);
+    min-height: var(--topbar-h);
+    padding: 0 var(--s-4);
+}
+
+.topbar__brand {
+    color: var(--fg);
+    font-weight: 600;
+    max-width: 220px;
+    overflow: hidden;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.topbar__brand:hover { color: var(--fg); text-decoration: none; }
+
+/* Below the breakpoint the menu expands the bar itself instead of floating a drawer. */
+.topnav {
+    flex-basis: 100%;
+    order: 3;
+}
+
+.topnav:not(.is-open) { display: none; }
+
+.topnav__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 0 0 var(--s-3);
+}
+
+.topnav__list a {
+    border-radius: var(--r-control);
+    color: var(--fg-muted);
+    display: block;
+    padding: var(--s-2) var(--s-3);
+    text-decoration: none;
+    transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+    white-space: nowrap;
+}
+
+.topnav__list a:hover {
+    background-color: var(--surface-raised);
+    color: var(--fg);
+    text-decoration: none;
+}
+
+.topnav__list a.active {
+    background-color: var(--accent-tint);
+    color: var(--fg);
+}
+
+.topnav__group {
+    color: var(--fg-subtle);
+    font-size: var(--f-xs);
+    font-weight: 600;
+    padding: var(--s-3) var(--s-3) var(--s-1);
+}
+
+.topnav__sep { display: none; }
+
+.topbar__end {
+    align-items: center;
+    display: flex;
+    gap: var(--s-2);
+    margin-left: auto;
+}
+
+.topbar__user {
+    align-items: center;
+    background: none;
+    border: 0;
+    border-radius: var(--r-control);
+    color: var(--fg);
+    display: flex;
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2);
+}
+
+.topbar__user:hover { background-color: var(--surface-raised); }
+
+.topbar__user-name {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.topbar__end .dropdown-menu { box-shadow: var(--shadow-overlay); }
+
+.topbar__toggle {
+    align-items: center;
+    background: none;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-control);
+    color: var(--fg);
+    display: inline-flex;
+    padding: 5px 7px;
+}
+
+@media (max-width: 599.98px) {
+    .topbar__user-name { display: none; }
+}
+
+@media (min-width: 900px) {
+    .topbar__inner { padding: 0 var(--s-5); }
+}
+
+@media (min-width: 1000px) {
+    .topbar__inner { flex-wrap: nowrap; }
+
+    .topnav,
+    .topnav:not(.is-open) {
+        display: block;
+        flex-basis: auto;
+        min-width: 0;
+        order: 0;
+        overflow-x: auto;
+    }
+
+    .topnav__list {
+        align-items: center;
+        flex-direction: row;
+        gap: var(--s-1);
+        padding: 0;
+    }
+
+    .topnav__group { display: none; }
+
+    .topnav__sep {
+        background-color: var(--border-strong);
+        display: block;
+        height: 20px;
+        margin: 0 var(--s-2);
+        width: 1px;
+    }
+
+    .topbar__toggle { display: none; }
+}
+
+/* ==========================================================================
+   17. Blazor chrome
+   ========================================================================== */
+
+#blazor-error-ui {
+    background-color: var(--bad-tint);
+    border-top: 1px solid var(--bad);
+    bottom: 0;
+    box-shadow: var(--shadow-overlay);
+    color: var(--fg);
+    display: none;
+    left: 0;
+    padding: var(--s-3) var(--s-4);
+    position: fixed;
+    width: 100%;
+    z-index: 1050;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: var(--s-4);
+    top: var(--s-3);
+}
+
+/* ==========================================================================
+   18. Link list - hub pages
+   A card wrapped around a single link carried no information, so hubs are lists.
+   ========================================================================== */
+
+.nav-links {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: calc(var(--s-2) * -1) calc(var(--s-4) * -1);
+    padding: 0;
+}
+
+.nav-links li + li { border-top: 1px solid var(--border); }
+
+.nav-links a {
+    text-decoration: none;
+    align-items: center;
+    color: var(--fg);
+    display: flex;
+    justify-content: space-between;
+    padding: var(--s-3) var(--s-4);
+    transition: background-color var(--t-fast) var(--ease);
+}
+
+.nav-links a:hover {
+    background-color: var(--surface-raised);
+    text-decoration: none;
+}
+
+.nav-links__count {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+}
+
+/* ==========================================================================
+   19. Rows - a plain list inside a flush panel
+   ========================================================================== */
+
+.rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.rows > li {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    justify-content: space-between;
+    padding: var(--s-3) var(--s-4);
+}
+
+.rows > li + li { border-top: 1px solid var(--border); }
+
+.rows__main {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.rows__title { font-weight: 600; }
+
+.rows__text {
+    color: var(--fg-muted);
+    font-size: var(--f-sm);
+    margin: var(--s-1) 0 0;
+}
+
+.rows__side {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.rows__detail {
+    border-top: 1px solid var(--border);
+    flex-basis: 100%;
+    margin-top: var(--s-2);
+    padding-top: var(--s-3);
+}
+
+/* ==========================================================================
+   20. Question list - one form, not one card per question
+   ========================================================================== */
+
+.question-list > .field {
+    margin: 0;
+    padding-block: var(--s-4);
+}
+
+.question-list > .field:first-child { padding-top: 0; }
+.question-list > .field + .field { border-top: 1px solid var(--border); }
+
+.form-foot {
+    align-items: center;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    margin-top: var(--s-4);
+    padding-top: var(--s-4);
+}
+
+/* ==========================================================================
+   21. Detail layout
+   The page's weight sits in the main column (answers, decision, notes);
+   facts about the applicant are supporting material and go to the side.
+   ========================================================================== */
+
+.detail-grid {
+    align-items: start;
+    display: grid;
+    gap: var(--s-4);
+}
+
+@media (min-width: 1100px) {
+    .detail-grid { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+
+/* Snapshot vs. live, activity windows: a real comparison, so a real table. */
+.compare {
+    border-collapse: collapse;
+    font-size: var(--f-sm);
+    width: 100%;
+}
+
+.compare th,
+.compare td {
+    border-bottom: 1px solid var(--border);
+    padding: var(--s-2) 0;
+    text-align: right;
+}
+
+.compare td + td,
+.compare th + th { padding-left: var(--s-3); }
+
+.compare th:first-child,
+.compare td:first-child {
+    color: var(--fg-muted);
+    font-weight: 400;
+    text-align: left;
+}
+
+.compare thead th {
+    color: var(--fg-subtle);
+    font-weight: 500;
+}
+
+.compare tbody tr:last-child td { border-bottom: 0; }
+
+.filter-bar {
+    align-items: end;
+    display: grid;
+    gap: var(--s-3);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.filter-bar .field { margin: 0; }
+
+/* ==========================================================================
+   22. Form helpers
+   ========================================================================== */
+
+.field--wide { grid-column: 1 / -1; }
+
+.option-row {
+    display: flex;
+    gap: var(--s-2);
+    margin-bottom: var(--s-2);
+}
+
+.option-row .form-control { flex: 1; min-width: 0; }
+
+/* ==========================================================================
+   23. Page helpers
+   ========================================================================== */
+
+.panel-grid {
+    align-items: start;
+    display: grid;
+    gap: var(--s-4);
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.panel-grid > .panel + .panel { margin-top: 0; }
+
+.editor-grid {
+    align-items: start;
+    display: grid;
+    gap: var(--s-4);
+}
+
+@media (min-width: 1100px) {
+    .editor-grid { grid-template-columns: 360px minmax(0, 1fr); }
+}
+
+/* The signed-in user's own leaderboard row is their selection on the list. */
+.rows > li.is-self { background-color: var(--accent-tint); }
+
+.rank {
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 3ch;
+    text-align: right;
+}
+
+.rank--top { color: var(--fg); }
+
+.avatar--md {
+    height: 32px;
+    width: 32px;
+}
+
+.copy-id {
+    background: none;
+    border: 0;
+    color: var(--fg-subtle);
+    cursor: pointer;
+    font-size: var(--f-sm);
+    padding: 0;
+}
+
+.copy-id:hover { color: var(--fg); text-decoration: underline; }
+
+.copy-id__done {
+    color: var(--fg-muted);
+    font-size: var(--f-xs);
+    margin-left: var(--s-2);
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.swatch {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-control);
+    display: inline-block;
+    height: 20px;
+    vertical-align: middle;
+    width: 20px;
+}
+
+.preview-img {
+    border: 1px solid var(--border);
+    border-radius: var(--r-surface);
+    display: block;
+    height: auto;
+    max-width: 100%;
+}
+
+/* Imitates Discord's embed rendering - these colours are Discord's, not ours.
+   See DESIGN.md, "Exceptions on record". */
+.embed-preview {
+    background-color: #2b2d31;
+    border-left: 4px solid;
+    border-radius: var(--r-control);
+    color: #dbdee1;
+    max-width: 560px;
+    padding: var(--s-3) var(--s-4);
+}
+
+.embed-preview__title {
+    color: #f2f3f5;
+    font-weight: 600;
+    margin-bottom: var(--s-2);
+}
+
+.embed-preview__body {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.embed-preview__body p { margin: 0 0 var(--s-2); }
+
+.embed-preview__footer {
+    color: #949ba4;
+    font-size: var(--f-xs);
+    margin: var(--s-3) 0 0;
+}
+
+/* Blazor EditForm validation */
+.validation-errors {
+    color: var(--bad-text);
+    font-size: var(--f-sm);
+    margin: 0 0 var(--s-3);
+    padding-left: 1.2em;
+}
+
+.validation-message {
+    color: var(--bad-text);
+    font-size: var(--f-sm);
+}
+
+.form-control.invalid,
+.form-select.invalid { border-color: var(--bad); }
+
+/* A row list inside a padded panel body that has to run to the panel's edges. */
+.rows--bleed { margin-inline: calc(var(--s-4) * -1); }

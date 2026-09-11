@@ -7,286 +7,353 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<a class="btn btn-secondary-glass mt-2 mb-3" href="/teamarea/applysystem/applications">Zurück zur Übersicht</a>
-
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <a class="page-back" href="/teamarea/applysystem/applications"><AppIcon Name="back"/> Bewerbungen</a>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bewerbung wird geladen"
+                Description="Antworten, Stand und deine Rechte für diese Position werden abgefragt."/>
 }
 else if (application == null)
 {
-    <div class="alert alert-danger-glass" role="alert">Diese Bewerbung wurde nicht gefunden.</div>
+    <a class="page-back" href="/teamarea/applysystem/applications"><AppIcon Name="back"/> Bewerbungen</a>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Bewerbung nicht gefunden"
+                Description="Diese Bewerbung existiert nicht, oder sie wurde zusammen mit ihrer Position gelöscht."
+                ActionText="Zur Übersicht" ActionHref="/teamarea/applysystem/applications"/>
 }
 else if (!perms.ViewApplications)
 {
-    <div class="alert alert-danger-glass" role="alert">
-        Du hast keine Berechtigung, Bewerbungen für diese Position einzusehen.
-    </div>
+    <a class="page-back" href="/teamarea/applysystem/applications"><AppIcon Name="back"/> Bewerbungen</a>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Bewerbungen für diese Position darfst du nicht einsehen. Rechte vergibt ein Administrator in der Rechte-Matrix."
+                ActionText="Zur Übersicht" ActionHref="/teamarea/applysystem/applications"/>
 }
 else
 {
-    <h1>@ToolSet.GetFormattedName(application.UserId)</h1>
+    <PageHeader Title="@ToolSet.GetFormattedName(application.UserId)"
+                Lead="@HeaderLead"
+                BackHref="/teamarea/applysystem/applications" BackText="Bewerbungen">
+        <Actions>
+            <ApplicationStatusPill Status="@application.Status"/>
+        </Actions>
+    </PageHeader>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass" role="alert">@statusMessage</div>
-    }
-
-    @if (application.IsWithdrawn)
-    {
-        <div class="alert alert-warning-glass" role="alert">
-            <strong>Zurückgezogen</strong> am
-            @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.WithdrawnAt)
-        </div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
     }
 
     @if (application.DmDelivered == false)
     {
-        <div class="alert alert-danger-glass" role="alert">
-            <strong>Entscheidung nicht zustellbar</strong>
-            @if (!string.IsNullOrWhiteSpace(application.DmError))
-            {
-                <span> (@application.DmError)</span>
-            }
-        </div>
-    }
-
-    <!-- Kopfbereich: Snapshot bei Abgabe neben dem Live-Wert -->
-    <div class="glass-card mt-3 p-3">
-        <h3>Bewerber</h3>
-        <p class="text-muted">
-            @application.PositionName &middot; @application.PhaseName &middot;
-            Eingereicht am @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)
-            @if (application.Attempt > 1)
-            {
-                <span> &middot; Versuch @application.Attempt</span>
-            }
-        </p>
-
-        <div class="row g-3">
-            <div class="col-12 col-md-6">
-                <div class="glass-effect-bg p-3">
-                    <h5>Bei Abgabe</h5>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item">Level: <strong>@application.LevelSnapshot</strong></li>
-                        <li class="list-group-item">XP: <strong>@application.XpSnapshot</strong></li>
-                        <li class="list-group-item">Beigetreten: <strong>@Time(application.JoinedAtSnapshot)</strong></li>
-                        <li class="list-group-item">Account erstellt: <strong>@Time(application.AccountCreatedSnapshot)</strong></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="col-12 col-md-6">
-                <div class="glass-effect-bg p-3">
-                    <h5>Aktuell</h5>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item">Level: <strong>@liveLevel</strong></li>
-                        <li class="list-group-item">XP: <strong>@liveXp</strong></li>
-                        <li class="list-group-item">Beigetreten: <strong>@Time(liveJoinedAt)</strong></li>
-                        <li class="list-group-item">Account erstellt: <strong>@Time(liveCreatedAt)</strong></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Aktivitaet -->
-    <div class="glass-card mt-3 p-3">
-        <h3>Aktivität</h3>
-        @if (activity == null)
-        {
-            <div class="spinner-border spinner-border-sm" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        }
-        else
-        {
-            <div class="row row-cols-2 row-cols-md-3 g-2">
-                <div class="col"><div class="glass-effect-bg p-2"><small>Nachrichten 7 Tage</small><div><strong>@activity.Messages7</strong></div></div></div>
-                <div class="col"><div class="glass-effect-bg p-2"><small>Nachrichten 30 Tage</small><div><strong>@activity.Messages30</strong></div></div></div>
-                <div class="col"><div class="glass-effect-bg p-2"><small>Nachrichten 90 Tage</small><div><strong>@activity.Messages90</strong></div></div></div>
-                <div class="col"><div class="glass-effect-bg p-2"><small>Voice-Minuten 7 Tage</small><div><strong>@activity.VoiceMinutes7</strong></div></div></div>
-                <div class="col"><div class="glass-effect-bg p-2"><small>Voice-Minuten 30 Tage</small><div><strong>@activity.VoiceMinutes30</strong></div></div></div>
-                <div class="col"><div class="glass-effect-bg p-2"><small>Voice-Minuten 90 Tage</small><div><strong>@activity.VoiceMinutes90</strong></div></div></div>
-            </div>
-        }
-    </div>
-
-    <!-- Antworten -->
-    <div class="glass-card mt-3 p-3">
-        <h3>Antworten</h3>
-        <ul class="list-group list-group-flush">
-            @foreach (var answer in answers)
-            {
-                <li class="list-group-item">
-                    <strong>@answer.QuestionTextSnapshot</strong>
-                    <p class="mb-0 mt-1" style="white-space: pre-wrap; word-break: break-word;">@Render(answer)</p>
-                </li>
-            }
-        </ul>
-    </div>
-
-    @if (perms.ViewModerationHistory)
-    {
-        <div class="glass-card mt-3 p-3">
-            <h3>Moderationshistorie</h3>
-            @if (moderation == null)
-            {
-                <div class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            }
-            else if (moderation.Count == 0)
-            {
-                <p class="mb-0 text-muted">Keine Einträge.</p>
-            }
-            else
-            {
-                <ul class="list-group list-group-flush">
-                    @foreach (var entry in moderation)
-                    {
-                        <li class="list-group-item">
-                            <span class="badge-danger-glass">@entry.Kind</span>
-                            @if (!string.IsNullOrWhiteSpace(entry.CaseId))
-                            {
-                                <code class="ms-2">@entry.CaseId</code>
-                            }
-                            <div class="mt-1">@entry.Description</div>
-                            <small class="text-muted">@Time(entry.Timestamp)</small>
-                        </li>
-                    }
-                </ul>
-            }
-        </div>
-    }
-
-    @if (perms.Notes)
-    {
-        <div class="glass-card mt-3 p-3">
-            <h3>Interne Notizen</h3>
-            <p class="text-muted">Nur für das Team sichtbar, niemals für den Bewerber.</p>
-
-            @if (notes.Count == 0)
-            {
-                <p class="text-muted">Noch keine Notizen.</p>
-            }
-            else
-            {
-                <ul class="list-group list-group-flush mb-3">
-                    @foreach (var note in notes)
-                    {
-                        <li class="list-group-item">
-                            <div style="white-space: pre-wrap;">@note.Text</div>
-                            <small class="text-muted">
-                                @ToolSet.GetFormattedName(note.AuthorId) &middot; @Time(note.CreatedAt)
-                            </small>
-                        </li>
-                    }
-                </ul>
-            }
-
-            <textarea class="form-control glassy-input" rows="3" placeholder="Notiz hinzufügen"
-                      @bind="newNote"></textarea>
-            <button class="btn btn-primary-glass mt-2" @onclick="AddNote">Notiz speichern</button>
-        </div>
-    }
-
-    @if (perms.MarkInternal && application.IsOpen)
-    {
-        <div class="glass-card mt-3 p-3">
-            <h3>Interne Markierung</h3>
-            <p class="text-muted">Löst keine Benachrichtigung an den Bewerber aus.</p>
-            <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-secondary-glass" @onclick="() => Mark(TeamApplicationStatus.Gelesen)">
-                    Gelesen
-                </button>
-                <button class="btn btn-warning-glass" @onclick="() => Mark(TeamApplicationStatus.Vorgemerkt)">
-                    Vorgemerkt
-                </button>
-                <button class="btn btn-info-glass" @onclick="() => Mark(TeamApplicationStatus.WartetAufRueckfrage)">
-                    Wartet auf Rückfrage
-                </button>
-            </div>
-        </div>
-    }
-
-    @if (perms.Decide && application.IsOpen)
-    {
-        <div class="glass-card mt-3 p-3">
-            <h3>Entscheiden</h3>
-
-            @if (!decideOpen)
-            {
-                <button class="btn btn-primary-glass" @onclick="() => decideOpen = true">Entscheidung treffen</button>
-            }
-            else
-            {
-                <div class="mb-3">
-                    <label class="form-label">Vorlage</label>
-                    <select class="form-select glassy-input" @onchange="ApplyTemplate">
-                        <option value="">-- keine Vorlage --</option>
-                        @foreach (var template in templates)
-                        {
-                            <option value="@template.TemplateId">
-                                @(template.Kind == TeamApplicationTemplateKind.Accept ? "Zusage" : "Absage"): @template.Name
-                            </option>
-                        }
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Text an den Bewerber</label>
-                    <textarea class="form-control glassy-input" rows="6" @bind="decisionText"></textarea>
-                    <small class="text-muted">Bei einer Absage ist eine Begründung Pflicht.</small>
-                </div>
-
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-success-glass" disabled="@deciding"
-                            @onclick="() => Decide(TeamApplicationStatus.Angenommen)">Annehmen</button>
-                    <button class="btn btn-danger-glass" disabled="@deciding"
-                            @onclick="() => Decide(TeamApplicationStatus.Abgelehnt)">Ablehnen</button>
-                    <button class="btn btn-secondary-glass" @onclick="() => decideOpen = false">Abbrechen</button>
-                </div>
-            }
-        </div>
-    }
-
-    @if (perms.GrantReapply)
-    {
-        <div class="glass-card mt-3 p-3">
-            <h3>Sofort-Wiederbewerbung</h3>
-            @if (activeGrant != null)
-            {
-                <div class="alert alert-info-glass" role="alert">
-                    Für diesen Nutzer ist in dieser Phase bereits eine erneute Bewerbung freigeschaltet.
-                </div>
-            }
-            else
-            {
-                <p class="text-muted">
-                    Erlaubt dem Bewerber, sich innerhalb der laufenden Phase noch einmal zu bewerben. Verfällt
-                    beim Einlösen oder mit der Phase.
-                </p>
-                <textarea class="form-control glassy-input" rows="2" placeholder="Begründung (optional, geht per DM raus)"
-                          @bind="grantReason"></textarea>
-                <button class="btn btn-primary-glass mt-2" @onclick="GrantReapply">Erneute Bewerbung erlauben</button>
-            }
-        </div>
-    }
-
-    @if (application.IsDecided)
-    {
-        <div class="glass-card mt-3 mb-5 p-3">
-            <h3>Entscheidung</h3>
-            <p class="mb-1">
-                <strong>@(application.Status == TeamApplicationStatus.Angenommen ? "Angenommen" : "Abgelehnt")</strong>
-                von @ToolSet.GetFormattedName(application.DecidedBy) am @Time(application.DecidedAt)
+        <div class="notice notice--bad mb-3">
+            <p class="notice__title">Entscheidung nicht zustellbar</p>
+            <p>
+                Die DM an den Bewerber kam nicht an@(string.IsNullOrWhiteSpace(application.DmError) ? "" : $" ({application.DmError})").
+                Im Team-Channel der Position steht ein Hinweis, damit jemand per Ping nachfasst.
             </p>
-            @if (!string.IsNullOrWhiteSpace(application.DecisionText))
+        </div>
+    }
+
+    @if (application.IsWithdrawn)
+    {
+        <div class="notice mb-3">
+            Vom Bewerber zurückgezogen am <time>@Time(application.WithdrawnAt)</time>.
+        </div>
+    }
+
+    <div class="detail-grid">
+        <div>
+            <Panel Title="Antworten">
+                @if (answers.Count == 0)
+                {
+                    <p class="meta">Zu dieser Bewerbung sind keine Antworten gespeichert.</p>
+                }
+                else
+                {
+                    <dl class="qa">
+                        @foreach (var answer in answers)
+                        {
+                            <dt class="qa__q">@answer.QuestionTextSnapshot</dt>
+                            <dd class="qa__a">@Render(answer)</dd>
+                        }
+                    </dl>
+                }
+            </Panel>
+
+            @if (application.IsDecided)
             {
-                <p class="mb-0" style="white-space: pre-wrap;">@application.DecisionText</p>
+                <Panel Title="Entscheidung">
+                    <dl class="facts">
+                        <dt>Ergebnis</dt>
+                        <dd><ApplicationStatusPill Status="@application.Status"/></dd>
+                        <dt>Von</dt>
+                        <dd>@ToolSet.GetFormattedName(application.DecidedBy)</dd>
+                        <dt>Am</dt>
+                        <dd><time>@Time(application.DecidedAt)</time></dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(application.DecisionText))
+                    {
+                        <p class="qa__q mt-3">Nachricht an den Bewerber</p>
+                        <p class="qa__a">@application.DecisionText</p>
+                    }
+                </Panel>
             }
+            else if (perms.Decide && application.IsOpen)
+            {
+                <Panel Title="Entscheiden"
+                       Lead="Annehmen und Ablehnen schicken dem Bewerber eine DM. Bei einer Absage ist eine Begründung Pflicht.">
+                    @if (!decideOpen)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="() => decideOpen = true">
+                            Entscheidung treffen
+                        </button>
+                    }
+                    else
+                    {
+                        @if (templates.Count > 0)
+                        {
+                            <div class="field">
+                                <label class="field__label" for="d-template">Vorlage</label>
+                                <select id="d-template" class="form-select" @onchange="ApplyTemplate">
+                                    <option value="">Keine Vorlage</option>
+                                    @foreach (var template in templates)
+                                    {
+                                        <option value="@template.TemplateId">
+                                            @(template.Kind == TeamApplicationTemplateKind.Accept ? "Zusage" : "Absage"): @template.Name
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        <div class="field">
+                            <label class="field__label" for="d-text">Nachricht an den Bewerber</label>
+                            <textarea id="d-text" class="form-control" rows="6" @bind="decisionText"></textarea>
+                            <span class="field__hint">Platzhalter wie {user} und {position} werden beim Versand ersetzt.</span>
+                        </div>
+
+                        @* Accept and reject are peers here - neither gets the accent, so the
+                           layout does not lean the decision. *@
+                        <div class="form-foot">
+                            <button type="button" class="btn btn-secondary" disabled="@deciding"
+                                    @onclick="() => Decide(TeamApplicationStatus.Angenommen)">Annehmen</button>
+                            <button type="button" class="btn btn-danger" disabled="@deciding"
+                                    @onclick="() => Decide(TeamApplicationStatus.Abgelehnt)">Ablehnen</button>
+                            <button type="button" class="btn btn-ghost" disabled="@deciding"
+                                    @onclick="() => decideOpen = false">Abbrechen</button>
+                        </div>
+                    }
+                </Panel>
+            }
+
+            @if (perms.Notes)
+            {
+                <Panel Title="Interne Notizen" Lead="Nur für das Team sichtbar, niemals für den Bewerber.">
+                    @if (notes.Count == 0)
+                    {
+                        <p class="meta mb-3">Noch keine Notizen.</p>
+                    }
+                    else
+                    {
+                        <ul class="rows rows--bleed mb-3">
+                            @foreach (var note in notes)
+                            {
+                                <li>
+                                    <div class="rows__main">
+                                        <p class="qa__a mb-1">@note.Text</p>
+                                        <p class="meta">
+                                            @ToolSet.GetFormattedName(note.AuthorId) · <time>@Time(note.CreatedAt)</time>
+                                        </p>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    <div class="field">
+                        <label class="field__label" for="n-text">Neue Notiz</label>
+                        <textarea id="n-text" class="form-control" rows="3" @bind="newNote"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-secondary" @onclick="AddNote">Notiz speichern</button>
+                </Panel>
+            }
+        </div>
+
+        <div>
+            <Panel Title="Bewerber">
+                <table class="compare">
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Bei Abgabe</th>
+                        <th>Jetzt</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>Level</td>
+                        <td>@application.LevelSnapshot</td>
+                        <td>@liveLevel</td>
+                    </tr>
+                    <tr>
+                        <td>XP</td>
+                        <td>@application.XpSnapshot</td>
+                        <td>@liveXp</td>
+                    </tr>
+                    <tr>
+                        <td>Beigetreten</td>
+                        <td>@Day(application.JoinedAtSnapshot)</td>
+                        <td>@Day(liveJoinedAt)</td>
+                    </tr>
+                    <tr>
+                        <td>Account seit</td>
+                        <td>@Day(application.AccountCreatedSnapshot)</td>
+                        <td>@Day(liveCreatedAt)</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p class="meta mt-2 mono">@application.UserId</p>
+            </Panel>
+
+            <Panel Title="Aktivität">
+                @if (activity == null && sideDataFailed)
+                {
+                    <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
+                                Title="Aktivität konnte nicht gezählt werden"
+                                Description="Die Abfrage der Nachrichten und Voice-Minuten ist fehlgeschlagen."
+                                ActionText="Erneut versuchen"
+                                OnAction="LoadSideDataAsync"/>
+                }
+                else if (activity == null)
+                {
+                    <StateBlock Kind="StateBlock.StateKind.Loading" Inline="true"
+                                Title="Aktivität wird gezählt"
+                                Description="Nachrichten und Voice-Minuten der letzten 90 Tage."/>
+                }
+                else
+                {
+                    <table class="compare">
+                        <thead>
+                        <tr>
+                            <th></th>
+                            <th>7 Tage</th>
+                            <th>30 Tage</th>
+                            <th>90 Tage</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Nachrichten</td>
+                            <td>@activity.Messages7</td>
+                            <td>@activity.Messages30</td>
+                            <td>@activity.Messages90</td>
+                        </tr>
+                        <tr>
+                            <td>Voice-Min.</td>
+                            <td>@activity.VoiceMinutes7</td>
+                            <td>@activity.VoiceMinutes30</td>
+                            <td>@activity.VoiceMinutes90</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                }
+            </Panel>
+
+            @if (perms.ViewModerationHistory)
+            {
+                <Panel Title="Moderationshistorie" Flush="@(moderation is { Count: > 0 })">
+                    @if (moderation == null && sideDataFailed)
+                    {
+                        <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
+                                    Title="Historie konnte nicht geladen werden"
+                                    Description="Die Abfrage der Verwarnungen, Flags und Banns ist fehlgeschlagen."
+                                    ActionText="Erneut versuchen"
+                                    OnAction="LoadSideDataAsync"/>
+                    }
+                    else if (moderation == null)
+                    {
+                        <StateBlock Kind="StateBlock.StateKind.Loading" Inline="true"
+                                    Title="Historie wird geladen"
+                                    Description="Verwarnungen, Flags und Banns dieses Nutzers."/>
+                    }
+                    else if (moderation.Count == 0)
+                    {
+                        <p class="meta">Keine Verwarnungen, Flags oder Banns.</p>
+                    }
+                    else
+                    {
+                        <ul class="rows">
+                            @foreach (var entry in moderation)
+                            {
+                                <li>
+                                    <div class="rows__main">
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <StatusPill Text="@entry.Kind" Tone="@ModerationTone(entry.Kind)"/>
+                                            @if (!string.IsNullOrWhiteSpace(entry.CaseId))
+                                            {
+                                                <code>@entry.CaseId</code>
+                                            }
+                                        </div>
+                                        <p class="qa__a mt-1 mb-1">@entry.Description</p>
+                                        <p class="meta"><time>@Time(entry.Timestamp)</time></p>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </Panel>
+            }
+
+            @if (perms.MarkInternal && application.IsOpen)
+            {
+                <Panel Title="Interne Markierung" Lead="Der Bewerber wird darüber nicht benachrichtigt.">
+                    <div class="row-actions">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                disabled="@(application.Status == TeamApplicationStatus.Gelesen)"
+                                @onclick="() => Mark(TeamApplicationStatus.Gelesen)">Gelesen</button>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                disabled="@(application.Status == TeamApplicationStatus.Vorgemerkt)"
+                                @onclick="() => Mark(TeamApplicationStatus.Vorgemerkt)">Vormerken</button>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                disabled="@(application.Status == TeamApplicationStatus.WartetAufRueckfrage)"
+                                @onclick="() => Mark(TeamApplicationStatus.WartetAufRueckfrage)">Rückfrage offen</button>
+                    </div>
+                </Panel>
+            }
+
+            @if (perms.GrantReapply)
+            {
+                <Panel Title="Sofort-Wiederbewerbung">
+                    @if (activeGrant != null)
+                    {
+                        <p class="meta">In dieser Phase ist bereits eine erneute Bewerbung freigeschaltet.</p>
+                    }
+                    else
+                    {
+                        <p class="meta mb-3">
+                            Erlaubt eine weitere Bewerbung innerhalb der laufenden Phase. Verfällt beim Einlösen oder
+                            mit der Phase.
+                        </p>
+                        <div class="field">
+                            <label class="field__label" for="g-reason">Begründung (optional, geht per DM raus)</label>
+                            <textarea id="g-reason" class="form-control" rows="2" @bind="grantReason"></textarea>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="GrantReapply">
+                            Erneute Bewerbung erlauben
+                        </button>
+                    }
+                </Panel>
+            }
+        </div>
+    </div>
+
+    @if (application.Readers.Count > 0)
+    {
+        <div class="seen-by">
+            <span>Gelesen von</span>
+            <SeenByAvatars Readers="@application.Readers" Large="true"/>
         </div>
     }
 }
@@ -300,6 +367,7 @@ else
 
     private bool loaded;
     private string statusMessage = "";
+    private string statusTone = "ok";
 
     private TeamApplication? application;
     private TeamApplicationPermissionSet perms = new();
@@ -307,6 +375,8 @@ else
     private List<TeamApplicationNote> notes = new();
     private List<TeamApplicationTemplate> templates = new();
     private TeamApplicationReapplyGrant? activeGrant;
+    private bool sideDataRequested;
+    private bool sideDataFailed;
     private TeamApplicationActivity? activity;
     private List<ModerationEntry>? moderation;
 
@@ -320,6 +390,11 @@ else
     private string grantReason = "";
     private bool decideOpen;
     private bool deciding;
+
+    private string HeaderLead => application == null
+        ? ""
+        : $"{application.PositionName} · {application.PhaseName} · eingereicht am {Time(application.SubmittedAt)}" +
+          (application.Attempt > 1 ? $" · Versuch {application.Attempt}" : "");
 
     protected override async Task OnInitializedAsync()
     {
@@ -342,16 +417,34 @@ else
 
     /// <summary>
     ///     The six activity aggregates and the moderation history are pulled after the first render so the
-    ///     page itself never waits on them.
+    ///     page itself never waits on them. Keyed on a flag, not on firstRender: OnInitializedAsync awaits,
+    ///     so the first render happens before the application is loaded.
     /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || application == null || !perms.ViewApplications) return;
+        if (!loaded || sideDataRequested || application == null || !perms.ViewApplications) return;
+        sideDataRequested = true;
 
-        activity = await TeamApplicationService.GetActivityAsync(application.UserId);
-        if (perms.ViewModerationHistory) moderation = await LoadModerationAsync(application.UserId);
+        await LoadSideDataAsync();
+    }
 
-        await InvokeAsync(StateHasChanged);
+    private async Task LoadSideDataAsync()
+    {
+        if (application == null) return;
+
+        sideDataFailed = false;
+        try
+        {
+            activity = await TeamApplicationService.GetActivityAsync(application.UserId);
+            if (perms.ViewModerationHistory) moderation = await LoadModerationAsync(application.UserId);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Aktivität oder Moderationshistorie einer Bewerbung konnte nicht geladen werden");
+            sideDataFailed = true;
+        }
+
+        StateHasChanged();
     }
 
     private async Task LoadCore()
@@ -375,15 +468,30 @@ else
         }
 
         await TeamApplicationService.MarkSeenAsync(ApplicationId, userId);
+        if (application.Status == TeamApplicationStatus.Eingereicht) application.Status = TeamApplicationStatus.Gelesen;
+        if (application.Readers.All(r => r.UserId != userId))
+            application.Readers.Add(new TeamApplicationReader
+                { UserId = userId, SeenAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() });
     }
 
     private static string Time(long unix) =>
-        unix <= 0 ? "Unbekannt" : ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(unix);
+        unix <= 0 ? "unbekannt" : ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(unix);
+
+    /// <summary>The side table is narrow; a date is all a join or account age needs to say.</summary>
+    private static string Day(long unix) =>
+        unix <= 0 ? "unbekannt" : DateTimeOffset.FromUnixTimeSeconds(unix).ToLocalTime().ToString("dd.MM.yyyy");
 
     private static string Render(TeamApplicationAnswer answer) =>
         answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
             ? string.Join(", ", answer.AnswerOptions)
             : answer.Answer;
+
+    private static StatusPill.PillTone ModerationTone(string kind) => kind switch
+    {
+        "Ban" => StatusPill.PillTone.Bad,
+        "Verwarnung" => StatusPill.PillTone.Warn,
+        _ => StatusPill.PillTone.Neutral
+    };
 
     private async Task<List<ModerationEntry>> LoadModerationAsync(ulong targetId)
     {
@@ -420,12 +528,18 @@ else
         return entries.OrderByDescending(e => e.Timestamp).ToList();
     }
 
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
     private async Task<bool> Ensure(TeamApplicationPermission permission)
     {
         if (application != null && await TeamApplicationPermissionService.HasAsync(userId, permission,
                 application.PositionId, application.PhaseId)) return true;
 
-        statusMessage = "Keine Berechtigung.";
+        Say("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -435,7 +549,7 @@ else
 
         await TeamApplicationService.SetStatusAsync(ApplicationId, status);
         application.Status = status;
-        statusMessage = "Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.";
+        Say("Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.", "ok");
     }
 
     private async Task AddNote()
@@ -444,14 +558,14 @@ else
 
         if (string.IsNullOrWhiteSpace(newNote))
         {
-            statusMessage = "Die Notiz ist leer.";
+            Say("Die Notiz ist leer.", "bad");
             return;
         }
 
         await TeamApplicationService.AddNoteAsync(ApplicationId, userId, newNote.Trim());
         newNote = "";
         notes = await TeamApplicationService.GetNotesAsync(ApplicationId);
-        statusMessage = "Notiz gespeichert.";
+        Say("Notiz gespeichert.", "ok");
     }
 
     private void ApplyTemplate(ChangeEventArgs e)
@@ -467,7 +581,7 @@ else
 
         if (status == TeamApplicationStatus.Abgelehnt && string.IsNullOrWhiteSpace(decisionText))
         {
-            statusMessage = "Bei einer Absage ist eine Begründung Pflicht.";
+            Say("Bei einer Absage ist eine Begründung Pflicht.", "bad");
             return;
         }
 
@@ -486,14 +600,16 @@ else
 
             application = await TeamApplicationService.GetApplicationAsync(ApplicationId);
             decideOpen = false;
-            statusMessage = application?.DmDelivered == false
-                ? "Entscheidung gespeichert, die DM konnte aber nicht zugestellt werden."
-                : "Entscheidung gespeichert und dem Bewerber zugestellt.";
+
+            if (application?.DmDelivered == false)
+                Say("Entscheidung gespeichert, die DM konnte aber nicht zugestellt werden.", "warn");
+            else
+                Say("Entscheidung gespeichert und dem Bewerber zugestellt.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Entscheidung fehlgeschlagen");
-            statusMessage = "Die Entscheidung konnte nicht gespeichert werden.";
+            Say("Die Entscheidung konnte nicht gespeichert werden. Es wurde nichts verschickt.", "bad");
         }
         finally
         {
@@ -511,7 +627,7 @@ else
         grantReason = "";
 
         await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
-        statusMessage = "Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.";
+        Say("Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
     }
 
     private sealed class ModerationEntry

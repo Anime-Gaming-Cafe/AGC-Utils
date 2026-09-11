@@ -4,37 +4,32 @@
 @using AGC_Management.Services
 @attribute [Authorize(Roles = "BotOwner, Administrator")]
 
-<h1>Rechte-Matrix Bewerbungssystem</h1>
+<PageHeader Title="Rechte-Matrix"
+            Lead="Rechte im Bewerbungssystem hängen an Discord-Rollen. Bot-Owner und Administratoren haben immer alle Rechte und brauchen keinen Eintrag."
+            BackHref="/konfiguration" BackText="Administration"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Rechte werden geladen"
+                Description="Vergebene Rechte, Positionen und Serverrollen werden abgefragt."/>
 }
 else
 {
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
     }
 
-    <div class="alert alert-info-glass mt-2" role="alert">
-        Rechte hängen an Discord-Rollen. Bot-Owner und Administratoren haben immer alle Rechte und brauchen
-        keinen Eintrag. <strong>Vollzugriff</strong> deckt in einer Zeile alle Rechte dieser Liste ab &ndash;
-        nicht jedoch das Löschen von Positionen, das Administratoren vorbehalten bleibt.
-    </div>
-
-    <div class="glass-card mt-4 p-3">
-        <h3>Vergebene Rechte</h3>
-
-        @if (rules.Count == 0)
-        {
-            <p class="text-muted mb-0">Es ist noch kein Recht vergeben.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
+    @if (rules.Count == 0)
+    {
+        <StateBlock Title="Noch kein Recht vergeben"
+                    Description="Ohne Einträge haben nur Bot-Owner und Administratoren Zugriff auf das Bewerbungssystem. Vergib das erste Recht im Formular darunter."/>
+    }
+    else
+    {
+        <Panel Title="Vergebene Rechte" Flush="true">
+            <div class="table-wrap">
                 <table class="table">
                     <thead>
                     <tr>
@@ -53,42 +48,41 @@ else
                             <td>
                                 @if (rule.Permission == TeamApplicationPermission.FullAccess)
                                 {
-                                    <span class="badge-success-glass">@PermissionLabel(rule.Permission)</span>
+                                    @* Flagged because its reach is easy to underestimate in a long list. *@
+                                    <StatusPill Text="@PermissionLabel(rule.Permission)" Tone="StatusPill.PillTone.Warn"/>
                                 }
                                 else
                                 {
                                     @PermissionLabel(rule.Permission)
                                 }
                             </td>
-                            <td>
-                                <button class="btn btn-danger-glass btn-sm" @onclick="() => RemoveRule(rule)">
-                                    Entfernen
-                                </button>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveRule(rule)">Entfernen</button>
                             </td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
-        }
-    </div>
+        </Panel>
+    }
 
-    <div class="glass-card mt-4 p-3">
-        <h3>Recht vergeben</h3>
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-4">
-                <label class="form-label">Rolle</label>
-                <select class="form-select glassy-input" @bind="newRoleId">
-                    <option value="0">-- Rolle wählen --</option>
+    <Panel Title="Recht vergeben" Class="mt-3"
+           Lead="Vollzugriff deckt alle Rechte dieser Liste ab, nicht aber das Löschen von Positionen. Das bleibt Administratoren vorbehalten.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="r-role">Rolle</label>
+                <select id="r-role" class="form-select" @bind="newRoleId">
+                    <option value="0">Rolle wählen</option>
                     @foreach (var role in roles)
                     {
                         <option value="@role.Id">@role.Name</option>
                     }
                 </select>
             </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label">Position</label>
-                <select class="form-select glassy-input" @bind="newPositionId">
+            <div class="field">
+                <label class="field__label" for="r-position">Position</label>
+                <select id="r-position" class="form-select" @bind="newPositionId">
                     <option value="">Alle Positionen</option>
                     @foreach (var position in positions)
                     {
@@ -96,9 +90,9 @@ else
                     }
                 </select>
             </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label">Recht</label>
-                <select class="form-select glassy-input" @bind="newPermission">
+            <div class="field">
+                <label class="field__label" for="r-permission">Recht</label>
+                <select id="r-permission" class="form-select" @bind="newPermission">
                     @foreach (var permission in Enum.GetValues<TeamApplicationPermission>())
                     {
                         <option value="@permission">@PermissionLabel(permission)</option>
@@ -106,13 +100,16 @@ else
                 </select>
             </div>
         </div>
-        <button class="btn btn-primary-glass mt-3" @onclick="AddRule">Recht hinzufügen</button>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddRule">Recht vergeben</button>
+        </div>
+    </Panel>
 }
 
 @code {
     private bool loaded;
     private string statusMessage = "";
+    private string statusTone = "ok";
 
     private List<TeamApplicationPermissionRule> rules = new();
     private List<TeamApplicationPosition> positions = new();
@@ -138,6 +135,12 @@ else
             .ToList();
     }
 
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
     private string RoleName(ulong roleId)
     {
         var role = roles.FirstOrDefault(r => r.Id == roleId);
@@ -152,7 +155,7 @@ else
 
     private static string PermissionLabel(TeamApplicationPermission permission) => permission switch
     {
-        TeamApplicationPermission.FullAccess => "Vollzugriff (alle Rechte)",
+        TeamApplicationPermission.FullAccess => "Vollzugriff",
         TeamApplicationPermission.ViewApplications => "Bewerbungen ansehen",
         TeamApplicationPermission.MarkInternal => "Intern markieren",
         TeamApplicationPermission.Notes => "Interne Notizen",
@@ -168,20 +171,20 @@ else
     {
         if (newRoleId == 0)
         {
-            statusMessage = "Bitte eine Rolle wählen.";
+            Say("Bitte eine Rolle wählen.", "bad");
             return;
         }
 
         await TeamApplicationPermissionService.AddRuleAsync(newRoleId,
             string.IsNullOrWhiteSpace(newPositionId) ? null : newPositionId, null, newPermission);
         await LoadAll();
-        statusMessage = "Recht hinzugefügt.";
+        Say("Recht vergeben.", "ok");
     }
 
     private async Task RemoveRule(TeamApplicationPermissionRule rule)
     {
         await TeamApplicationPermissionService.RemoveRuleAsync(rule.PermissionId);
         await LoadAll();
-        statusMessage = "Recht entfernt.";
+        Say("Recht entfernt.", "ok");
     }
 }

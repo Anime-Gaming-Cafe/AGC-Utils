@@ -1,56 +1,234 @@
-﻿@page "/"
-@using AGC_Management.Entities.Web
+@page "/"
 @using AGC_Management.Controller
-@inject UserService userService
-@inject NavigationManager NavigationManager
-
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Entities.Ticket
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
 
 <PageTitle>Start</PageTitle>
 
-<h1>Willkommen! @username</h1>
-
-<AuthorizeView Roles="NichtImServer">
-    <div class="alert alert-danger" role="alert">
-        Du bist nicht im Server. Dieses Dashboard ist nur für Mitglieder des Servers verfügbar.
-    </div>
-</AuthorizeView>
-
-@if (initialized && !isAuthenticated)
+@if (!initialized)
 {
-    <div class="alert alert-warning-glass" role="alert">
-        Nicht angemeldet! Bitte <a href="/login">anmelden</a>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Startseite wird geladen"
+                Description="Deine Rechte und offenen Posten werden abgefragt."/>
+}
+else if (!isAuthenticated)
+{
+    <PageHeader Title="AGC Dashboard"
+                Lead="Das Dashboard steht Mitgliedern des Servers zur Verfügung."/>
+
+    <StateBlock Title="Nicht angemeldet"
+                Description="Melde dich mit deinem Discord-Konto an, um fortzufahren."
+                ActionText="Mit Discord anmelden"
+                ActionHref="/login"
+                ActionTargetsServer="true"/>
+}
+else
+{
+    <PageHeader Title="@($"Hallo {username}")"/>
+
+    <AuthorizeView Roles="NichtImServer">
+        <div class="notice notice--bad">
+            <p class="notice__title">Du bist nicht auf dem Server</p>
+            <p>Dieses Dashboard ist nur für Mitglieder des Servers verfügbar.</p>
+        </div>
+    </AuthorizeView>
+
+    @if (forYouVisible)
+    {
+        <Panel Title="Für dich" Flush="true">
+            <Actions>
+                @if (hasTickets)
+                {
+                    <a class="btn btn-ghost btn-sm" href="/tickets">Meine Tickets</a>
+                }
+                @if (ownApplications.Count > 0)
+                {
+                    <a class="btn btn-ghost btn-sm" href="/apply/status">Meine Bewerbungen</a>
+                }
+            </Actions>
+            <ChildContent>
+                @if (visibleOpenApplications is not > 0 && openTickets.Count == 0 && shownApplications.Count == 0)
+                {
+                    <div class="panel__body">
+                        <p class="meta">Alles erledigt. Gerade wartet nichts auf dich.</p>
+                    </div>
+                }
+                else
+                {
+                    <ul class="rows">
+                        @* One real number, only for team members who can act on it. No stat row, no trend. *@
+                        @if (visibleOpenApplications is > 0)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">
+                                        <span class="tnum">@visibleOpenApplications</span>
+                                        @(visibleOpenApplications == 1 ? "Bewerbung wartet" : "Bewerbungen warten") auf eine Entscheidung
+                                    </p>
+                                </div>
+                                <div class="rows__side">
+                                    <a class="btn btn-secondary btn-sm" href="/teamarea/applysystem/applications">Ansehen</a>
+                                </div>
+                            </li>
+                        }
+
+                        @foreach (var ticket in openTickets)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">Dein offenes @ticket.TypeLabel</p>
+                                    @if (ticket.ChannelName is not null || ticket.OpenedAt > 0)
+                                    {
+                                        <p class="rows__text">
+                                            @if (ticket.ChannelName is not null)
+                                            {
+                                                <span>#@ticket.ChannelName</span>
+                                            }
+                                            @if (ticket.ChannelName is not null && ticket.OpenedAt > 0)
+                                            {
+                                                <span> · </span>
+                                            }
+                                            @if (ticket.OpenedAt > 0)
+                                            {
+                                                <span>eröffnet am <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(ticket.OpenedAt)</time></span>
+                                            }
+                                        </p>
+                                    }
+                                </div>
+                                @if (ticket.ChannelUrl is not null)
+                                {
+                                    <div class="rows__side">
+                                        <a class="btn btn-secondary btn-sm" href="@ticket.ChannelUrl" target="_blank" rel="noopener">Zum Ticket</a>
+                                    </div>
+                                }
+                            </li>
+                        }
+
+                        @foreach (var application in shownApplications)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">Deine Bewerbung als @application.PositionName</p>
+                                    <p class="rows__text">
+                                        @application.PhaseName ·
+                                        eingereicht am <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)</time>
+                                    </p>
+                                </div>
+                                <div class="rows__side">
+                                    <ApplicantStatusPill Status="@application.Status"/>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </ChildContent>
+        </Panel>
+
+        <Panel Title="Schnellzugriff">
+            <ul class="nav-links">
+                @if (canApplySomewhere)
+                {
+                    <li><a href="/apply">Jetzt bewerben</a></li>
+                }
+                <li><a href="/tickets">Meine Tickets</a></li>
+                <li><a href="/leaderboard">Leaderboard</a></li>
+                <li><a href="/benutzereinstellungen">Einstellungen</a></li>
+            </ul>
+        </Panel>
+    }
 }
 
-
 @code {
-    private DiscordUserWebClaim claim;
-    private string username = "";
-    private bool isAuthenticated;
-    private bool initialized;
-
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private const int OwnApplicationsShown = 3;
+
+    // Mirror the page attributes, so the start page never offers something that ends on /403.
+    private static readonly string[] TeamRoles =
+        ["BotOwner", "Administrator", "HeadModerator", "Moderator", "Supporter", "HeadEventmanager", "Team"];
+
+    private static readonly string[] MemberRoles = [..TeamRoles, "User"];
+
+    private bool initialized;
+    private bool isAuthenticated;
+    private string username = "";
+
+    /// <summary>Null means the user may not view applications at all.</summary>
+    private int? visibleOpenApplications;
+
+    private bool forYouVisible;
+    private bool canApplySomewhere;
+    private bool hasTickets;
+    private List<TeamApplication> ownApplications = [];
+    private List<TeamApplication> shownApplications = [];
+    private List<UserTicket> openTickets = [];
+
+    /// <summary>Open ones stay, a decision stays for 14 days, a withdrawal leaves at once.</summary>
+    private static bool ShowOnStart(TeamApplication application) =>
+        application.IsOpen ||
+        (application.IsDecided && application.DecidedAt > DateTimeOffset.UtcNow.AddDays(-14).ToUnixTimeSeconds());
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             var principal = AuthState is null ? null : (await AuthState).User;
-            isAuthenticated = userService.IsAuthenticated(principal);
+            isAuthenticated = UserService.IsAuthenticated(principal);
 
-            var userid = userService.GetUserId(principal);
-            if (userid is not null)
+            var userId = UserService.GetUserId(principal);
+            if (principal is not null && userId is not null)
             {
-                var user = await CurrentApplication.DiscordClient.GetUserAsync(userid.Value);
-                username = user.Username;
+                var user = await CurrentApplication.DiscordClient.GetUserAsync(userId.Value);
+                username = user.GlobalName ?? user.Username;
+
+                if (MemberRoles.Any(principal.IsInRole))
+                {
+                    forYouVisible = true;
+                    ownApplications = await TeamApplicationService.GetOwnApplicationsAsync(userId.Value);
+                    shownApplications = ownApplications.Where(ShowOnStart).Take(OwnApplicationsShown).ToList();
+
+                    // A failing ticket query must not take the rest of the start page with it.
+                    try
+                    {
+                        var tickets = await UserTicketService.GetTicketsAsync(userId.Value);
+                        hasTickets = tickets.Count > 0;
+                        openTickets = tickets.Where(t => t.IsOpen).ToList();
+                    }
+                    catch (Exception e)
+                    {
+                        CurrentApplication.Logger.Error(e, "Tickets für die Startseite konnten nicht geladen werden");
+                    }
+
+                    foreach (var position in await TeamApplicationService.GetPositionsAsync(true))
+                    {
+                        if (!await TeamApplicationService.CanUserApplyNowAsync(userId.Value, position)) continue;
+                        canApplySomewhere = true;
+                        break;
+                    }
+                }
+
+                // The matrix alone is not enough: DebugMode grants it to everyone.
+                if (TeamRoles.Any(principal.IsInRole))
+                {
+                    var allowed = await TeamApplicationPermissionService.GetAllowedPositionsAsync(userId.Value,
+                        TeamApplicationPermission.ViewApplications);
+                    if (allowed.Count > 0)
+                    {
+                        var applications = await TeamApplicationService.GetApplicationsAsync(allowed);
+                        visibleOpenApplications = applications.Count(a => a.IsOpen);
+                    }
+                }
             }
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            // ignored
+            CurrentApplication.Logger.Error(e, "Startseite konnte nicht vollständig geladen werden");
         }
 
         initialized = true;
     }
-
 }

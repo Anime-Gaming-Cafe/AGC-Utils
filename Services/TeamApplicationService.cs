@@ -194,6 +194,8 @@ public static class TeamApplicationService
             "(SELECT application_id FROM teamapplication_application WHERE position_id = @id)",
             "DELETE FROM teamapplication_notes WHERE application_id IN " +
             "(SELECT application_id FROM teamapplication_application WHERE position_id = @id)",
+            "DELETE FROM teamapplication_seen WHERE application_id IN " +
+            "(SELECT application_id FROM teamapplication_application WHERE position_id = @id)",
             "DELETE FROM teamapplication_application WHERE position_id = @id",
             "DELETE FROM teamapplication_reapply_grant WHERE position_id = @id",
             "DELETE FROM teamapplication_phase WHERE position_id = @id",
@@ -610,28 +612,29 @@ public static class TeamApplicationService
         };
     }
 
+    /// <summary>The gates the form applies before it shows questions: open phase, level, free slot.</summary>
+    public static async Task<bool> CanUserApplyNowAsync(ulong userId, TeamApplicationPosition position)
+    {
+        var opening = await ResolveOpeningAsync(position);
+        if (!opening.CanApply || opening.Phase is null) return false;
+        if (!opening.Bypassed && await LevelUtils.GetLevel(userId) < position.MinLevel) return false;
+
+        var (allowed, _, _) = await CanApplyAsync(userId, position.PositionId, opening.Phase.PhaseId,
+            opening.Bypassed);
+        return allowed;
+    }
+
     #endregion
 
     #region Applications
 
     private const string ApplicationColumns =
         "application_id, user_id, position_id, phase_id, questionset_version, attempt, status, submitted_at, " +
-        "decided_at, decided_by, decision_text, dm_delivered, dm_error, withdrawn_at, seen_by, level_snapshot, " +
+        "decided_at, decided_by, decision_text, dm_delivered, dm_error, withdrawn_at, level_snapshot, " +
         "xp_snapshot, joined_at_snapshot, account_created_snapshot";
 
     private static TeamApplication ReadApplication(NpgsqlDataReader reader)
     {
-        var seenBy = new List<ulong>();
-        if (!reader.IsDBNull(14))
-            try
-            {
-                seenBy = reader.GetFieldValue<long[]>(14).Select(x => (ulong)x).ToList();
-            }
-            catch (InvalidCastException)
-            {
-                seenBy = [];
-            }
-
         return new TeamApplication
         {
             ApplicationId = reader.GetString(0),
@@ -648,20 +651,20 @@ public static class TeamApplicationService
             DmDelivered = reader.IsDBNull(11) ? null : reader.GetBoolean(11),
             DmError = reader.IsDBNull(12) ? "" : reader.GetString(12),
             WithdrawnAt = reader.IsDBNull(13) ? 0 : reader.GetInt64(13),
-            SeenBy = seenBy,
-            LevelSnapshot = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
-            XpSnapshot = reader.IsDBNull(16) ? 0 : reader.GetInt32(16),
-            JoinedAtSnapshot = reader.IsDBNull(17) ? 0 : reader.GetInt64(17),
-            AccountCreatedSnapshot = reader.IsDBNull(18) ? 0 : reader.GetInt64(18)
+            LevelSnapshot = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
+            XpSnapshot = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+            JoinedAtSnapshot = reader.IsDBNull(16) ? 0 : reader.GetInt64(16),
+            AccountCreatedSnapshot = reader.IsDBNull(17) ? 0 : reader.GetInt64(17)
         };
     }
 
     private static async Task DecorateAsync(IEnumerable<TeamApplication> applications)
     {
+        var list = applications as IList<TeamApplication> ?? applications.ToList();
         var positions = (await GetPositionsAsync()).ToDictionary(p => p.PositionId, p => p.PositionName);
         var phases = (await GetPhasesAsync()).ToDictionary(p => p.PhaseId, p => p.Name);
 
-        foreach (var application in applications)
+        foreach (var application in list)
         {
             application.PositionName = positions.TryGetValue(application.PositionId, out var name)
                 ? name
@@ -670,6 +673,22 @@ public static class TeamApplicationService
                 ? phase
                 : application.PhaseId;
         }
+
+        if (list.Count == 0) return;
+
+        var byId = list.ToDictionary(a => a.ApplicationId);
+        await using var cmd = Db.CreateCommand(
+            "SELECT application_id, user_id, seen_at FROM teamapplication_seen " +
+            "WHERE application_id = ANY(@ids) ORDER BY seen_at, user_id");
+        cmd.Parameters.AddWithValue("ids", byId.Keys.ToArray());
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            if (byId.TryGetValue(reader.GetString(0), out var application))
+                application.Readers.Add(new TeamApplicationReader
+                {
+                    UserId = (ulong)reader.GetInt64(1),
+                    SeenAt = reader.IsDBNull(2) ? 0 : reader.GetInt64(2)
+                });
     }
 
     public static async Task<TeamApplication?> GetApplicationAsync(string applicationId)
@@ -880,13 +899,22 @@ public static class TeamApplicationService
         await cmd.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    ///     Opening an application is reading it: the reader is recorded with the time of their first view,
+    ///     and a fresh submission moves to Gelesen. Any later marking is left alone.
+    /// </summary>
     public static async Task MarkSeenAsync(string applicationId, ulong userId)
     {
         await using var cmd = Db.CreateCommand(
-            "UPDATE teamapplication_application SET seen_by = array_append(coalesce(seen_by, ARRAY[]::BIGINT[]), @uid) " +
-            "WHERE application_id = @id AND NOT (@uid = ANY(coalesce(seen_by, ARRAY[]::BIGINT[])))");
+            "INSERT INTO teamapplication_seen (application_id, user_id, seen_at) VALUES (@id, @uid, @now) " +
+            "ON CONFLICT (application_id, user_id) DO NOTHING; " +
+            "UPDATE teamapplication_application SET status = CASE WHEN status = @submitted THEN @read ELSE status END " +
+            "WHERE application_id = @id");
         cmd.Parameters.AddWithValue("id", applicationId);
         cmd.Parameters.AddWithValue("uid", (long)userId);
+        cmd.Parameters.AddWithValue("now", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        cmd.Parameters.AddWithValue("submitted", Store(TeamApplicationStatus.Eingereicht));
+        cmd.Parameters.AddWithValue("read", Store(TeamApplicationStatus.Gelesen));
         await cmd.ExecuteNonQueryAsync();
     }
 

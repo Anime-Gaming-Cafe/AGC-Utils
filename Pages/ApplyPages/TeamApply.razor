@@ -4,57 +4,61 @@
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
-<h1>Bewerben</h1>
+<PageHeader Title="Bewerben"
+            Lead="Bitte beachte vor deiner Bewerbung die Anforderungen auf dem Server.">
+    <Actions>
+        <a class="btn btn-secondary" href="/apply/status">Meine Bewerbungen</a>
+    </Actions>
+</PageHeader>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Positionen werden geladen"
+                Description="Ausgeschriebene Positionen und ihre Bewerbungsphasen werden abgefragt."/>
+}
+else if (entries.Count == 0)
+{
+    <StateBlock Title="Zurzeit ist keine Position ausgeschrieben"
+                Description="Sobald das Team eine Position ausschreibt, erscheint sie hier."
+                ActionText="Meine Bewerbungen"
+                ActionHref="/apply/status"/>
 }
 else
 {
-    <a class="btn btn-secondary-glass mb-3" href="/apply/status">Meine Bewerbungen</a>
-
-    @if (entries.Count == 0)
-    {
-        <div class="alert alert-warning-glass" role="alert">
-            Aktuell gibt es keine Positionen, auf die du dich bewerben kannst.
-        </div>
-    }
-
-    @foreach (var entry in entries)
-    {
-        <div class="glass-card mt-3 p-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <h5 class="mb-0">@entry.Position.PositionName</h5>
-                <span class="@(entry.IsOpen ? "badge-success-glass" : "badge-danger-glass")">
-                    @(entry.IsOpen ? "Bewerbungen offen" : closedText)
-                </span>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(entry.Position.Description))
+    <Panel Flush="true">
+        <ul class="rows">
+            @* Open positions first: they are the ones this page is for. *@
+            @foreach (var entry in entries.OrderByDescending(e => e.IsOpen).ThenBy(e => e.Position.PositionName))
             {
-                <p class="mb-2">@entry.Position.Description</p>
+                <li>
+                    <div class="rows__main">
+                        <p class="rows__title">@entry.Position.PositionName</p>
+                        @if (!string.IsNullOrWhiteSpace(entry.Position.Description))
+                        {
+                            <p class="rows__text">@entry.Position.Description</p>
+                        }
+                        @if (!entry.IsOpen && entry.NextOpensAt > 0)
+                        {
+                            <p class="rows__text">
+                                @opensAtText <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(entry.NextOpensAt)</time>
+                            </p>
+                        }
+                    </div>
+                    <div class="rows__side">
+                        @if (entry.IsOpen)
+                        {
+                            <a class="btn btn-primary" href="/apply/@entry.Position.PositionId">Jetzt bewerben</a>
+                        }
+                        else
+                        {
+                            <StatusPill Text="@closedText"/>
+                        }
+                    </div>
+                </li>
             }
-
-            @if (!entry.IsOpen && entry.NextOpensAt > 0)
-            {
-                <p class="text-muted mb-2">
-                    @opensAtText @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(entry.NextOpensAt)
-                </p>
-            }
-
-            @if (entry.IsOpen)
-            {
-                <a class="btn btn-primary-glass" href="/apply/@entry.Position.PositionId">Jetzt bewerben</a>
-            }
-        </div>
-    }
-
-    <div class="alert alert-info-glass mt-4" role="alert">
-        Bitte beachte die Bewerbungsanforderungen auf dem Server.
-    </div>
+        </ul>
+    </Panel>
 }
 
 @code {

@@ -1,175 +1,175 @@
-﻿@page "/teamarea/applysystem/legacy/applications"
+@page "/teamarea/applysystem/legacy/applications"
 @using AGC_Management.Entities
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
-<div class="alert alert-info-glass mt-3" role="alert">
-    Dies ist eine Ansicht des alten Bewerbungssystems. Sie ist schreibgeschützt: Status und "Gesehen von"
-    lassen sich hier nicht mehr ändern. Neue Bewerbungen laufen über das aktuelle System.
-</div>
+<PageHeader Title="Alte Bewerbungen"
+            Lead="Altsystem, nur lesend. Status und „Gesehen von“ lassen sich hier nicht mehr ändern."
+            BackHref="/teamarea" BackText="Teambereich"/>
 
-
-
-<div class="search-bar-centered">
-    <input type="text" class="search-bar-input" placeholder="Suche nach Nutzername / Nutzer ID" @bind="searchQuery">
-    <button class="search-bar-button" @onclick="ApplySearch">
-        <i class="fas fa-search"></i>
-    </button>
-    <button class="search-bar-button" @onclick="RefreshApplications">
-        <i class="fas fa-refresh"></i>
-    </button>
-</div>
-
-
-<div class="container mt-5">
-    @if (loading)
-    {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+@if (loading)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Alte Bewerbungen werden geladen"
+                Description="Die Bewerbungen aus dem alten System werden abgefragt."/>
+}
+else if (applications.Count == 0)
+{
+    <StateBlock Title="Keine alten Bewerbungen"
+                Description="Im alten System liegen keine Bewerbungen. Neue Bewerbungen laufen über das aktuelle System."
+                ActionText="Aktuelle Bewerbungen"
+                ActionHref="/teamarea/applysystem/applications"/>
+}
+else
+{
+    <Panel>
+        <div class="field">
+            <label class="field__label" for="legacy-search">Suche</label>
+            <input id="legacy-search" class="form-control" placeholder="Name oder Nutzer-ID"
+                   value="@searchQuery" @oninput="OnSearch"/>
         </div>
-    }
-    else if (applications.Count == 0 && searchQuery == "")
-    {
-        <div class="alert alert-warning-glass" role="alert">
-            Es wurden keine Bewerbungen gefunden.
-        </div>
-    }
-    else if (applications.Count == 0 && searchQuery != "")
-    {
-        <div class="alert alert-warning-glass" role="alert">
-            Es wurden keine Bewerbungen gefunden, die zu deiner Suche passen.
-        </div>
-    }
-    else
-    {
-        @foreach (var application in applications)
+    </Panel>
+
+    <div class="mt-3">
+        @if (filtered.Count == 0)
         {
-            <div class="glass-card mb-3">
-                <ul class="list-group @getcssfromstatus(application.Status) list-group-flush">
-                    <li class="list-group-item">
+            <StateBlock Title="Keine alte Bewerbung passt zur Suche"
+                        Description="Weder Name noch Nutzer-ID einer alten Bewerbung enthalten diesen Suchbegriff."
+                        ActionText="Suche leeren"
+                        OnAction="ClearSearch"/>
+        }
+        else
+        {
+            <ul class="record-list">
+                @foreach (var application in PageItems)
+                {
+                    <li class="record @EdgeClass(application.Status)">
                         <a href="/teamarea/applysystem/legacy/application/@application.BewerbungsId">
-                            <h5 class="mb-1">Username: @ToolSet.GetFormattedName((ulong)application.UserId)</h5>
-                            <p class="mb-1">NutzerID: @application.UserId</p>
-                            <p class="mb-1">Bewerbungsposition: @application.PositionName</p>
-                            <small>Bewerbung eingereicht am: @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.Timestamp)</small>
-                            <p class="mb-1">Status: <strong>@GetStatusFromInt(application.Status)</strong></p>
-
-                            @if (application.SeenBy.Count > 0)
-                            {
-                                <div class="seen-by">
-                                    <div class="seen-by-title">Gesehen von:</div>
-                                    @foreach (var seenuser in application.SeenBy)
-                                    {
-                                        <img title="@getusernamefromid(seenuser)" src="@getprofileimagefromid(seenuser)" alt="profile" class="profile-image">
-                                    }
-                                </div>
-                            }
+                            <p class="record__title">@Name(application.UserId)</p>
+                            <div class="record__meta">
+                                <span>@application.PositionName</span>
+                                <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.Timestamp)</time>
+                                <span class="mono">@application.UserId</span>
+                            </div>
+                            <div class="record__foot">
+                                <StatusPill Text="@StatusLabel(application.Status)" Tone="@StatusTone(application.Status)"/>
+                                @if (application.SeenBy.Count > 0)
+                                {
+                                    <span class="avatar-row">
+                                        <span class="meta me-1">Gesehen von</span>
+                                        @foreach (var seen in application.SeenBy)
+                                        {
+                                            <img class="avatar" src="@AvatarUrl(seen)" alt="@Name(seen)" title="@Name(seen)"/>
+                                        }
+                                    </span>
+                                }
+                            </div>
                         </a>
                     </li>
-                </ul>
-            </div>
-        }
-    }
-</div>
+                }
+            </ul>
 
+            <Pager Current="currentPage" CurrentChanged="p => currentPage = p"
+                   TotalPages="TotalPages" TotalItems="filtered.Count"/>
+        }
+    </div>
+}
 
 @code {
-    private List<Application> applications = new();
-    private List<Application> FilteredApplications => applications.Where(a => a.UserId.ToString().Contains(searchQuery) || GetUsernameById(a.UserId).Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+    private readonly List<Application> applications = new();
+    private List<Application> filtered = new();
+    private readonly Dictionary<long, string> names = new();
     private string searchQuery = "";
-    private bool loading;
+    private bool loading = true;
+    private const int PageSize = 25;
+    private int currentPage = 1;
 
-    private string getcssfromstatus(int status)
-    {
-        return status switch
-        {
-            0 => "unread",
-            1 => "read",
-            2 => "vorgemerkt",
-            3 => "angenommen",
-            4 => "abgelehnt",
-            _ => "unread"
-        };
-    }
-
-    private async Task RefreshApplications()
-    {
-        loading = true;
-        applications.Clear();
-        await GetApplications();
-        StateHasChanged();
-        loading = false;
-    }
-
-    private string GetStatusFromInt(int status)
-    {
-        return status switch
-        {
-            0 => "Ungelesen",
-            1 => "Gelesen",
-            2 => "Vorgemerkt",
-            3 => "Angenommen",
-            4 => "Abgelehnt",
-            _ => "Ungelesen"
-        };
-    }
-
-    private string getusernamefromid(long id)
-    {
-        var users = CurrentApplication.DiscordClient.UserCache.Values.ToList();
-        foreach (var user in users)
-        {
-            if (user.Id == (ulong)id)
-            {
-                return user.Username;
-            }
-        }
-
-        return id.ToString();
-    }
-
-    private string getprofileimagefromid(long id)
-    {
-        var users = CurrentApplication.DiscordClient.UserCache.Values.ToList();
-        foreach (var user in users)
-        {
-            if (user.Id == (ulong)id)
-            {
-                return user.AvatarUrl;
-            }
-        }
-
-        var fallbackuser = ToolSet.GetFallbackUser(ulong.Parse(id.ToString()));
-        return fallbackuser.Avatar;
-    }
+    private IEnumerable<Application> PageItems => filtered.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
-        loading = true;
         await GetApplications();
+        filtered = applications;
         loading = false;
     }
 
+    private string Name(long id)
+    {
+        if (names.TryGetValue(id, out var name)) return name;
 
-    //bewerbungen (bewerbungsid TEXT, userid BIGINT, positionname TEXT, status INTEGER DEFAULT 0, timestamp BIGINT, bewerbungstext TEXT, seenby BIGINT[])
+        name = ToolSet.GetFormattedName((ulong)id);
+        names[id] = name;
+        return name;
+    }
+
+    /// <summary>The old search narrowed the list in place, so a second search could only ever find less.</summary>
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? "";
+        var term = searchQuery.Trim();
+
+        filtered = term.Length == 0
+            ? applications
+            : applications.Where(a => a.UserId.ToString().Contains(term) ||
+                                      Name(a.UserId).Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        currentPage = 1;
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
+        filtered = applications;
+        currentPage = 1;
+    }
+
+    private static string StatusLabel(int status) => status switch
+    {
+        1 => "Gelesen",
+        2 => "Vorgemerkt",
+        3 => "Angenommen",
+        4 => "Abgelehnt",
+        _ => "Ungelesen"
+    };
+
+    private static StatusPill.PillTone StatusTone(int status) => status switch
+    {
+        3 => StatusPill.PillTone.Ok,
+        4 => StatusPill.PillTone.Bad,
+        _ => StatusPill.PillTone.Neutral
+    };
+
+    private static string EdgeClass(int status) => status switch
+    {
+        1 => "record--read",
+        2 => "record--shortlisted",
+        3 => "record--accepted",
+        4 => "record--rejected",
+        _ => "record--new"
+    };
+
+    private static string AvatarUrl(long id)
+    {
+        var user = CurrentApplication.DiscordClient.UserCache.Values.FirstOrDefault(u => u.Id == (ulong)id);
+        return user?.AvatarUrl ?? ToolSet.GetFallbackUser((ulong)id).Avatar;
+    }
+
     private async Task GetApplications()
     {
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = db.CreateCommand();
-        command.CommandText = "SELECT bewerbungsid, userid, positionname, status, timestamp, bewerbungstext, seenby FROM bewerbungen ORDER BY timestamp DESC";
+        await using var command = db.CreateCommand(
+            "SELECT bewerbungsid, userid, positionname, status, timestamp, bewerbungstext, seenby FROM bewerbungen ORDER BY timestamp DESC");
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            List<long> seenby = new List<long>();
+            List<long> seenBy;
             try
             {
-                seenby = reader.GetFieldValue<long[]>(6).ToList();
+                seenBy = reader.GetFieldValue<long[]>(6).ToList();
             }
             catch (InvalidCastException)
             {
-                seenby = new List<long>();
+                seenBy = new List<long>();
             }
 
             applications.Add(new Application
@@ -180,29 +180,8 @@
                 Status = reader.GetInt32(3),
                 Timestamp = reader.GetInt64(4),
                 Bewerbungstext = reader.GetString(5),
-                SeenBy = seenby
+                SeenBy = seenBy
             });
         }
     }
-
-    private async Task ApplySearch()
-    {
-        applications = FilteredApplications;
-
-        if (searchQuery == "")
-        {
-            applications.Clear();
-            await GetApplications();
-        }
-
-
-        StateHasChanged();
-    }
-
-    private string GetUsernameById(long id)
-    {
-        return getusernamefromid(id);
-    }
-
-
 }

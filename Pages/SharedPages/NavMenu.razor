@@ -1,145 +1,92 @@
-﻿@using AGC_Management.Controller
+@using AGC_Management.Controller
+@implements IDisposable
 @inject UserService usrSvc
+@inject NavigationManager Nav
 
-@if (initialized)
-{
-    <div class="top-row ps-3 navbar navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="">@(CurrentApplication.TargetGuild?.NameWithRemovedRegionSuffix() ?? "Dashboard")</a>
-            <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-                <span class="navbar-toggler-icon"></span>
+@* One level, at most six entries: that is a top bar, not a sidebar. Deeper navigation lives on the hubs. *@
+<header class="topbar">
+    <div class="topbar__inner">
+        <a class="topbar__brand" href="">@(CurrentApplication.TargetGuild?.NameWithRemovedRegionSuffix() ?? "Dashboard")</a>
+
+        <nav id="topnav" class="topnav @(open ? "is-open" : null)" aria-label="Hauptnavigation">
+            <ul class="topnav__list" @onclick="Close">
+                <li><NavLink href="" Match="NavLinkMatch.All">Start</NavLink></li>
+                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User">
+                    <li><NavLink href="leaderboard">Leaderboard</NavLink></li>
+                </AuthorizeView>
+                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
+                    <li class="topnav__sep" aria-hidden="true"></li>
+                    <li class="topnav__group">Team</li>
+                    <li><NavLink href="teamarea">Teambereich</NavLink></li>
+                    <li><NavLink href="bot">Botinformationen</NavLink></li>
+                    <li><NavLink href="logs">Logging</NavLink></li>
+                </AuthorizeView>
+                @* Matches Konfiguration.razor's own [Authorize]. *@
+                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+                    <li><NavLink href="konfiguration">Administration</NavLink></li>
+                </AuthorizeView>
+            </ul>
+        </nav>
+
+        <div class="topbar__end">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="dropdown">
+                        <button type="button" class="topbar__user" data-bs-toggle="dropdown" aria-expanded="false">
+                            @if (user is not null)
+                            {
+                                <img src="@user.AvatarUrl" class="avatar" alt=""/>
+                                <span class="topbar__user-name">@user.Username</span>
+                            }
+                            else
+                            {
+                                <span class="topbar__user-name">Konto</span>
+                            }
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (user is not null)
+                            {
+                                <li><h6 class="dropdown-header">@user.UsernameWithDiscriminator</h6></li>
+                                <li><span class="dropdown-item-text meta mono">@user.Id</span></li>
+                                <li><hr class="dropdown-divider"></li>
+                            }
+                            @* Personal destinations sit with the account, not in the main navigation. *@
+                            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User"
+                                           Context="memberContext">
+                                <li><a class="dropdown-item" href="/apply/status">Meine Bewerbungen</a></li>
+                                <li><a class="dropdown-item" href="/tickets">Meine Tickets</a></li>
+                                <li><a class="dropdown-item" href="/benutzereinstellungen">Einstellungen</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                            </AuthorizeView>
+                            <li><a class="dropdown-item" href="/logout" target="_top">Abmelden</a></li>
+                        </ul>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-secondary btn-sm" href="/login" target="_top">Anmelden</a>
+                </NotAuthorized>
+            </AuthorizeView>
+
+            <button type="button" class="topbar__toggle" aria-controls="topnav" aria-label="Navigation"
+                    aria-expanded="@(open ? "true" : "false")" @onclick="Toggle">
+                <AppIcon Name="menu"/>
             </button>
         </div>
     </div>
-
-    <div class="@NavMenuCssClass nav-scrollable">
-        <nav class="flex-column">
-            <AuthorizeView>
-                <Authorized>
-                    @if (user is not null)
-                    {
-                    <div class="nav-item dropdown px-3">
-                        <a class="nav-link dropdown-toggle" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="@user.AvatarUrl" class="nav-profile-pic" alt=""/>
-                            <span class="dropdown-label">@user.Username @(!user.IsMigrated ? "#" + user.Discriminator : "")</span>
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
-                            <li>
-                                <h6 class="dropdown-header">@user.UsernameWithDiscriminator</h6>
-                            </li>
-                            <li>
-                                <h6 class="dropdown-header">@user.Id</h6>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="/logout"><span class="oi oi-account-logout"></span> Abmelden</a>
-                            </li>
-
-                        </ul>
-                    </div>
-                    }
-                </Authorized>
-                <NotAuthorized>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/login">
-                            <span class="oi oi-account-login" aria-hidden="true"></span> Anmelden
-                        </NavLink>
-                    </div>
-                </NotAuthorized>
-            </AuthorizeView>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="oi oi-home" aria-hidden="true"></span> Home
-                </NavLink>
-            </div>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="leaderboard">
-                        <span class="oi oi-bar-chart" aria-hidden="true"></span> Leaderboard
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <!--
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="mitglieder">
-                        <span class="oi oi-person" aria-hidden="true"></span> Mitglieder
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-        -->
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="teamarea">
-                        <span class="oi oi-people" aria-hidden="true"></span> Teambereich
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="bot">
-                        <span class="oi oi-dashboard" aria-hidden="true"></span> Botinformationen
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="logs">
-                        <span class="oi oi-project" aria-hidden="true"></span> Logging
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="konfiguration">
-                        <span class="oi oi-wrench" aria-hidden="true"></span> Administration
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="apply/status">
-                        <span class="oi oi-envelope-closed" aria-hidden="true"></span> Meine Bewerbungen
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="benutzereinstellungen">
-                        <span class="oi oi-wrench" aria-hidden="true"></span> Benutzereinstellungen
-                    </NavLink>
-                </div>
-            </AuthorizeView>
-        </nav>
-    </div>
-    <style>
-    .nav-link {
-        color: #fff !important;
-        padding-left: 1rem;
-    }
-</style>
-}
+</header>
 
 @code {
-    private bool collapseNavMenu = true;
-    private ulong? userId = null;
-    private DiscordUser? user;
-    private bool initialized = false;
-
-
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private DiscordUser? user;
+    private bool open;
 
     protected override async Task OnInitializedAsync()
     {
-        userId = AuthState is null ? null : usrSvc.GetUserId((await AuthState).User);
+        Nav.LocationChanged += OnLocationChanged;
 
-        if (userId is null)
-        {
-            initialized = true;
-            return;
-        }
+        var userId = AuthState is null ? null : usrSvc.GetUserId((await AuthState).User);
+        if (userId is null) return;
 
         try
         {
@@ -149,15 +96,19 @@
         {
             user = null;
         }
-
-        initialized = true;
     }
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private void Toggle() => open = !open;
 
-    private void ToggleNavMenu()
+    private void Close() => open = false;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        collapseNavMenu = !collapseNavMenu;
+        if (!open) return;
+
+        open = false;
+        InvokeAsync(StateHasChanged);
     }
 
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
 }

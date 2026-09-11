@@ -1,0 +1,24 @@
+@* Destructive confirmation in the page flow. This codebase has no modal anywhere
+   and that stays deliberate - an inline panel is easier to reach on a phone. *@
+
+<div class="confirm" role="alertdialog">
+    <p class="confirm__title">@Title</p>
+    @ChildContent
+    <div class="confirm__actions">
+        <button type="button" class="btn btn-danger btn-sm" disabled="@Busy" @onclick="Confirm">@ConfirmText</button>
+        <button type="button" class="btn btn-secondary btn-sm" @onclick="Cancel">Abbrechen</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] [EditorRequired] public string Title { get; set; } = "";
+    [Parameter] [EditorRequired] public string ConfirmText { get; set; } = "";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task Confirm() => this.OnConfirm.InvokeAsync();
+
+    private Task Cancel() => this.OnCancel.InvokeAsync();
+}

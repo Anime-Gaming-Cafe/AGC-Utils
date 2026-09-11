@@ -8,153 +8,141 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<h1>Bewerbungspositionen</h1>
+<PageHeader Title="Bewerbungspositionen"
+            Lead="Jede Position braucht einen veröffentlichten Fragenkatalog und eine offene Phase, bevor sich jemand bewerben kann."
+            BackHref="/konfiguration" BackText="Administration"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Positionen werden geladen"
+                Description="Positionen, Text-Channels und deine Rechte werden abgefragt."/>
 }
 else if (!mayManage)
 {
-    <div class="alert alert-danger-glass mt-3" role="alert">
-        Du hast keine Berechtigung, Bewerbungspositionen zu verwalten.
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Positionen verwalten darf, wer das Recht „Fragenkatalog verwalten“ hat. Rechte vergibt ein Administrator in der Rechte-Matrix."/>
 }
 else
 {
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
+    }
+
+    @if (positions.Count == 0)
+    {
+        <StateBlock Title="Noch keine Position angelegt"
+                    Description="Lege die erste Position im Formular darunter an. Danach folgen Fragenkatalog und Bewerbungsphase."/>
     }
 
     @foreach (var position in positions)
     {
-        <div class="glass-card mt-4 p-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <h3 class="mb-0">@position.PositionName</h3>
-                <span class="@(position.Active ? "badge-success-glass" : "badge-danger-glass")">
-                    @(position.Active ? "Aktiv" : "Inaktiv")
-                </span>
-            </div>
-            <p class="text-muted mb-3"><code>@position.PositionId</code></p>
-
-            <div class="row g-2">
-                <div class="col-12 col-md-6">
-                    <label class="form-label">Anzeigename</label>
-                    <input class="form-control glassy-input" @bind="position.PositionName"/>
-                </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label">Mindestlevel</label>
-                    <input type="number" min="0" class="form-control glassy-input" @bind="position.MinLevel"/>
-                </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label">Benachrichtigungs-Channel</label>
-                    <select class="form-select glassy-input" @bind="position.NotifyChannelId">
-                        <option value="0">-- kein Channel --</option>
-                        @foreach (var channel in textChannels)
-                        {
-                            <option value="@channel.Id">#@channel.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Beschreibung</label>
-                    <textarea class="form-control glassy-input" rows="2" @bind="position.Description"></textarea>
-                </div>
-            </div>
-
-            <div class="form-check mt-3">
-                <input class="form-check-input" type="checkbox" id="active-@position.PositionId" @bind="position.Active"/>
-                <label class="form-check-label" for="active-@position.PositionId">
-                    Im Bewerbungspanel anzeigen
-                </label>
-            </div>
-
-            <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="alwaysopen-@position.PositionId"
-                       @bind="position.AlwaysOpen"/>
-                <label class="form-check-label" for="alwaysopen-@position.PositionId">
-                    Bewerbungseinsendung immer erlauben
-                    <span class="badge bg-secondary">Debug</span>
-                </label>
-            </div>
-
-            @if (position.AlwaysOpen)
-            {
-                <div class="alert alert-warning-glass" role="alert">
-                    Übersprungen werden: offene Phase, Mindestlevel und "eine Bewerbung pro Phase".
-                    Eingereicht wird auf die neueste nicht archivierte Phase, gegen den aktuell
-                    veröffentlichten Fragenkatalog. Ohne Phase und ohne veröffentlichten Katalog bleibt die
-                    Position trotzdem geschlossen.
-                </div>
-            }
-
-            <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-primary-glass" @onclick="() => SavePosition(position)">Speichern</button>
-                <a class="btn btn-secondary-glass" href="/konfiguration/applysystem/questions/@position.PositionId">Fragenkatalog</a>
-                <a class="btn btn-secondary-glass" href="/konfiguration/applysystem/phases/@position.PositionId">Phasen</a>
-                @if (isAdministrator && pendingDelete != position.PositionId)
+        <Panel Title="@position.PositionName" Lead="@($"Bewerbungs-URL: /apply/{position.PositionId}")">
+            <Actions>
+                @if (position.AlwaysOpen)
                 {
-                    <button class="btn btn-danger-glass" @onclick="() => RequestDelete(position)">Löschen</button>
+                    <StatusPill Text="Testmodus" Tone="StatusPill.PillTone.Warn"/>
                 }
-            </div>
-
-            @if (isAdministrator && pendingDelete == position.PositionId)
-            {
-                <div class="alert alert-danger-glass mt-3" role="alert">
-                    <h4 class="alert-heading">Position endgültig löschen?</h4>
-                    <hr>
-                    <p>
-                        Gelöscht werden die Position <strong>@position.PositionName</strong>, alle
-                        Fragenkatalog-Versionen, alle Phasen, alle positionsbezogenen Textbausteine und
-                        Rechte-Einträge
-                        @if (pendingDeleteApplications > 0)
-                        {
-                            <text>
-                                sowie <strong>@pendingDeleteApplications Bewerbungen</strong> mit allen Antworten
-                                und internen Notizen
-                            </text>
-                        }
-                        . Das lässt sich nicht rückgängig machen.
-                    </p>
-                    @if (pendingDeleteApplications > 0)
-                    {
-                        <p>
-                            Soll die Position nur aus dem Panel verschwinden, entferne stattdessen den Haken bei
-                            "Im Bewerbungspanel anzeigen" und speichere.
-                        </p>
-                    }
-                    <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-danger-glass" disabled="@deleting"
-                                @onclick="() => DeletePosition(position)">Ja, endgültig löschen</button>
-                        <button class="btn btn-secondary-glass" @onclick="() => pendingDelete = null">Abbrechen</button>
+                <StatusPill Text="@(position.Active ? "Im Panel" : "Ausgeblendet")"
+                            Tone="@(position.Active ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+            </Actions>
+            <ChildContent>
+                <div class="field-grid">
+                    <div class="field">
+                        <label class="field__label" for="name-@position.PositionId">Anzeigename</label>
+                        <input id="name-@position.PositionId" class="form-control" @bind="position.PositionName"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="lvl-@position.PositionId">Mindestlevel</label>
+                        <input id="lvl-@position.PositionId" type="number" min="0" class="form-control" @bind="position.MinLevel"/>
+                        <span class="field__hint">Bewerber sehen diese Zahl nie.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="ch-@position.PositionId">Benachrichtigungs-Channel</label>
+                        <select id="ch-@position.PositionId" class="form-select" @bind="position.NotifyChannelId">
+                            <option value="0">Kein Channel</option>
+                            @foreach (var channel in textChannels)
+                            {
+                                <option value="@channel.Id">#@channel.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field field--wide">
+                        <label class="field__label" for="desc-@position.PositionId">Beschreibung</label>
+                        <textarea id="desc-@position.PositionId" class="form-control" rows="2" @bind="position.Description"></textarea>
                     </div>
                 </div>
-            }
-        </div>
+
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="active-@position.PositionId"
+                           @bind="position.Active"/>
+                    <label class="form-check-label" for="active-@position.PositionId">Im Bewerbungspanel anzeigen</label>
+                </div>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="alwaysopen-@position.PositionId"
+                           @bind="position.AlwaysOpen"/>
+                    <label class="form-check-label" for="alwaysopen-@position.PositionId">
+                        Bewerbungseinsendung immer erlauben
+                    </label>
+                    <span class="field__hint">
+                        Zum Testen: überspringt offene Phase, Mindestlevel und „eine Bewerbung pro Phase“.
+                        Braucht trotzdem eine angelegte Phase und einen veröffentlichten Fragenkatalog.
+                    </span>
+                </div>
+
+                <div class="form-foot">
+                    <button type="button" class="btn btn-secondary" @onclick="() => SavePosition(position)">Speichern</button>
+                    <a class="btn btn-ghost" href="/konfiguration/applysystem/questions/@position.PositionId">Fragenkatalog</a>
+                    <a class="btn btn-ghost" href="/konfiguration/applysystem/phases/@position.PositionId">Phasen</a>
+                    @if (isAdministrator && pendingDelete != position.PositionId)
+                    {
+                        <button type="button" class="btn btn-danger ms-auto" @onclick="() => RequestDelete(position)">Löschen</button>
+                    }
+                </div>
+
+                @if (isAdministrator && pendingDelete == position.PositionId)
+                {
+                    <ConfirmInline Title="Position endgültig löschen?"
+                                   ConfirmText="Ja, endgültig löschen"
+                                   Busy="deleting"
+                                   OnConfirm="() => DeletePosition(position)"
+                                   OnCancel="() => pendingDelete = null">
+                        <p>
+                            Gelöscht werden die Position, alle Fragenkatalog-Versionen, alle Phasen sowie
+                            positionsbezogene Textbausteine und Rechte-Einträge@(pendingDeleteApplications > 0
+                                ? $", außerdem {pendingDeleteApplications} Bewerbungen mit allen Antworten und Notizen"
+                                : "").
+                            Das lässt sich nicht rückgängig machen.
+                        </p>
+                        @if (pendingDeleteApplications > 0)
+                        {
+                            <p>Soll die Position nur aus dem Panel verschwinden, schalte stattdessen „Im Bewerbungspanel anzeigen“ aus.</p>
+                        }
+                    </ConfirmInline>
+                }
+            </ChildContent>
+        </Panel>
     }
 
-    <div class="glass-card mt-4 p-3">
-        <h3>Neue Position anlegen</h3>
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-5">
-                <label class="form-label">Name</label>
-                <input class="form-control glassy-input" @bind="newName" placeholder="z.B. Supporter"/>
+    <h2 class="section-title">Neue Position</h2>
+    <Panel>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="new-name">Name</label>
+                <input id="new-name" class="form-control" @bind="newName" placeholder="Name der Position"/>
+                <span class="field__hint">Aus dem Namen wird die Bewerbungs-URL. Sie lässt sich später nicht ändern.</span>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label">Mindestlevel</label>
-                <input type="number" min="0" class="form-control glassy-input" @bind="newMinLevel"/>
-            </div>
-            <div class="col-12 col-md-4">
-                <button class="btn btn-primary-glass w-100" @onclick="CreatePosition">Anlegen</button>
+            <div class="field">
+                <label class="field__label" for="new-lvl">Mindestlevel</label>
+                <input id="new-lvl" type="number" min="0" class="form-control" @bind="newMinLevel"/>
             </div>
         </div>
-        <p class="text-muted mt-2 mb-0">
-            Aus dem Namen wird die ID für die Bewerbungs-URL gebildet. Sie lässt sich später nicht mehr ändern.
-        </p>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="CreatePosition">Position anlegen</button>
+        </div>
+    </Panel>
 }
 
 @code {
@@ -167,6 +155,7 @@ else
     private bool isAdministrator;
     private bool deleting;
     private string statusMessage = "";
+    private string statusTone = "ok";
 
     private string? pendingDelete;
     private int pendingDeleteApplications;
@@ -200,12 +189,18 @@ else
         positions = await TeamApplicationService.GetPositionsAsync();
     }
 
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
     private async Task SavePosition(TeamApplicationPosition position)
     {
         if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
                 position.PositionId))
         {
-            statusMessage = "Keine Berechtigung für diese Position.";
+            Say("Für diese Position fehlt dir die Berechtigung.", "bad");
             return;
         }
 
@@ -213,12 +208,12 @@ else
         {
             await TeamApplicationService.UpdatePositionAsync(position);
             ApplyPanelCommands.QueueRefreshPanel();
-            statusMessage = $"Position \"{position.PositionName}\" gespeichert.";
+            Say($"„{position.PositionName}“ gespeichert.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Position speichern fehlgeschlagen");
-            statusMessage = "Fehler beim Speichern.";
+            Say("Die Position konnte nicht gespeichert werden.", "bad");
         }
     }
 
@@ -226,7 +221,7 @@ else
     {
         if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
         {
-            statusMessage = "Positionen dürfen nur Administratoren löschen.";
+            Say("Positionen dürfen nur Administratoren löschen.", "bad");
             return;
         }
 
@@ -242,7 +237,7 @@ else
         // Re-checked here, not just when the button was rendered.
         if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
         {
-            statusMessage = "Positionen dürfen nur Administratoren löschen.";
+            Say("Positionen dürfen nur Administratoren löschen.", "bad");
             pendingDelete = null;
             return;
         }
@@ -259,12 +254,12 @@ else
 
             pendingDelete = null;
             await LoadAll();
-            statusMessage = $"Position \"{position.PositionName}\" wurde gelöscht.";
+            Say($"„{position.PositionName}“ wurde gelöscht.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Position löschen fehlgeschlagen");
-            statusMessage = "Die Position konnte nicht gelöscht werden. Es wurde nichts verändert.";
+            Say("Die Position konnte nicht gelöscht werden. Es wurde nichts verändert.", "bad");
         }
         finally
         {
@@ -276,33 +271,33 @@ else
     {
         if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions))
         {
-            statusMessage = "Keine Berechtigung.";
+            Say("Dafür fehlt dir die Berechtigung.", "bad");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            statusMessage = "Bitte einen Namen angeben.";
+            Say("Bitte einen Namen angeben.", "bad");
             return;
         }
 
         var slug = TeamApplicationService.Slugify(newName);
         if (string.IsNullOrEmpty(slug) || TeamApplicationService.IsReservedSlug(slug))
         {
-            statusMessage = "Dieser Name ergibt keine gültige ID. Bitte einen anderen wählen.";
+            Say("Aus diesem Namen lässt sich keine gültige URL bilden. Bitte einen anderen wählen.", "bad");
             return;
         }
 
         var created = await TeamApplicationService.CreatePositionAsync(newName, newMinLevel, 0, "");
         if (created == null)
         {
-            statusMessage = "Es gibt bereits eine Position mit dieser ID.";
+            Say("Es gibt bereits eine Position mit dieser URL.", "bad");
             return;
         }
 
         newName = "";
         newMinLevel = 20;
         await LoadAll();
-        statusMessage = "Position angelegt. Lege nun den Fragenkatalog an.";
+        Say("Position angelegt. Als Nächstes den Fragenkatalog anlegen.", "ok");
     }
 }

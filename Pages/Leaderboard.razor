@@ -1,81 +1,70 @@
-﻿@page "/Leaderboard"
+@page "/Leaderboard"
 @using AGC_Management.Entities.Web
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
-@if (LevelUtils.LeaderboardDataLoaded)
+
+<PageHeader Title="Leaderboard"
+            Lead="@(LevelUtils.LeaderboardDataLoaded ? $"Stand: {LevelUtils.CacheDate}" : null)"/>
+
+@if (!LevelUtils.LeaderboardDataLoaded)
 {
-    <div class="leaderboard-container">
-        <h3>Leaderboard</h3>
-        <div class="leaderboard">
-            @* Add a separate card for the current user at the top of the leaderboard *@
-            @if (LevelUtils.cachedLeaderboardData.Any(item => item.UserId == ToolSet.GetUserIdFromPrincipal(_principal)))
-            {
-                var currentUser = LevelUtils.cachedLeaderboardData.First(item => item.UserId == ToolSet.GetUserIdFromPrincipal(_principal));
-                <div class="leaderboard-item selfyou">
-                    <div class="rank">
-                        <span class="rank-number">@currentUser.Rank</span>
-                    </div>
-                    <div class="avatar">
-                        <img src="@currentUser.Avatar" alt="@currentUser.Username"/>
-                    </div>
-                    <div class="username">@currentUser.Username (Du)</div>
-                    <div class="level-container">
-                        <div class="level">Level @currentUser.Level</div>
-                    </div>
-                    <div class="experience">@currentUser.Experience XP</div>
-                </div>
-            }
-
-            @foreach (var item in currentPageData)
-            {
-                <div class="leaderboard-item @(IsCurrentUser(item.UserId) ? "you" : "")">
-                    <div class="rank">
-                        @{
-                            var medalImages = new Dictionary<int, string>
-                            {
-                                { 1, "https://files.fabi-chan.me/resources/leaderboardassets/goldmedal.png" },
-                                { 2, "https://files.fabi-chan.me/resources/leaderboardassets/silvermedal.png" },
-                                { 3, "https://files.fabi-chan.me/resources/leaderboardassets/bronzemedal.png" }
-                            };
-                        }
-
-                        @if (item.Rank > 3)
-                        {
-                            <span class="rank-number">@item.Rank</span>
-                        }
-                        else if (medalImages.ContainsKey(item.Rank))
-                        {
-                            <img src="@medalImages[item.Rank]" alt="Medal" style="width:40px; height:40px;"/>
-                        }
-                    </div>
-                    <div class="avatar">
-                        <img loading="lazy" src="@item.Avatar" alt="@item.Username"/>
-                    </div>
-                    <div class="username">@item.Username</div>
-                    <div class="level-container">
-                        <div class="level">Level @item.Level</div>
-                    </div>
-                    <div class="experience">@item.Experience XP</div>
-                </div>
-            }
-
-        </div>
-        <div class="pagination-lg">
-            <div class="page-info">Seite @currentPage von @totalPages | Letztes Cacheupdate: @LevelUtils.CacheDate</div>
-            <button class="btn btn-primary-glass" @onclick="PreviousPage" disabled="@IsFirstPage">Vorherige Seite</button>
-            <button class="btn btn-primary-glass" @onclick="NextPage" disabled="@IsLastPage">Nächste Seite</button>
-        </div>
-    </div>
+    @* This used to render as a red error box, although nothing had gone wrong. *@
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Leaderboard wird aufgebaut"
+                Description="Der Bot berechnet die Rangliste gerade neu. Nach einem Neustart dauert das meist nur einen Moment."
+                ActionText="Erneut prüfen"
+                OnAction="Reload"/>
+}
+else if (totalItems == 0)
+{
+    <StateBlock Title="Noch niemand auf dem Leaderboard"
+                Description="Sobald Mitglieder mit Nachrichten oder Voice-Zeit XP sammeln, erscheinen sie hier."/>
 }
 else
 {
-    <p class="alert alert-danger-glass">Der Leaderboard-Daten-Cache wird gerade aufgebaut. Bitte warte einen Moment.</p>
+    @if (Self is { } self)
+    {
+        <Panel Title="Dein Platz" Flush="true">
+            <ul class="rows">
+                <li class="is-self">
+                    <span class="rank @(self.Rank <= 3 ? "rank--top" : null)">@self.Rank</span>
+                    <img class="avatar avatar--md" src="@self.Avatar" alt=""/>
+                    <div class="rows__main">
+                        <p class="rows__title">@self.Username</p>
+                    </div>
+                    <div class="rows__side tnum">
+                        <span>Level @self.Level</span>
+                        <span class="meta">@self.Experience XP</span>
+                    </div>
+                </li>
+            </ul>
+        </Panel>
+    }
+
+    <Panel Flush="true" Class="mt-3">
+        <ol class="rows">
+            @foreach (var item in currentPageData)
+            {
+                <li class="@(item.UserId == SelfId ? "is-self" : null)">
+                    @* Rank 1 to 3 used remote medal images from an external host; brightness carries it now. *@
+                    <span class="rank @(item.Rank <= 3 ? "rank--top" : null)">@item.Rank</span>
+                    <img class="avatar avatar--md" loading="lazy" src="@item.Avatar" alt=""/>
+                    <div class="rows__main">
+                        <p class="rows__title">@item.Username</p>
+                    </div>
+                    <div class="rows__side tnum">
+                        <span>Level @item.Level</span>
+                        <span class="meta">@item.Experience XP</span>
+                    </div>
+                </li>
+            }
+        </ol>
+    </Panel>
+
+    <Pager Current="currentPage" CurrentChanged="GoToPage" TotalPages="TotalPages" TotalItems="totalItems"/>
 }
 
-<br>
-
 @code {
-
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private ClaimsPrincipal? _principal;
 
@@ -83,49 +72,34 @@ else
     private const int ItemsPerPage = 25;
     private int currentPage = 1;
     private int totalItems;
-    private int totalPages => (int)Math.Ceiling((double)totalItems / ItemsPerPage);
 
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)totalItems / ItemsPerPage));
+
+    private ulong? SelfId => ToolSet.GetUserIdFromPrincipal(_principal);
+
+    private WebLeaderboardData? Self => LevelUtils.cachedLeaderboardData.FirstOrDefault(i => i.UserId == SelfId);
 
     protected override async Task OnInitializedAsync()
     {
         _principal = AuthState is null ? null : (await AuthState).User;
-
-        await LoadPage(currentPage);
+        LoadPage(currentPage);
     }
 
-    private async Task LoadPage(int page)
+    private void LoadPage(int page)
     {
-        var start = (page - 1) * ItemsPerPage;
-        totalItems = LevelUtils.cachedLeaderboardData.Count;
-        var count = Math.Min(ItemsPerPage, LevelUtils.cachedLeaderboardData.Count - start);
-        currentPageData = LevelUtils.cachedLeaderboardData.GetRange(start, count);
+        var data = LevelUtils.cachedLeaderboardData;
+        totalItems = data.Count;
+
+        var start = Math.Clamp((page - 1) * ItemsPerPage, 0, totalItems);
+        var count = Math.Min(ItemsPerPage, totalItems - start);
+        currentPageData = data.GetRange(start, count);
     }
 
-    private async Task NextPage()
+    private void GoToPage(int page)
     {
-        if (!IsLastPage)
-        {
-            currentPage++;
-            await LoadPage(currentPage);
-        }
+        currentPage = page;
+        LoadPage(page);
     }
 
-    private async Task PreviousPage()
-    {
-        if (!IsFirstPage)
-        {
-            currentPage--;
-            await LoadPage(currentPage);
-        }
-    }
-
-    private bool IsFirstPage => currentPage == 1;
-    private bool IsLastPage => currentPage * ItemsPerPage >= totalItems;
-
-    private bool IsCurrentUser(ulong userId)
-    {
-        return userId == ToolSet.GetUserIdFromPrincipal(_principal);
-    }
-
-
+    private void Reload() => LoadPage(currentPage);
 }

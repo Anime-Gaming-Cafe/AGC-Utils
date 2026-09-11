@@ -1,0 +1,50 @@
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Utils
+@* The team members who opened an application, as overlapping avatars. Name and time sit in the
+   hover title; the large variant also shows them on tap, since touch screens have no hover. *@
+
+<span class="avatar-stack @(Large ? "avatar-stack--md" : null)">
+    @foreach (var reader in Readers)
+    {
+        var label = Label(reader);
+        var id = reader.UserId;
+        @if (Large)
+        {
+            <button type="button" class="avatar-button" title="@label" aria-label="@label"
+                    aria-pressed="@(selected == id ? "true" : "false")" @onclick="() => Toggle(id)">
+                <img class="avatar avatar--md" src="@AvatarUrl(id)" alt=""/>
+            </button>
+        }
+        else
+        {
+            <img class="avatar" src="@AvatarUrl(id)" alt="@label" title="@label"/>
+        }
+    }
+</span>
+@if (Large && Readers.FirstOrDefault(r => r.UserId == selected) is { } shown)
+{
+    <span role="status">@Label(shown)</span>
+}
+
+@code {
+    [Parameter] [EditorRequired] public IReadOnlyList<TeamApplicationReader> Readers { get; set; } = [];
+    [Parameter] public bool Large { get; set; }
+
+    private ulong selected;
+
+    private void Toggle(ulong userId) => selected = selected == userId ? 0 : userId;
+
+    private static string Label(TeamApplicationReader reader)
+    {
+        var name = ToolSet.GetFormattedName(reader.UserId);
+        return reader.SeenAt > 0
+            ? $"{name}, gelesen am {ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(reader.SeenAt)}"
+            : $"{name}, Zeitpunkt nicht erfasst";
+    }
+
+    private static string AvatarUrl(ulong id)
+    {
+        var user = CurrentApplication.DiscordClient.UserCache.Values.FirstOrDefault(u => u.Id == id);
+        return user?.AvatarUrl ?? ToolSet.GetFallbackUser(id).Avatar;
+    }
+}

@@ -1,59 +1,47 @@
-﻿@page "/teamarea"
+@page "/teamarea"
+@using AGC_Management.Controller
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<h3>Teambereich</h3>
+<PageHeader Title="Teambereich"
+            Lead="Bewerbungen sichten und entscheiden, Altbestände einsehen."/>
 
+<Panel Title="Bewerbungen">
+    <ul class="nav-links">
+        <li><a href="/teamarea/applysystem/applications">Bewerbungen sichten</a></li>
+        @* Gated on the real matrix permission: a role list would hide it from people who
+           were granted it, or show it to people who then hit a permission wall. *@
+        @if (mayConfigure)
+        {
+            <li><a href="/konfiguration/applysystem/positions">Bewerbungssystem konfigurieren</a></li>
+        }
+    </ul>
+</Panel>
 
-<div class="container mt-5 mb-5">
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    Berichte
-                    <span>
-                        <i class="bi bi-journals"></i>
-                    </span>
-                </h5>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, Team">
-                    <a href="/teamarea/journals/meetingdocumentation" class="btn btn-primary-glass mt-2 mb-2">Besprechungsprotokolle</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    Bewerbungsmanagement
-                    <span>
-                        <i class="bi bi-journals"></i>
-                    </span>
-                </h5>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
-                    <a href="/teamarea/applysystem/applications" class="btn btn-primary-glass mt-2 mb-2">Bewerbungen ansehen</a>
-                </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
-                    <a href="/konfiguration/applysystem/positions" class="btn btn-primary-glass mt-2 mb-2">Bewerbungssystem konfigurieren</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 mb-4">
-        <div class="glass-card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    Bewerbungen (Altsystem, nur lesend)
-                    <span>
-                        <i class="bi bi-archive"></i>
-                    </span>
-                </h5>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                    <a href="/teamarea/applysystem/legacy/applications" class="btn btn-secondary-glass mt-2 mb-2">Alte Bewerbungen (Team allgemein)</a>
-                </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, HeadEventmanager">
-                    <a href="/teamarea/applysystem/legacy/eventapplications" class="btn btn-secondary-glass mt-2 mb-2">Alte Bewerbungen (Eventteam)</a>
-                </AuthorizeView>
-            </div>
-        </div>
-    </div>
-</div>
+<Panel Title="Altsystem" Lead="Nur lesend. Über dieses System kommen keine neuen Bewerbungen mehr herein.">
+    <ul class="nav-links">
+        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+            <li><a href="/teamarea/applysystem/legacy/applications">Alte Bewerbungen (Team allgemein)</a></li>
+        </AuthorizeView>
+        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, HeadEventmanager">
+            <li><a href="/teamarea/applysystem/legacy/eventapplications">Alte Bewerbungen (Eventteam)</a></li>
+        </AuthorizeView>
+    </ul>
+</Panel>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool mayConfigure;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = AuthState is null ? null : (await AuthState).User;
+        var userId = UserService.GetUserId(principal) ?? 0;
+
+        mayConfigure = await TeamApplicationPermissionService.HasAsync(userId,
+            TeamApplicationPermission.ManageQuestions);
+    }
+}

@@ -1,0 +1,11 @@
+@* Replaces badge-success-glass / badge-danger-glass / badge bg-danger, which were
+   previously mixed inside a single control. *@
+
+<span class="pill pill--@Tone.ToString().ToLowerInvariant()">@Text</span>
+
+@code {
+    public enum PillTone { Neutral, Ok, Warn, Bad }
+
+    [Parameter] [EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public PillTone Tone { get; set; } = PillTone.Neutral;
+}

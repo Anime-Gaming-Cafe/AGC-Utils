@@ -79,10 +79,7 @@ public sealed class ImageUtils
         var xptoCompleteCurrentLevel = Converter.FormatWithCommas(xpforthisleveltocomplete);
         var progress = progression / 100;
 
-        using var httpclient = new HttpClient();
-        httpclient.DefaultRequestHeaders.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+        var httpclient = Http;
 
         var avatarurl = user.GetAvatarUrl(MediaFormat.Png);
         var response2 = await httpclient.GetAsync(avatarurl);
@@ -103,17 +100,7 @@ public sealed class ImageUtils
         {
             IsAntialias = true
         };
-        var bgurl = "";
         var default_barcolor = SKColor.Parse("#9f00ff");
-        var overridecard = false;
-        try
-        {
-            bgurl = BotConfig.GetConfig()["Leveling"]["DefaultRankCardBackgroundUrl"];
-            overridecard = true;
-        }
-        catch (Exception)
-        {
-        }
 
         var barcolor = default_barcolor;
 
@@ -124,15 +111,7 @@ public sealed class ImageUtils
         {
             if (!hasCustomSettings)
             {
-                httpclient.DefaultRequestHeaders.Add("User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-                var response = await httpclient.GetAsync(bgurl);
-                if (!response.IsSuccessStatusCode)
-                    throw new InvalidDataException("Failed to download background image");
-
-                var bgstream = await response.Content.ReadAsByteArrayAsync();
-                using var bg_stream = new MemoryStream(bgstream);
+                using var bg_stream = new MemoryStream(Convert.FromBase64String(await GetFallbackBackground()));
                 var backgroundBitmap = SKBitmap.Decode(bg_stream);
                 canvas.DrawBitmap(backgroundBitmap, new SKRect(0, 0, cardWidth, cardHeight), backgroundPaint);
             }
@@ -326,10 +305,7 @@ public sealed class ImageUtils
         var xptoCompleteCurrentLevel = Converter.FormatWithCommas(xpforthisleveltocomplete);
         var progress = progression / 100;
 
-        using var httpclient = new HttpClient();
-        httpclient.DefaultRequestHeaders.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+        var httpclient = Http;
 
         var avatarurl = user.GetAvatarUrl(MediaFormat.Png);
         var response2 = await httpclient.GetAsync(avatarurl);
@@ -492,8 +468,31 @@ public sealed class ImageUtils
     }
 
 
+    // One client for every rank card download. A card is rendered while someone waits for it, so a dead
+    // host has to fail within seconds instead of the default 100.
+    private static readonly HttpClient Http = CreateHttpClient();
+
+    private static string? _fallbackBackground;
+    private static DateTimeOffset _fallbackBackgroundUntil;
+
+    private static HttpClient CreateHttpClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        client.DefaultRequestHeaders.Add("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+        return client;
+    }
+
+    /// <summary>
+    ///     Cached, because a single card asks for it up to three times. A failure is cached too, but only
+    ///     briefly, so an unreachable host costs one timeout every few minutes rather than one per card.
+    /// </summary>
     public static async Task<string> GetFallbackBackground()
     {
+        if (_fallbackBackground != null && DateTimeOffset.UtcNow < _fallbackBackgroundUntil)
+            return _fallbackBackground;
+
         var bgurl = "";
         try
         {
@@ -504,31 +503,31 @@ public sealed class ImageUtils
             // ignored
         }
 
-        try
-        {
-            using var httpclient = new HttpClient();
-            httpclient.DefaultRequestHeaders.Add("User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-            var response = await httpclient.GetAsync(bgurl);
-            if (!response.IsSuccessStatusCode) throw new InvalidDataException("Failed to download background image");
+        if (!string.IsNullOrWhiteSpace(bgurl))
+            try
+            {
+                var response = await Http.GetAsync(bgurl);
+                if (!response.IsSuccessStatusCode)
+                    throw new InvalidDataException($"Failed to download background image ({(int)response.StatusCode})");
 
-            var bgstream = await response.Content.ReadAsByteArrayAsync();
-            return Convert.ToBase64String(bgstream);
-        }
-        catch (Exception e)
-        {
-            CurrentApplication.Logger.Error(e,
-                "Failed to download fallback background image. Returning black background.");
-        }
+                var bgstream = await response.Content.ReadAsByteArrayAsync();
+                _fallbackBackground = Convert.ToBase64String(bgstream);
+                _fallbackBackgroundUntil = DateTimeOffset.UtcNow.AddHours(1);
+                return _fallbackBackground;
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e,
+                    "Failed to download fallback background image. Returning black background.");
+            }
 
-        // if everything fails, return a black background
-        var bmp = new SKBitmap(934, 282);
+        using var bmp = new SKBitmap(934, 282);
         using var canvas = new SKCanvas(bmp);
         canvas.Clear(SKColors.Black);
-        var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        var base64 = Convert.ToBase64String(data.ToArray());
-        return base64;
+        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
+        _fallbackBackground = Convert.ToBase64String(data.ToArray());
+        _fallbackBackgroundUntil = DateTimeOffset.UtcNow.AddMinutes(5);
+        return _fallbackBackground;
     }
 
 

@@ -7,95 +7,108 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
-<h1>Meine Bewerbungen</h1>
+<PageHeader Title="Meine Bewerbungen">
+    <Actions>
+        <a class="btn btn-secondary" href="/apply">Offene Positionen</a>
+    </Actions>
+</PageHeader>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Bewerbungen werden geladen"
+                Description="Deine eingereichten Bewerbungen und ihr Stand werden abgefragt."/>
 }
 else
 {
-    <a class="btn btn-secondary-glass mb-3" href="/apply">Zur Bewerbungsübersicht</a>
-
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass" role="alert">@statusMessage</div>
+        <div class="notice notice--ok" role="status">@statusMessage</div>
     }
 
     @if (applications.Count == 0)
     {
-        <div class="alert alert-warning-glass" role="alert">Du hast dich bisher nicht beworben.</div>
+        <StateBlock Title="Du hast dich noch nicht beworben"
+                    Description="Hier siehst du später den Stand jeder Bewerbung, die du abschickst."
+                    ActionText="Offene Positionen ansehen"
+                    ActionHref="/apply"/>
     }
-
-    @foreach (var application in applications)
+    else
     {
-        <div class="glass-card mt-3 p-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <h5 class="mb-0">@application.PositionName</h5>
-                <span class="@CoarseBadge(application)">@CoarseLabel(application)</span>
-            </div>
-
-            <p class="text-muted mb-2">
-                Phase: @application.PhaseName<br/>
-                Eingereicht am @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)
-            </p>
-
-            @if (application.IsDecided && !string.IsNullOrWhiteSpace(application.DecisionText))
-            {
-                <div class="alert @(application.Status == TeamApplicationStatus.Angenommen ? "alert-success-glass" : "alert-danger-glass")" role="alert">
-                    @application.DecisionText
-                </div>
-            }
-
-            <button class="btn btn-secondary-glass btn-sm"
-                    @onclick="() => ToggleAnswers(application.ApplicationId)">
-                @(expanded.Contains(application.ApplicationId) ? "Antworten ausblenden" : "Meine Antworten ansehen")
-            </button>
-
-            @if (application.IsOpen)
-            {
-                @if (pendingWithdraw == application.ApplicationId)
+        <Panel Flush="true">
+            <ul class="rows">
+                @foreach (var application in applications)
                 {
-                    <div class="alert alert-warning-glass mt-3" role="alert">
-                        <p>
-                            Möchtest du deine Bewerbung wirklich zurückziehen? Du kannst dich danach in dieser
-                            Phase erneut bewerben.
-                        </p>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-danger-glass" @onclick="() => Withdraw(application)">
-                                Ja, zurückziehen
-                            </button>
-                            <button class="btn btn-secondary-glass" @onclick="() => pendingWithdraw = null">
-                                Abbrechen
-                            </button>
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@application.PositionName</p>
+                            <p class="rows__text">
+                                @application.PhaseName ·
+                                eingereicht am <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)</time>
+                            </p>
                         </div>
-                    </div>
-                }
-                else
-                {
-                    <button class="btn btn-danger-glass btn-sm ms-2"
-                            @onclick="() => pendingWithdraw = application.ApplicationId">
-                        Bewerbung zurückziehen
-                    </button>
-                }
-            }
 
-            @if (expanded.Contains(application.ApplicationId) &&
-                 answers.TryGetValue(application.ApplicationId, out var list))
-            {
-                <ul class="list-group list-group-flush mt-3">
-                    @foreach (var answer in list)
-                    {
-                        <li class="list-group-item">
-                            <strong>@answer.QuestionTextSnapshot</strong>
-                            <p class="mb-0 mt-1" style="white-space: pre-wrap;">@Render(answer)</p>
-                        </li>
-                    }
-                </ul>
-            }
-        </div>
+                        <div class="rows__side">
+                            <ApplicantStatusPill Status="@application.Status"/>
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    aria-expanded="@expanded.Contains(application.ApplicationId)"
+                                    @onclick="() => ToggleAnswers(application.ApplicationId)">
+                                @(expanded.Contains(application.ApplicationId) ? "Antworten ausblenden" : "Antworten ansehen")
+                            </button>
+                            @if (application.IsOpen && pendingWithdraw != application.ApplicationId)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        @onclick="() => pendingWithdraw = application.ApplicationId">
+                                    Zurückziehen
+                                </button>
+                            }
+                        </div>
+
+                        @if (application.IsDecided && !string.IsNullOrWhiteSpace(application.DecisionText))
+                        {
+                            <div class="rows__detail">
+                                <p class="qa__q">Nachricht vom Team</p>
+                                <p class="qa__a">@application.DecisionText</p>
+                            </div>
+                        }
+
+                        @if (application.IsOpen && pendingWithdraw == application.ApplicationId)
+                        {
+                            <div class="rows__detail">
+                                <ConfirmInline Title="Bewerbung zurückziehen?"
+                                               ConfirmText="Ja, zurückziehen"
+                                               OnConfirm="() => Withdraw(application)"
+                                               OnCancel="() => pendingWithdraw = null">
+                                    <p>Du kannst dich danach in dieser Bewerbungsphase erneut bewerben.</p>
+                                </ConfirmInline>
+                            </div>
+                        }
+
+                        @if (expanded.Contains(application.ApplicationId))
+                        {
+                            <div class="rows__detail">
+                                @if (!answers.TryGetValue(application.ApplicationId, out var list))
+                                {
+                                    <StateBlock Kind="StateBlock.StateKind.Loading" Inline="true"
+                                                Title="Antworten werden geladen"
+                                                Description="Deine Antworten zu dieser Bewerbung werden abgefragt."/>
+                                }
+                                else
+                                {
+                                    <dl class="qa">
+                                        @foreach (var answer in list)
+                                        {
+                                            <dt class="qa__q">@answer.QuestionTextSnapshot</dt>
+                                            <dd class="qa__a">@Render(answer)</dd>
+                                        }
+                                    </dl>
+                                }
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        </Panel>
     }
 }
 
@@ -125,26 +138,6 @@ else
     {
         applications = await TeamApplicationService.GetOwnApplicationsAsync(userId);
     }
-
-    /// <summary>
-    ///     Internal markings stay invisible here: Gelesen, Vorgemerkt and WartetAufRueckfrage all read as
-    ///     "In Bearbeitung", so the applicant cannot tell them apart.
-    /// </summary>
-    private static string CoarseLabel(TeamApplication application) => application.Status switch
-    {
-        TeamApplicationStatus.Eingereicht => "Eingegangen",
-        TeamApplicationStatus.Angenommen => "Angenommen",
-        TeamApplicationStatus.Abgelehnt => "Abgelehnt",
-        TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
-        _ => "In Bearbeitung"
-    };
-
-    private static string CoarseBadge(TeamApplication application) => application.Status switch
-    {
-        TeamApplicationStatus.Angenommen => "badge-success-glass",
-        TeamApplicationStatus.Abgelehnt => "badge-danger-glass",
-        _ => "badge bg-secondary"
-    };
 
     private static string Render(TeamApplicationAnswer answer) =>
         answer.QuestionType == TeamApplicationQuestionType.MultipleChoice

@@ -1,10 +1,10 @@
-﻿@page "/403"
-<PageTitle>403 - Unauthorized</PageTitle>
-<h3>403 - Access Denied</h3>
+@page "/403"
 
-<br/>
-<p class="alert alert-danger-glass">You are not authorized to access this resource.</p>
+<PageTitle>Kein Zugriff</PageTitle>
 
-@code {
-
-}
+@* This page was the only one in English. *@
+<StateBlock Kind="StateBlock.StateKind.Error"
+            Title="Kein Zugriff"
+            Description="Deinem Konto fehlt die Rolle für diese Seite. Wenn du glaubst, dass das ein Fehler ist, melde dich beim Team."
+            ActionText="Zur Startseite"
+            ActionHref="/"/>

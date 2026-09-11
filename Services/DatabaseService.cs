@@ -202,10 +202,6 @@ public static class DatabaseService
                 "CREATE TABLE IF NOT EXISTS banlogs (userid BIGINT, executorid BIGINT, reason TEXT, timestamp BIGINT)"
             },
             {
-                "dashboardlogins",
-                "CREATE TABLE IF NOT EXISTS dashboardlogins (userid TEXT, useragent TEXT, ip TEXT, timestamp BIGINT)"
-            },
-            {
                 "userrankcardunallowedimagelog",
                 "CREATE TABLE IF NOT EXISTS userrankcardunallowedimagelog (userid BIGINT, imagedata TEXT, timestamp BIGINT,  blockreason TEXT)"
             },
@@ -311,7 +307,7 @@ public static class DatabaseService
             },
             {
                 "teamapplication_application",
-                "CREATE TABLE IF NOT EXISTS teamapplication_application (application_id TEXT PRIMARY KEY, user_id BIGINT, position_id TEXT, phase_id TEXT, questionset_version INTEGER DEFAULT 0, attempt INTEGER DEFAULT 1, status TEXT DEFAULT 'eingereicht', submitted_at BIGINT DEFAULT 0, decided_at BIGINT DEFAULT 0, decided_by BIGINT DEFAULT 0, decision_text TEXT DEFAULT '', dm_delivered BOOLEAN, dm_error TEXT DEFAULT '', withdrawn_at BIGINT DEFAULT 0, seen_by BIGINT[] DEFAULT '{}', level_snapshot INTEGER DEFAULT 0, xp_snapshot INTEGER DEFAULT 0, joined_at_snapshot BIGINT DEFAULT 0, account_created_snapshot BIGINT DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS teamapplication_application (application_id TEXT PRIMARY KEY, user_id BIGINT, position_id TEXT, phase_id TEXT, questionset_version INTEGER DEFAULT 0, attempt INTEGER DEFAULT 1, status TEXT DEFAULT 'eingereicht', submitted_at BIGINT DEFAULT 0, decided_at BIGINT DEFAULT 0, decided_by BIGINT DEFAULT 0, decision_text TEXT DEFAULT '', dm_delivered BOOLEAN, dm_error TEXT DEFAULT '', withdrawn_at BIGINT DEFAULT 0, level_snapshot INTEGER DEFAULT 0, xp_snapshot INTEGER DEFAULT 0, joined_at_snapshot BIGINT DEFAULT 0, account_created_snapshot BIGINT DEFAULT 0)"
             },
             {
                 "idx_teamapplication_application_list",
@@ -332,6 +328,10 @@ public static class DatabaseService
             {
                 "idx_teamapplication_notes_application",
                 "CREATE INDEX IF NOT EXISTS idx_teamapplication_notes_application ON teamapplication_notes (application_id)"
+            },
+            {
+                "teamapplication_seen",
+                "CREATE TABLE IF NOT EXISTS teamapplication_seen (application_id TEXT NOT NULL, user_id BIGINT NOT NULL, seen_at BIGINT DEFAULT 0, PRIMARY KEY (application_id, user_id))"
             },
             {
                 "teamapplication_permissions",
@@ -962,8 +962,17 @@ public static class DatabaseService
                         "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS withdrawn_at BIGINT DEFAULT 0"
                     },
                     {
-                        "seen_by",
-                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS seen_by BIGINT[] DEFAULT '{}'"
+                        // Readers used to be an id array without times. Copy them over as "time unknown",
+                        // then drop the column; once it is gone this does nothing.
+                        "seen_by_to_seen_table",
+                        "DO $$ BEGIN " +
+                        "IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() " +
+                        "AND table_name = 'teamapplication_application' AND column_name = 'seen_by') THEN " +
+                        "INSERT INTO teamapplication_seen (application_id, user_id, seen_at) " +
+                        "SELECT a.application_id, s.user_id, 0 FROM teamapplication_application a, " +
+                        "unnest(a.seen_by) AS s(user_id) ON CONFLICT DO NOTHING; " +
+                        "ALTER TABLE teamapplication_application DROP COLUMN seen_by; " +
+                        "END IF; END $$"
                     },
                     {
                         "level_snapshot",
@@ -1119,6 +1128,36 @@ public static class DatabaseService
                         "text",
                         "ALTER TABLE teamapplication_placeholder ADD COLUMN IF NOT EXISTS text TEXT DEFAULT ''"
                     }
+                }
+            },
+            {
+                "teamapplication_seen", new Dictionary<string, string>
+                {
+                    {
+                        "seen_at",
+                        "ALTER TABLE teamapplication_seen ADD COLUMN IF NOT EXISTS seen_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                // The ticket tables predate the schema code and are not created here, hence IF EXISTS.
+                "ticketstore", new Dictionary<string, string>
+                {
+                    {
+                        "opened_at",
+                        "ALTER TABLE IF EXISTS ticketstore ADD COLUMN IF NOT EXISTS opened_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "closed_at",
+                        "ALTER TABLE IF EXISTS ticketstore ADD COLUMN IF NOT EXISTS closed_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                // Dashboard logins are not recorded any more; this removes what was.
+                "dashboardlogins", new Dictionary<string, string>
+                {
+                    { "drop", "DROP TABLE IF EXISTS dashboardlogins" }
                 }
             }
         };

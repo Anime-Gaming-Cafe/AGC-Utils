@@ -8,166 +8,155 @@
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
-<h1>Phasen: @(position?.PositionName ?? PositionId)</h1>
-<a class="btn btn-secondary-glass mb-3" href="/konfiguration/applysystem/positions">Zurück zu den Positionen</a>
+<PageHeader Title="Bewerbungsphasen"
+            Lead="@(position?.PositionName)"
+            BackHref="/konfiguration/applysystem/positions" BackText="Positionen"/>
 
 @if (!loaded)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Phasen werden geladen"
+                Description="Phasen, veröffentlichter Fragenkatalog und deine Rechte werden abgefragt."/>
 }
 else if (!mayManage)
 {
-    <div class="alert alert-danger-glass mt-3" role="alert">
-        Du hast keine Berechtigung, die Phasen dieser Position zu verwalten.
-    </div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Die Phasen dieser Position darfst du nicht verwalten. Rechte vergibt ein Administrator in der Rechte-Matrix."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
 }
 else if (position == null)
 {
-    <div class="alert alert-danger-glass mt-3" role="alert">Diese Position existiert nicht.</div>
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Position nicht gefunden"
+                Description="Diese Position existiert nicht, oder sie wurde gelöscht."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
 }
 else
 {
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
     }
 
     @if (published == null)
     {
-        <div class="alert alert-warning-glass mt-2" role="alert">
-            Für diese Position ist noch kein Fragenkatalog veröffentlicht. Eine Phase lässt sich erst öffnen,
-            wenn es einen gibt.
+        @* The old page stated this and offered no way out, although the route existed. *@
+        <div class="notice notice--warn mb-3">
+            <p class="notice__title">Noch kein Fragenkatalog veröffentlicht</p>
+            <p>Eine Phase lässt sich erst öffnen, wenn für diese Position ein veröffentlichter Fragenkatalog existiert.</p>
+            <a class="btn btn-secondary btn-sm mt-2" href="/konfiguration/applysystem/questions/@PositionId">Fragenkatalog öffnen</a>
         </div>
     }
 
-    @if (pendingPhase != null)
+    @if (phases.Count == 0)
     {
-        <div class="alert alert-warning-glass mt-2" role="alert">
-            <h4 class="alert-heading">
-                @(pendingArchive ? "Phase endgültig schließen?" : "Phase wirklich schließen?")
-            </h4>
-            <hr>
-            @if (pendingUndecided > 0)
-            {
-                <p>
-                    In der Phase <strong>@pendingPhase.Name</strong> sind noch @pendingUndecided Bewerbungen
-                    unentschieden. Sie bleiben in jedem Fall entscheidbar, auch danach.
-                </p>
-            }
-            <p>
-                @if (pendingArchive)
-                {
-                    <text>
-                        Endgültig schließen lässt sich nicht rückgängig machen: die Phase kann danach nicht
-                        mehr geöffnet werden.
-                    </text>
-                }
-                else
-                {
-                    <text>
-                        Schließen heißt nur, dass keine neuen Bewerbungen mehr angenommen werden. Die Phase
-                        lässt sich jederzeit wieder öffnen.
-                    </text>
-                }
-            </p>
-            <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-danger-glass" @onclick="ConfirmPending">
-                    @(pendingArchive ? "Ja, endgültig schließen" : "Trotzdem schließen")
-                </button>
-                <button class="btn btn-secondary-glass" @onclick="() => pendingPhase = null">Abbrechen</button>
-            </div>
-        </div>
+        <StateBlock Title="Noch keine Phase angelegt"
+                    Description="Eine Phase ist eine Bewerbungsrunde. Lege die erste im Formular darunter an."/>
     }
 
     @foreach (var phase in phases)
     {
-        <div class="glass-card mt-3 p-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <h5 class="mb-0">@(string.IsNullOrWhiteSpace(phase.Name) ? "Unbenannte Phase" : phase.Name)</h5>
-                <span class="@StateBadge(phase.State)">@StateLabel(phase.State)</span>
-            </div>
-
-            <p class="text-muted mb-3">
-                Eingefrorene Katalogversion:
-                @(phase.QuestionSetVersion > 0 ? phase.QuestionSetVersion.ToString() : "noch keine")
-            </p>
-
-            <div class="row g-2">
-                <div class="col-12 col-md-4">
-                    <label class="form-label">Name</label>
-                    <input class="form-control glassy-input" @bind="phase.Name"
-                           disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
+        <Panel Title="@(string.IsNullOrWhiteSpace(phase.Name) ? "Unbenannte Phase" : phase.Name)"
+               Lead="@(phase.QuestionSetVersion > 0 ? $"Fragenkatalog Version {phase.QuestionSetVersion} eingefroren" : "Noch nie geöffnet")">
+            <Actions>
+                <StatusPill Text="@StateLabel(phase.State)" Tone="@StateTone(phase.State)"/>
+            </Actions>
+            <ChildContent>
+                <div class="field-grid">
+                    <div class="field">
+                        <label class="field__label" for="p-name-@phase.PhaseId">Name</label>
+                        <input id="p-name-@phase.PhaseId" class="form-control" @bind="phase.Name"
+                               disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="p-open-@phase.PhaseId">Öffnet am (optional)</label>
+                        <input id="p-open-@phase.PhaseId" type="datetime-local" class="form-control"
+                               value="@ToLocalInput(phase.OpensAt)"
+                               @onchange="e => phase.OpensAt = FromLocalInput(e.Value?.ToString())"
+                               disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="p-close-@phase.PhaseId">Schließt am (optional)</label>
+                        <input id="p-close-@phase.PhaseId" type="datetime-local" class="form-control"
+                               value="@ToLocalInput(phase.ClosesAt)"
+                               @onchange="e => phase.ClosesAt = FromLocalInput(e.Value?.ToString())"
+                               disabled="@(phase.State == TeamApplicationPhaseState.Archived)"/>
+                    </div>
                 </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label">Öffnet am (optional)</label>
-                    <input type="datetime-local" class="form-control glassy-input"
-                           value="@ToLocalInput(phase.OpensAt)"
-                           @onchange="e => phase.OpensAt = FromLocalInput(e.Value?.ToString())"
-                           disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label">Schließt am (optional)</label>
-                    <input type="datetime-local" class="form-control glassy-input"
-                           value="@ToLocalInput(phase.ClosesAt)"
-                           @onchange="e => phase.ClosesAt = FromLocalInput(e.Value?.ToString())"
-                           disabled="@(phase.State == TeamApplicationPhaseState.Archived)"/>
-                </div>
-            </div>
 
-            <div class="d-flex flex-wrap gap-2 mt-3">
                 @if (phase.State != TeamApplicationPhaseState.Archived)
                 {
-                    <button class="btn btn-primary-glass" @onclick="() => SaveSchedule(phase)">Termine speichern</button>
+                    <div class="form-foot">
+                        <button type="button" class="btn btn-secondary" @onclick="() => SaveSchedule(phase)">Termine speichern</button>
+
+                        @if (phase.State == TeamApplicationPhaseState.Draft)
+                        {
+                            <button type="button" class="btn btn-secondary" disabled="@(published == null)"
+                                    @onclick="() => OpenPhase(phase)">Jetzt öffnen</button>
+                        }
+                        @if (phase.State == TeamApplicationPhaseState.Open)
+                        {
+                            <button type="button" class="btn btn-secondary" @onclick="() => RequestClose(phase, false)">Schließen</button>
+                        }
+                        @if (phase.State == TeamApplicationPhaseState.Closed)
+                        {
+                            <button type="button" class="btn btn-secondary" @onclick="() => OpenPhase(phase)">Wieder öffnen</button>
+                            <button type="button" class="btn btn-danger ms-auto" @onclick="() => RequestClose(phase, true)">
+                                Endgültig schließen
+                            </button>
+                        }
+                    </div>
                 }
-                @if (phase.State == TeamApplicationPhaseState.Draft)
+
+                @* The confirmation sits in the phase it belongs to - it used to appear at the
+                   top of the page, far away from the button that triggered it. *@
+                @if (pendingPhase?.PhaseId == phase.PhaseId)
                 {
-                    <button class="btn btn-success-glass" disabled="@(published == null)"
-                            @onclick="() => OpenPhase(phase)">Jetzt öffnen</button>
+                    <ConfirmInline Title="@(pendingArchive ? "Phase endgültig schließen?" : "Phase schließen?")"
+                                   ConfirmText="@(pendingArchive ? "Ja, endgültig schließen" : "Schließen")"
+                                   OnConfirm="ConfirmPending"
+                                   OnCancel="() => pendingPhase = null">
+                        @if (pendingUndecided > 0)
+                        {
+                            <p>@pendingUndecided Bewerbungen sind noch unentschieden. Sie bleiben in jedem Fall entscheidbar.</p>
+                        }
+                        <p>
+                            @(pendingArchive
+                                ? "Das lässt sich nicht rückgängig machen: die Phase kann danach nicht mehr geöffnet werden."
+                                : "Es gehen keine neuen Bewerbungen mehr ein. Die Phase lässt sich jederzeit wieder öffnen.")
+                        </p>
+                    </ConfirmInline>
                 }
-                @if (phase.State == TeamApplicationPhaseState.Open)
-                {
-                    <button class="btn btn-danger-glass" @onclick="() => RequestClose(phase, false)">Schließen</button>
-                }
-                @if (phase.State == TeamApplicationPhaseState.Closed)
-                {
-                    <button class="btn btn-success-glass" @onclick="() => OpenPhase(phase)">Wieder öffnen</button>
-                    <button class="btn btn-danger-glass" @onclick="() => RequestClose(phase, true)">
-                        Endgültig schließen
-                    </button>
-                }
-            </div>
-        </div>
+            </ChildContent>
+        </Panel>
     }
 
-    <div class="glass-card mt-4 p-3">
-        <h3>Neue Phase anlegen</h3>
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-md-4">
-                <label class="form-label">Name</label>
-                <input class="form-control glassy-input" @bind="newName" placeholder="z.B. Runde Frühling"/>
+    <h2 class="section-title">Neue Phase</h2>
+    <Panel>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="new-phase-name">Name</label>
+                <input id="new-phase-name" class="form-control" @bind="newName" placeholder="Name der Runde"/>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label">Öffnet am (optional)</label>
-                <input type="datetime-local" class="form-control glassy-input"
+            <div class="field">
+                <label class="field__label" for="new-phase-open">Öffnet am (optional)</label>
+                <input id="new-phase-open" type="datetime-local" class="form-control"
                        value="@ToLocalInput(newOpensAt)"
                        @onchange="e => newOpensAt = FromLocalInput(e.Value?.ToString())"/>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label">Schließt am (optional)</label>
-                <input type="datetime-local" class="form-control glassy-input"
+            <div class="field">
+                <label class="field__label" for="new-phase-close">Schließt am (optional)</label>
+                <input id="new-phase-close" type="datetime-local" class="form-control"
                        value="@ToLocalInput(newClosesAt)"
                        @onchange="e => newClosesAt = FromLocalInput(e.Value?.ToString())"/>
             </div>
-            <div class="col-12 col-md-2">
-                <button class="btn btn-primary-glass w-100" @onclick="CreatePhase">Anlegen</button>
-            </div>
         </div>
-        <p class="text-muted mt-2 mb-0">
-            Ohne Termine wird die Phase nur von Hand geöffnet und geschlossen.
-        </p>
-    </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="CreatePhase">Phase anlegen</button>
+            <span class="meta">Ohne Termine wird die Phase nur von Hand geöffnet und geschlossen.</span>
+        </div>
+    </Panel>
 }
 
 @code {
@@ -180,6 +169,7 @@ else
     private bool loaded;
     private bool mayManage;
     private string statusMessage = "";
+    private string statusTone = "ok";
 
     private TeamApplicationPosition? position;
     private TeamApplicationQuestionSet? published;
@@ -223,8 +213,9 @@ else
         _ => state.ToString()
     };
 
-    private static string StateBadge(TeamApplicationPhaseState state) =>
-        state == TeamApplicationPhaseState.Open ? "badge-success-glass" : "badge-danger-glass";
+    /// <summary>Only an open phase is a live state worth signalling; the rest are neutral.</summary>
+    private static StatusPill.PillTone StateTone(TeamApplicationPhaseState state) =>
+        state == TeamApplicationPhaseState.Open ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral;
 
     /// <summary>The inputs work in server local time, the same frame the rest of the dashboard renders in.</summary>
     private static string ToLocalInput(long unix)
@@ -245,12 +236,18 @@ else
         return new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds();
     }
 
+    private void Say(string message, string tone)
+    {
+        statusMessage = message;
+        statusTone = tone;
+    }
+
     private async Task<bool> EnsurePermission()
     {
         if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManagePhases,
                 PositionId)) return true;
 
-        statusMessage = "Keine Berechtigung.";
+        Say("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -260,7 +257,7 @@ else
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            statusMessage = "Bitte einen Namen angeben.";
+            Say("Bitte einen Namen angeben.", "bad");
             return;
         }
 
@@ -269,7 +266,7 @@ else
         newOpensAt = 0;
         newClosesAt = 0;
         await LoadAll();
-        statusMessage = "Phase angelegt.";
+        Say("Phase angelegt.", "ok");
     }
 
     private async Task SaveSchedule(TeamApplicationPhase phase)
@@ -279,7 +276,7 @@ else
         await TeamApplicationService.UpdatePhaseScheduleAsync(phase.PhaseId, phase.Name, phase.OpensAt,
             phase.ClosesAt);
         ApplyPanelCommands.QueueRefreshPanel();
-        statusMessage = "Termine gespeichert.";
+        Say("Termine gespeichert.", "ok");
     }
 
     private async Task OpenPhase(TeamApplicationPhase phase)
@@ -293,17 +290,18 @@ else
         var result = await TeamApplicationService.OpenPhaseAsync(phase.PhaseId);
         if (result != TeamApplicationPhaseOpenResult.Opened)
         {
-            statusMessage = OpenResultMessage(result);
+            Say(OpenResultMessage(result), "bad");
             return;
         }
 
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
 
-        statusMessage = reopened ? "Phase wieder geöffnet." : "Phase geöffnet.";
+        var message = reopened ? "Phase wieder geöffnet." : "Phase geöffnet.";
         if (reopened && hadExpiredEnd)
-            statusMessage += " Der abgelaufene Endtermin wurde entfernt, sonst hätte der Hintergrund-Task " +
-                             "die Phase sofort wieder geschlossen.";
+            message += " Der abgelaufene Endtermin wurde entfernt, sonst hätte der Hintergrund-Task " +
+                       "die Phase sofort wieder geschlossen.";
+        Say(message, "ok");
     }
 
     private static string OpenResultMessage(TeamApplicationPhaseOpenResult result) => result switch
@@ -358,8 +356,7 @@ else
         await TeamApplicationService.ClosePhaseAsync(phase.PhaseId);
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
-        statusMessage = "Phase geschlossen. Vorhandene Bewerbungen bleiben entscheidbar, " +
-                        "die Phase lässt sich wieder öffnen.";
+        Say("Phase geschlossen. Vorhandene Bewerbungen bleiben entscheidbar, die Phase lässt sich wieder öffnen.", "ok");
     }
 
     private async Task ArchivePhase(TeamApplicationPhase phase)
@@ -369,6 +366,6 @@ else
         await TeamApplicationService.ArchivePhaseAsync(phase.PhaseId);
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
-        statusMessage = "Phase endgültig geschlossen. Vorhandene Bewerbungen bleiben entscheidbar.";
+        Say("Phase endgültig geschlossen. Vorhandene Bewerbungen bleiben entscheidbar.", "ok");
     }
 }

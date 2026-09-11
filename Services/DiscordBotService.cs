@@ -63,10 +63,6 @@ public class DiscordBotService : IHostedService
                 MinimumLogLevel = Microsoft.Extensions.Logging.LogLevel.Debug,
                 LogTimestampFormat = "MMM dd yyyy - HH:mm:ss tt"
             },
-            Telemetry = new()
-            {
-                DeveloperUserId = GlobalProperties.BotOwnerId
-            },
             Api = new()
             {
                 Locale = "de"
@@ -176,7 +172,6 @@ public class DiscordBotService : IHostedService
             }
             catch
             {
-                Sentry.SentrySdk.CaptureMessage("Discord API Token could not be loaded.");
                 CurrentApplication.Logger.Fatal("Der Discord API Token konnte nicht geladen werden.");
                 throw new ApplicationException();
             }
