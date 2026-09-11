@@ -1,6 +1,6 @@
 # Privacy Notice
 
-Last updated: 2026-09-08
+Last updated: 2026-09-11
 
 This notice describes what personal data the AGC Utils bot ("the bot") collects, why, who it is
 shared with, and how long it is kept. It reflects the behaviour of the code in this repository. If
@@ -80,13 +80,25 @@ request your email address, so no email address is collected.
 | Session | Your user ID, username, display name, discriminator, avatar hash, and your role on the server, held in your login session. |
 | OAuth tokens | Your Discord access and refresh tokens are stored inside the encrypted authentication cookie in your browser. |
 | Cookies | An authentication cookie and a session cookie with a 30 minute idle timeout. Both are HttpOnly and SameSite=Lax, and both are strictly necessary for the dashboard to work. There are no analytics or advertising cookies. |
-| Staff applications | If you submit an application: an application ID, your user ID, the position, a timestamp, and your full free-text application. The application text is base64 encoded in the database, which is an encoding and not encryption. The user IDs of the staff who opened your application are also recorded. |
 
 
 The dashboard loads its fonts, icons, stylesheets and scripts from its own server. The only images
 fetched from elsewhere are Discord avatars, which your browser loads from Discord's image servers.
 
-### 3.6 Other features
+### 3.6 Staff applications
+
+| Data | Detail |
+|---|---|
+| Application | An application ID, your user ID, the position and phase you applied for, a timestamp, and your attempt number for that phase. |
+| Answers | Your answer to every question in that position's question catalog at the time you applied, together with a snapshot of the question's text and type so it still reads correctly even if the catalog changes later. Depending on how a question is set up, an answer can be free text, a number, a date, or one or more chosen options. A question that is only shown once an earlier one is answered a certain way is recorded only if it was actually shown to you. |
+| Activity snapshot | Your level, XP, server join date, and account creation date at the moment you applied. |
+| Decision | If your application is decided: the outcome, the staff member who decided it, a timestamp, and the message sent to you, which can quote or paraphrase your application. |
+| Internal notes | Free-text notes staff write about your application while reviewing it. These are never shown to you. |
+| Readers | The user IDs and timestamps of staff who opened your application. |
+| Re-application grants | If staff explicitly allow you to apply again in a phase you would otherwise be blocked from: your user ID, the staff member who granted it, a timestamp, an optional reason, and whether it has been used. |
+| Legacy applications | Applications submitted before this structured question system existed are still stored and viewable the old way: an application ID, your user ID, the position, a timestamp, and your full free-text application, base64 encoded in the database, which is an encoding and not encryption. |
+
+### 3.7 Other features
 
 | Feature | Data |
 |---|---|
@@ -94,7 +106,7 @@ fetched from elsewhere are Discord avatars, which your browser loads from Discor
 | Temporary voice channels | The channel owner's user ID, your saved channel name, bitrate and user limit, your block list and permit list, and your lock and hide preferences. |
 | Introduction cooldown | Your user ID and the time of your last post in the introduction channel. |
 
-### 3.7 What is posted to Discord channels
+### 3.8 What is posted to Discord channels
 
 Some processing results in your data being posted into staff-visible channels rather than stored in
 the database:
