@@ -11,7 +11,7 @@ namespace AGC_Management.Eventlistener;
 public sealed class VorstellungscooldownListener : ApplicationCommandsModule
 {
     private const ulong VorstellungsChannelId = 784909775615295508;
-    private const long CooldownSeconds = 864000; // 10 Tage
+    internal const long CooldownSeconds = 864000; // 10 Tage
 
     [Event]
     private Task MessageCreated(DiscordClient client, MessageCreateEventArgs args)

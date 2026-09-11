@@ -1,0 +1,88 @@
+@page "/verwarnungen"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.Moderation
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<PageHeader Title="Meine Verwarnungen"
+            Lead="Aktive Verwarnungen, die du vom Serverteam erhalten hast."/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Verwarnungen werden geladen"
+                Description="Deine aktiven Verwarnungen werden abgefragt."/>
+}
+else if (failed)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Verwarnungen konnten nicht geladen werden"
+                Description="Die Abfrage ist fehlgeschlagen. Versuch es in einem Moment erneut."
+                ActionText="Erneut versuchen"
+                OnAction="Load"/>
+}
+else if (warns.Count == 0)
+{
+    <StateBlock Title="Du hast aktuell keine aktiven Verwarnungen"
+                Description="Zeitlich befristete Verwarnungen werden nach 7 Tagen automatisch entfernt. Nur permanente Verwarnungen bleiben dauerhaft bestehen."/>
+}
+else
+{
+    <Panel Flush="true">
+        <ul class="rows">
+            @foreach (var warn in warns)
+            {
+                <li>
+                    <div class="rows__main">
+                        <p class="rows__title">@warn.Description</p>
+                        <p class="rows__text">
+                            <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(warn.Timestamp)</time>
+                            · <span class="mono">@warn.CaseId</span>
+                        </p>
+                    </div>
+                    @if (warn.IsPermanent)
+                    {
+                        <div class="rows__side">
+                            <StatusPill Text="Dauerhaft" Tone="StatusPill.PillTone.Bad"/>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    </Panel>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool loaded;
+    private bool failed;
+    private ulong userId;
+    private List<UserWarn> warns = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(principal) ?? 0;
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        failed = false;
+        try
+        {
+            warns = await UserWarnService.GetWarnsAsync(userId);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Verwarnungen für die Seite Meine Verwarnungen konnten nicht geladen werden");
+            failed = true;
+        }
+
+        loaded = true;
+    }
+}

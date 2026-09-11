@@ -1,6 +1,7 @@
 @page "/"
 @using AGC_Management.Controller
 @using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Entities.Moderation
 @using AGC_Management.Entities.Ticket
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
@@ -41,17 +42,13 @@ else
     {
         <Panel Title="Für dich" Flush="true">
             <Actions>
-                @if (hasTickets)
-                {
-                    <a class="btn btn-ghost btn-sm" href="/tickets">Meine Tickets</a>
-                }
                 @if (ownApplications.Count > 0)
                 {
                     <a class="btn btn-ghost btn-sm" href="/apply/status">Meine Bewerbungen</a>
                 }
             </Actions>
             <ChildContent>
-                @if (visibleOpenApplications is not > 0 && openTickets.Count == 0 && shownApplications.Count == 0)
+                @if (visibleOpenApplications is not > 0 && openTickets.Count == 0 && shownApplications.Count == 0 && warns.Count == 0 && cooldownEndsAt is null)
                 {
                     <div class="panel__body">
                         <p class="meta">Alles erledigt. Gerade wartet nichts auf dich.</p>
@@ -72,6 +69,33 @@ else
                                 </div>
                                 <div class="rows__side">
                                     <a class="btn btn-secondary btn-sm" href="/teamarea/applysystem/applications">Ansehen</a>
+                                </div>
+                            </li>
+                        }
+
+                        @if (warns.Count > 0)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title rows__title--bad">
+                                        <span class="tnum">@warns.Count</span>
+                                        @(warns.Count == 1 ? "aktive Verwarnung" : "aktive Verwarnungen")
+                                    </p>
+                                </div>
+                                <div class="rows__side">
+                                    <a class="btn btn-secondary btn-sm" href="/verwarnungen">Ansehen</a>
+                                </div>
+                            </li>
+                        }
+
+                        @if (cooldownEndsAt is { } cooldown)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">Vorstellungscooldown noch @FormatRemaining(cooldown - DateTimeOffset.UtcNow)</p>
+                                    <p class="rows__text">
+                                        Du kannst wieder ab <time>@ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(cooldown.ToUnixTimeSeconds())</time> eine Vorstellung posten.
+                                    </p>
                                 </div>
                             </li>
                         }
@@ -135,6 +159,10 @@ else
                     <li><a href="/apply">Jetzt bewerben</a></li>
                 }
                 <li><a href="/tickets">Meine Tickets</a></li>
+                @if (warns.Count > 0)
+                {
+                    <li><a href="/verwarnungen">Meine Verwarnungen</a></li>
+                }
                 <li><a href="/leaderboard">Leaderboard</a></li>
                 <li><a href="/benutzereinstellungen">Einstellungen</a></li>
             </ul>
@@ -162,10 +190,26 @@ else
 
     private bool forYouVisible;
     private bool canApplySomewhere;
-    private bool hasTickets;
     private List<TeamApplication> ownApplications = [];
     private List<TeamApplication> shownApplications = [];
     private List<UserTicket> openTickets = [];
+    private List<UserWarn> warns = [];
+    private DateTimeOffset? cooldownEndsAt;
+
+    /// <summary>Mirrors the wording of the cooldown DM, so the two match up.</summary>
+    private static string FormatRemaining(TimeSpan span)
+    {
+        var parts = new List<string>();
+        if (span.Days > 0) parts.Add($"{span.Days} Tag{(span.Days != 1 ? "e" : "")}");
+        if (span.Hours > 0) parts.Add($"{span.Hours} Stunde{(span.Hours != 1 ? "n" : "")}");
+        if (parts.Count == 0)
+        {
+            var minutes = Math.Max(span.Minutes, 1);
+            parts.Add($"{minutes} Minute{(minutes != 1 ? "n" : "")}");
+        }
+
+        return string.Join(", ", parts);
+    }
 
     /// <summary>Open ones stay, a decision stays for 14 days, a withdrawal leaves at once.</summary>
     private static bool ShowOnStart(TeamApplication application) =>
@@ -195,12 +239,31 @@ else
                     try
                     {
                         var tickets = await UserTicketService.GetTicketsAsync(userId.Value);
-                        hasTickets = tickets.Count > 0;
                         openTickets = tickets.Where(t => t.IsOpen).ToList();
                     }
                     catch (Exception e)
                     {
                         CurrentApplication.Logger.Error(e, "Tickets für die Startseite konnten nicht geladen werden");
+                    }
+
+                    // A failing warn query must not take the rest of the start page with it.
+                    try
+                    {
+                        warns = await UserWarnService.GetWarnsAsync(userId.Value);
+                    }
+                    catch (Exception e)
+                    {
+                        CurrentApplication.Logger.Error(e, "Verwarnungen für die Startseite konnten nicht geladen werden");
+                    }
+
+                    // A failing cooldown query must not take the rest of the start page with it.
+                    try
+                    {
+                        cooldownEndsAt = await UserVorstellungscooldownService.GetCooldownEndsAtAsync(userId.Value);
+                    }
+                    catch (Exception e)
+                    {
+                        CurrentApplication.Logger.Error(e, "Vorstellungscooldown für die Startseite konnte nicht geladen werden");
                     }
 
                     foreach (var position in await TeamApplicationService.GetPositionsAsync(true))
