@@ -60,6 +60,19 @@ public static class BoosterColorService
             .ToList();
     }
 
+    /// <summary>Whether a role is one of the two boundaries or sits between them, so the panel shows it.</summary>
+    public static bool IsColorRoleOrBoundary(DiscordGuild guild, DiscordRole role)
+    {
+        if (role.Name is BeginRoleName or EndRoleName) return true;
+
+        var boundaries = GetBoundaries(guild);
+        if (boundaries == null) return false;
+
+        var low = Math.Min(boundaries.Value.begin.Position, boundaries.Value.end.Position);
+        var high = Math.Max(boundaries.Value.begin.Position, boundaries.Value.end.Position);
+        return role.Position > low && role.Position < high;
+    }
+
     #endregion
 
     #region Eligibility
@@ -239,9 +252,43 @@ public static class BoosterColorService
         return serverId == ProductionGuildId ? ProductionEmojiGuildId : serverId;
     }
 
-    public static string GetEmojiName(ulong roleId)
+    private const string EmojiPrefix = "bc_";
+
+    /// <summary>
+    ///     The name carries the role id and a fingerprint of the colors the circle was drawn with. A color
+    ///     changed anywhere, in the dashboard or in Discord, shows up as a name mismatch and gets redrawn.
+    /// </summary>
+    public static string GetEmojiName(DiscordRole role)
     {
-        return $"bc_{roleId}";
+        return $"{EmojiPrefix}{role.Id}_{ColorFingerprint(role)}";
+    }
+
+    private static string ColorFingerprint(DiscordRole role)
+    {
+        var secondary = role.Colors?.SecondaryColor;
+        var key = secondary.HasValue
+            ? $"{role.Color.Value:x6}{secondary.Value.Value:x6}"
+            : $"{role.Color.Value:x6}";
+
+        // FNV-1a cut to 24 bits: role id plus six hex digits stays inside Discord's 32 character limit.
+        var hash = 2166136261u;
+        unchecked
+        {
+            foreach (var c in key)
+            {
+                hash ^= c;
+                hash *= 16777619u;
+            }
+        }
+
+        return (hash & 0xFFFFFF).ToString("x6");
+    }
+
+    private static ulong? RoleIdOf(string emojiName)
+    {
+        if (!emojiName.StartsWith(EmojiPrefix)) return null;
+        var idPart = emojiName[EmojiPrefix.Length..].Split('_')[0];
+        return ulong.TryParse(idPart, out var id) ? id : null;
     }
 
     private static async Task<DiscordGuild?> GetEmojiGuildAsync()
@@ -258,23 +305,75 @@ public static class BoosterColorService
     }
 
     /// <summary>
-    ///     Generates / refreshes the colored circle emoji for a color role on the emoji guild.
-    ///     Returns the created emoji, or null on failure (caller falls back to a unicode circle).
+    ///     Brings the emoji guild in line with the color roles: a circle whose name no longer matches the role's
+    ///     current colors is drawn again, and circles of roles that are gone are removed. Returns role id to
+    ///     emoji id for every role that has a circle.
     /// </summary>
-    public static async Task<DiscordGuildEmoji?> SyncEmojiAsync(DiscordRole role)
+    public static async Task<Dictionary<ulong, ulong>> EnsureEmojisAsync(IReadOnlyCollection<DiscordRole> colorRoles)
     {
+        var result = new Dictionary<ulong, ulong>();
         var emojiGuild = await GetEmojiGuildAsync();
-        if (emojiGuild == null) return null;
+        if (emojiGuild is null) return result;
 
-        var name = GetEmojiName(role.Id);
+        List<DiscordGuildEmoji> ours;
         try
         {
-            var existing = (await emojiGuild.GetEmojisAsync()).FirstOrDefault(e => e.Name == name);
-            if (existing != null)
-                await emojiGuild.DeleteEmojiAsync(existing, "Booster color emoji refresh");
+            ours = (await emojiGuild.GetEmojisAsync()).Where(e => e.Name.StartsWith(EmojiPrefix)).ToList();
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to fetch emoji lookup");
+            return result;
+        }
 
+        foreach (var role in colorRoles)
+        {
+            var current = ours.FirstOrDefault(e => e.Name == GetEmojiName(role));
+            if (current is not null)
+            {
+                result[role.Id] = current.Id;
+                continue;
+            }
+
+            foreach (var stale in ours.Where(e => RoleIdOf(e.Name) == role.Id))
+                await TryDeleteEmojiAsync(emojiGuild, stale, "Booster color changed");
+
+            var created = await TryCreateEmojiAsync(emojiGuild, role);
+            if (created is not null) result[role.Id] = created.Id;
+        }
+
+        // An empty role list is more likely a cache that is not loaded yet than a server without colors.
+        if (colorRoles.Count == 0) return result;
+
+        var roleIds = colorRoles.Select(r => r.Id).ToHashSet();
+        foreach (var orphan in ours.Where(e => RoleIdOf(e.Name) is { } id && !roleIds.Contains(id)))
+            await TryDeleteEmojiAsync(emojiGuild, orphan, "Booster color role no longer exists");
+
+        return result;
+    }
+
+    public static async Task DeleteEmojiAsync(ulong roleId)
+    {
+        var emojiGuild = await GetEmojiGuildAsync();
+        if (emojiGuild is null) return;
+
+        try
+        {
+            foreach (var emoji in (await emojiGuild.GetEmojisAsync()).Where(e => RoleIdOf(e.Name) == roleId))
+                await TryDeleteEmojiAsync(emojiGuild, emoji, "Booster color role deleted");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete emoji for role {RoleId}", roleId);
+        }
+    }
+
+    private static async Task<DiscordGuildEmoji?> TryCreateEmojiAsync(DiscordGuild emojiGuild, DiscordRole role)
+    {
+        try
+        {
             await using var stream = GenerateCircle(role.Color, role.Colors?.SecondaryColor);
-            return await emojiGuild.CreateEmojiAsync(name, stream, reason: "Booster color emoji");
+            return await emojiGuild.CreateEmojiAsync(GetEmojiName(role), stream, reason: "Booster color emoji");
         }
         catch (Exception e)
         {
@@ -283,57 +382,27 @@ public static class BoosterColorService
         }
     }
 
-    public static async Task DeleteEmojiAsync(ulong roleId)
+    private static async Task TryDeleteEmojiAsync(DiscordGuild emojiGuild, DiscordGuildEmoji emoji, string reason)
     {
-        var emojiGuild = await GetEmojiGuildAsync();
-        if (emojiGuild == null) return;
-
-        var name = GetEmojiName(roleId);
         try
         {
-            var existing = (await emojiGuild.GetEmojisAsync()).FirstOrDefault(e => e.Name == name);
-            if (existing != null)
-                await emojiGuild.DeleteEmojiAsync(existing, "Booster color role deleted");
+            await emojiGuild.DeleteEmojiAsync(emoji, reason);
         }
         catch (Exception e)
         {
-            CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete emoji for role {RoleId}", roleId);
+            CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete emoji {EmojiName}", emoji.Name);
         }
     }
 
     /// <summary>
-    ///     Builds a name -> emoji id lookup of all color role emojis on the emoji guild (single fetch).
+    ///     The custom circle emoji if the emoji guild has one, otherwise the nearest unicode circle.
     /// </summary>
-    public static async Task<Dictionary<string, ulong>> GetEmojiLookupAsync()
+    public static DiscordComponentEmoji GetComponentEmoji(DiscordRole role,
+        IReadOnlyDictionary<ulong, ulong> emojiLookup)
     {
-        var result = new Dictionary<string, ulong>();
-        var emojiGuild = await GetEmojiGuildAsync();
-        if (emojiGuild == null) return result;
-
-        try
-        {
-            foreach (var emoji in await emojiGuild.GetEmojisAsync())
-                if (emoji.Name.StartsWith("bc_"))
-                    result[emoji.Name] = emoji.Id;
-        }
-        catch (Exception e)
-        {
-            CurrentApplication.Logger.Error(e, "BoosterColors: failed to fetch emoji lookup");
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    ///     Returns a component emoji for the dropdown: the custom circle emoji if present, otherwise
-    ///     the nearest matching unicode circle for the role color.
-    /// </summary>
-    public static DiscordComponentEmoji GetComponentEmoji(DiscordRole role, Dictionary<string, ulong> emojiLookup)
-    {
-        if (emojiLookup != null && emojiLookup.TryGetValue(GetEmojiName(role.Id), out var emojiId))
-            return new DiscordComponentEmoji(emojiId);
-
-        return new DiscordComponentEmoji(NearestUnicodeCircle(role.Color));
+        return emojiLookup.TryGetValue(role.Id, out var emojiId)
+            ? new DiscordComponentEmoji(emojiId)
+            : new DiscordComponentEmoji(NearestUnicodeCircle(role.Color));
     }
 
     private static MemoryStream GenerateCircle(DiscordColor primary, DiscordColor? secondary = null)
@@ -401,7 +470,10 @@ public static class BoosterColorService
             var dr = color.R - candidate.r;
             var dg = color.G - candidate.g;
             var db = color.B - candidate.b;
-            var distance = dr * dr + dg * dg + db * db;
+
+            // "Redmean" weighting: plain RGB distance treats all three channels alike, the eye does not.
+            var redMean = (color.R + candidate.r) / 2.0;
+            var distance = (2 + redMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - redMean) / 256) * db * db;
             if (distance < bestDistance)
             {
                 bestDistance = distance;

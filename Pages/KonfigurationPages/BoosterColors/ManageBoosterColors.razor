@@ -346,7 +346,6 @@ else
             positionWarning = " Boundary-Rollen fehlen, die Rolle wurde nicht einsortiert.";
         }
 
-        await BoosterColorService.SyncEmojiAsync(role);
         BoosterColorPanelCommands.QueueRefreshPanel();
 
         newRoleName = "";
@@ -424,7 +423,6 @@ else
 
             await role.ModifyAsync(name: vm.Name, reason: "Booster color role edited via WebUI");
             await ApplyColorsAsync(role, vm.Hex, vm.Gradient, vm.SecondaryHex);
-            await BoosterColorService.SyncEmojiAsync(guild.GetRole(vm.Id));
             BoosterColorPanelCommands.QueueRefreshPanel();
             Say($"Farbrolle „{vm.Name}“ wurde gespeichert.", "ok");
             LoadColorRoles(guild);
