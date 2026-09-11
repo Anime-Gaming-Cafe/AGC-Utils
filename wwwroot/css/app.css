@@ -386,6 +386,41 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     border-color: var(--accent);
 }
 
+/* Bootstrap paints the range track with --bs-secondary-bg, which is the panel colour here, and hard-codes
+   a blue thumb. The track takes the strong border colour; the thumb is a set value, so like a checked box
+   it takes the accent. Each engine's pseudo-elements need their own rule, a shared list would be dropped. */
+.form-range::-webkit-slider-runnable-track {
+    background-color: var(--border-strong);
+    border-radius: var(--r-control);
+}
+
+.form-range::-moz-range-track {
+    background-color: var(--border-strong);
+    border-radius: var(--r-control);
+}
+
+.form-range::-webkit-slider-thumb {
+    background-color: var(--accent);
+    border-radius: var(--r-control);
+}
+
+.form-range::-moz-range-thumb {
+    background-color: var(--accent);
+    border-radius: var(--r-control);
+}
+
+.form-range::-webkit-slider-thumb:active { background-color: var(--accent-hover); }
+.form-range::-moz-range-thumb:active { background-color: var(--accent-hover); }
+
+.form-range:focus::-webkit-slider-thumb { box-shadow: none; }
+.form-range:focus::-moz-range-thumb { box-shadow: none; }
+
+/* Bootstrap's .form-range:focus { outline: 0 } outranks the global ring. */
+.form-range:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
+}
+
 .field { margin-bottom: var(--s-4); }
 .field:last-child { margin-bottom: 0; }
 
