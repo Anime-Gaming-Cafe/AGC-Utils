@@ -291,7 +291,7 @@ public static class DatabaseService
             },
             {
                 "teamapplication_questions",
-                "CREATE TABLE IF NOT EXISTS teamapplication_questions (question_id TEXT PRIMARY KEY, position_id TEXT, version INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, type TEXT DEFAULT 'shorttext', text TEXT DEFAULT '', description TEXT DEFAULT '', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0, min_value BIGINT DEFAULT 0, max_value BIGINT DEFAULT 0, options JSONB DEFAULT '[]'::jsonb, min_selections INTEGER DEFAULT 0, max_selections INTEGER DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS teamapplication_questions (question_id TEXT PRIMARY KEY, position_id TEXT, version INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, type TEXT DEFAULT 'shorttext', text TEXT DEFAULT '', description TEXT DEFAULT '', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0, min_value BIGINT DEFAULT 0, max_value BIGINT DEFAULT 0, options JSONB DEFAULT '[]'::jsonb, min_selections INTEGER DEFAULT 0, max_selections INTEGER DEFAULT 0, condition_question_id TEXT DEFAULT '', condition_value TEXT DEFAULT '')"
             },
             {
                 "idx_teamapplication_questions_set",
@@ -837,6 +837,14 @@ public static class DatabaseService
                     {
                         "max_selections",
                         "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS max_selections INTEGER DEFAULT 0"
+                    },
+                    {
+                        "condition_question_id",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS condition_question_id TEXT DEFAULT ''"
+                    },
+                    {
+                        "condition_value",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS condition_value TEXT DEFAULT ''"
                     }
                 }
             },

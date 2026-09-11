@@ -86,6 +86,10 @@ else
 
             <Panel Title="@($"Frage {index + 1}")">
                 <Actions>
+                    @if (!string.IsNullOrEmpty(question.ConditionQuestionId))
+                    {
+                        <StatusPill Text="Bedingt" Tone="StatusPill.PillTone.Neutral"/>
+                    }
                     <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == 0)"
                             @onclick="() => MoveQuestion(currentIndex, -1)">Nach oben</button>
                     <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == questions.Count - 1)"
@@ -147,6 +151,42 @@ else
                                 <label class="field__label" for="q-smax-@question.QuestionId">Höchstens auswählen</label>
                                 <input id="q-smax-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxSelections" @bind:after="OnFieldChanged"/>
                             </div>
+                        }
+
+                        @{ var triggers = EligibleTriggers(currentIndex).ToList(); }
+                        @if (triggers.Count > 0)
+                        {
+                            <div class="field">
+                                <label class="field__label" for="q-condq-@question.QuestionId">Abhängig von</label>
+                                <select id="q-condq-@question.QuestionId" class="form-select"
+                                        @bind="question.ConditionQuestionId" @bind:after="() => OnConditionQuestionChanged(question)">
+                                    <option value="">Immer sichtbar</option>
+                                    @foreach (var trigger in triggers)
+                                    {
+                                        <option value="@trigger.QuestionId">@trigger.Text</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(question.ConditionQuestionId))
+                            {
+                                var triggerQuestion = triggers.FirstOrDefault(t => t.QuestionId == question.ConditionQuestionId);
+                                <div class="field">
+                                    <label class="field__label" for="q-condv-@question.QuestionId">Wert</label>
+                                    <select id="q-condv-@question.QuestionId" class="form-select"
+                                            @bind="question.ConditionValue" @bind:after="OnFieldChanged">
+                                        <option value="">Wert wählen</option>
+                                        @if (triggerQuestion != null)
+                                        {
+                                            @foreach (var option in triggerQuestion.Options)
+                                            {
+                                                <option value="@option">@option</option>
+                                            }
+                                        }
+                                    </select>
+                                    <span class="field__hint">Nur sichtbar, wenn „@triggerQuestion?.Text“ mit diesem Wert beantwortet wurde.</span>
+                                </div>
+                            }
                         }
                     </div>
 
@@ -276,8 +316,22 @@ else
         TeamApplicationQuestionType.SingleChoice => "Einfachauswahl",
         TeamApplicationQuestionType.MultipleChoice => "Mehrfachauswahl",
         TeamApplicationQuestionType.Number => "Zahl",
+        TeamApplicationQuestionType.Date => "Datum",
+        TeamApplicationQuestionType.Dropdown => "Dropdown-Auswahl",
         _ => type.ToString()
     };
+
+    // Only earlier choice-type questions are valid triggers - a pure UI restriction (evaluation
+    // itself is order-independent, it looks the trigger up by id).
+    private IEnumerable<TeamApplicationQuestion> EligibleTriggers(int currentIndex) =>
+        questions.Take(currentIndex).Where(q => q.IsChoice);
+
+    private void OnConditionQuestionChanged(TeamApplicationQuestion question)
+    {
+        // The old value almost certainly doesn't match the new trigger's options.
+        question.ConditionValue = "";
+        OnFieldChanged();
+    }
 
     private static TeamApplicationQuestion CloneQuestion(TeamApplicationQuestion source) => new()
     {
@@ -295,7 +349,9 @@ else
         MaxValue = source.MaxValue,
         Options = new List<string>(source.Options),
         MinSelections = source.MinSelections,
-        MaxSelections = source.MaxSelections
+        MaxSelections = source.MaxSelections,
+        ConditionQuestionId = source.ConditionQuestionId,
+        ConditionValue = source.ConditionValue
     };
 
     // Copies every editable field except identity/sort - used by Discard to revert in place
@@ -313,6 +369,8 @@ else
         target.Options = new List<string>(source.Options);
         target.MinSelections = source.MinSelections;
         target.MaxSelections = source.MaxSelections;
+        target.ConditionQuestionId = source.ConditionQuestionId;
+        target.ConditionValue = source.ConditionValue;
     }
 
     private void RebuildSnapshot() => originalQuestions = questions.ToDictionary(q => q.QuestionId, CloneQuestion);
@@ -365,6 +423,14 @@ else
         if (invalid != null)
         {
             ToastService.Notify("Jede Frage braucht einen Text, Auswahlfragen brauchen mindestens zwei Optionen.", "bad");
+            return;
+        }
+
+        var invalidCondition = questions.FirstOrDefault(q =>
+            !string.IsNullOrEmpty(q.ConditionQuestionId) && string.IsNullOrEmpty(q.ConditionValue));
+        if (invalidCondition != null)
+        {
+            ToastService.Notify("Bei einer bedingten Frage muss auch ein Wert gewählt sein.", "bad");
             return;
         }
 
@@ -428,6 +494,16 @@ else
         await TeamApplicationService.DeleteQuestionAsync(question.QuestionId);
         questions.Remove(question);
         originalQuestions.Remove(question.QuestionId);
+
+        // Don't leave dangling references to a question that no longer exists.
+        var orphaned = questions.Where(q => q.ConditionQuestionId == question.QuestionId).ToList();
+        foreach (var q in orphaned)
+        {
+            q.ConditionQuestionId = "";
+            q.ConditionValue = "";
+        }
+        if (orphaned.Count > 0) Tracker.MarkDirty();
+
         await PersistOrder();
         ToastService.Notify("Frage gelöscht.", "ok");
     }

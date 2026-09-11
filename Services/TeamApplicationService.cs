@@ -344,7 +344,8 @@ public static class TeamApplicationService
         var questions = new List<TeamApplicationQuestion>();
         await using var cmd = Db.CreateCommand(
             "SELECT question_id, position_id, version, sort_order, type, text, description, required, " +
-            "min_length, max_length, min_value, max_value, options, min_selections, max_selections " +
+            "min_length, max_length, min_value, max_value, options, min_selections, max_selections, " +
+            "condition_question_id, condition_value " +
             "FROM teamapplication_questions WHERE position_id = @id AND version = @version ORDER BY sort_order");
         cmd.Parameters.AddWithValue("id", positionId);
         cmd.Parameters.AddWithValue("version", version);
@@ -367,7 +368,9 @@ public static class TeamApplicationService
                 MaxValue = reader.IsDBNull(11) ? 0 : reader.GetInt64(11),
                 Options = ReadJsonArray(reader, 12),
                 MinSelections = reader.IsDBNull(13) ? 0 : reader.GetInt32(13),
-                MaxSelections = reader.IsDBNull(14) ? 0 : reader.GetInt32(14)
+                MaxSelections = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
+                ConditionQuestionId = reader.IsDBNull(15) ? "" : reader.GetString(15),
+                ConditionValue = reader.IsDBNull(16) ? "" : reader.GetString(16)
             });
 
         return questions;
@@ -379,14 +382,16 @@ public static class TeamApplicationService
 
         await using var cmd = Db.CreateCommand(
             "INSERT INTO teamapplication_questions (question_id, position_id, version, sort_order, type, text, " +
-            "description, required, min_length, max_length, min_value, max_value, options, min_selections, max_selections) " +
+            "description, required, min_length, max_length, min_value, max_value, options, min_selections, max_selections, " +
+            "condition_question_id, condition_value) " +
             "VALUES (@qid, @pid, @version, @sort, @type, @text, @description, @required, @minlen, @maxlen, " +
-            "@minval, @maxval, @options, @minsel, @maxsel) " +
+            "@minval, @maxval, @options, @minsel, @maxsel, @condqid, @condval) " +
             "ON CONFLICT (question_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, type = EXCLUDED.type, " +
             "text = EXCLUDED.text, description = EXCLUDED.description, required = EXCLUDED.required, " +
             "min_length = EXCLUDED.min_length, max_length = EXCLUDED.max_length, min_value = EXCLUDED.min_value, " +
             "max_value = EXCLUDED.max_value, options = EXCLUDED.options, min_selections = EXCLUDED.min_selections, " +
-            "max_selections = EXCLUDED.max_selections");
+            "max_selections = EXCLUDED.max_selections, condition_question_id = EXCLUDED.condition_question_id, " +
+            "condition_value = EXCLUDED.condition_value");
         cmd.Parameters.AddWithValue("qid", question.QuestionId);
         cmd.Parameters.AddWithValue("pid", question.PositionId);
         cmd.Parameters.AddWithValue("version", question.Version);
@@ -402,6 +407,8 @@ public static class TeamApplicationService
         cmd.Parameters.AddWithValue("options", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(question.Options));
         cmd.Parameters.AddWithValue("minsel", question.MinSelections);
         cmd.Parameters.AddWithValue("maxsel", question.MaxSelections);
+        cmd.Parameters.AddWithValue("condqid", question.ConditionQuestionId);
+        cmd.Parameters.AddWithValue("condval", question.ConditionValue);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -1173,11 +1180,19 @@ public static class TeamApplicationService
                 return null;
             }
             case TeamApplicationQuestionType.SingleChoice:
+            case TeamApplicationQuestionType.Dropdown:
             {
                 var choice = (answer ?? "").Trim();
                 if (choice.Length == 0)
                     return question.Required ? "Bitte wähle eine Option aus." : null;
                 return question.Options.Contains(choice) ? null : "Die gewählte Option ist ungültig.";
+            }
+            case TeamApplicationQuestionType.Date:
+            {
+                var trimmed = (answer ?? "").Trim();
+                if (trimmed.Length == 0)
+                    return question.Required ? "Diese Frage muss beantwortet werden." : null;
+                return DateOnly.TryParse(trimmed, out _) ? null : "Bitte gib ein gültiges Datum ein.";
             }
             case TeamApplicationQuestionType.MultipleChoice:
             {

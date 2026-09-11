@@ -7,6 +7,8 @@
 <div class="question-list">
     @foreach (var answer in Answers)
     {
+        @if (QuestionConditionalLogic.IsVisible(answer, Answers))
+        {
         <div class="field">
             <label class="field__label" for="@(answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : answer.Question.QuestionId)">
                 @answer.Question.Text
@@ -37,6 +39,22 @@
                 case TeamApplicationQuestionType.Number:
                     <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
                            @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                    break;
+
+                case TeamApplicationQuestionType.Date:
+                    <input id="@answer.Question.QuestionId" type="date" class="form-control" value="@answer.Text"
+                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                    break;
+
+                case TeamApplicationQuestionType.Dropdown:
+                    <select id="@answer.Question.QuestionId" class="form-select" value="@answer.Text"
+                            @onchange="e => SetText(answer, e.Value?.ToString())">
+                        <option value="">Bitte wählen</option>
+                        @foreach (var option in answer.Question.Options)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    </select>
                     break;
 
                 case TeamApplicationQuestionType.SingleChoice:
@@ -77,6 +95,7 @@
                 <span class="field__error" role="alert">@answer.Error</span>
             }
         </div>
+        }
     }
 </div>
 
@@ -124,5 +143,26 @@
     private static void Validate(QuestionAnswerVm answer)
     {
         answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
+    }
+
+    // Called by the parent (via @ref) right before submit. Hidden (conditionally-invisible)
+    // answers are never required - they're cleared instead of validated, since the applicant
+    // never had a chance to see or fill them in.
+    public bool ValidateAll()
+    {
+        var allValid = true;
+        foreach (var answer in Answers)
+        {
+            if (!QuestionConditionalLogic.IsVisible(answer, Answers))
+            {
+                answer.Error = null;
+                continue;
+            }
+
+            Validate(answer);
+            if (answer.Error != null) allValid = false;
+        }
+
+        return allValid;
     }
 }

@@ -79,7 +79,7 @@ else
     }
 
     <Panel Class="mt-3">
-        <QuestionAnswerForm Answers="answers"/>
+        <QuestionAnswerForm @ref="questionForm" Answers="answers"/>
 
         <div class="form-foot">
             <button type="button" class="btn btn-primary" disabled="@submitting" @onclick="Submit">
@@ -120,6 +120,7 @@ else
     private TeamApplicationOpening? opening;
     private TeamApplicationReapplyGrant? grant;
     private List<QuestionAnswerVm> answers = new();
+    private QuestionAnswerForm questionForm = default!;
 
     private long nextOpensAt;
     private string closedText = "Bewerbungen aktuell geschlossen";
@@ -186,11 +187,6 @@ else
         stage = Stage.Form;
     }
 
-    private static void Validate(QuestionAnswerVm answer)
-    {
-        answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
-    }
-
     private async Task Submit()
     {
         if (submitting) return;
@@ -228,8 +224,7 @@ else
                 return;
             }
 
-            foreach (var answer in answers) Validate(answer);
-            if (answers.Any(a => a.Error != null))
+            if (!questionForm.ValidateAll())
             {
                 ToastService.Notify("Bitte korrigiere die markierten Antworten.", "bad");
                 return;
@@ -283,7 +278,7 @@ else
             AccountCreatedSnapshot = accountCreated
         };
 
-        var payload = answers.Select(a => new TeamApplicationAnswer
+        var payload = answers.Where(a => QuestionConditionalLogic.IsVisible(a, answers)).Select(a => new TeamApplicationAnswer
         {
             QuestionId = a.Question.QuestionId,
             SortOrder = a.Question.SortOrder,

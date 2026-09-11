@@ -6,5 +6,7 @@ public enum TeamApplicationQuestionType
     LongText,
     SingleChoice,
     MultipleChoice,
-    Number
+    Number,
+    Date,
+    Dropdown
 }

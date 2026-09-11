@@ -24,8 +24,14 @@ public class TeamApplicationQuestion
     public int MinSelections { get; set; }
     public int MaxSelections { get; set; }
 
+    // Empty means unconditional. Points at another question in the same set; the field only
+    // shows once that question's answer equals ConditionValue (or contains it, for MultipleChoice).
+    public string ConditionQuestionId { get; set; } = "";
+    public string ConditionValue { get; set; } = "";
+
     public bool IsChoice => Type is TeamApplicationQuestionType.SingleChoice
-        or TeamApplicationQuestionType.MultipleChoice;
+        or TeamApplicationQuestionType.MultipleChoice
+        or TeamApplicationQuestionType.Dropdown;
 
     public bool SupportsLength => Type is TeamApplicationQuestionType.ShortText
         or TeamApplicationQuestionType.LongText;
