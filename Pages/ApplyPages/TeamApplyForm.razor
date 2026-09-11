@@ -79,81 +79,7 @@ else
     }
 
     <Panel Class="mt-3">
-        <div class="question-list">
-            @foreach (var answer in answers)
-            {
-                <div class="field">
-                    <label class="field__label" for="@(answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : answer.Question.QuestionId)">
-                        @answer.Question.Text
-                        @if (answer.Question.Required)
-                        {
-                            <span class="field__req" aria-label="Pflichtfeld">*</span>
-                        }
-                    </label>
-
-                    @if (!string.IsNullOrWhiteSpace(answer.Question.Description))
-                    {
-                        <span class="field__hint mb-2">@answer.Question.Description</span>
-                    }
-
-                    @switch (answer.Question.Type)
-                    {
-                        case TeamApplicationQuestionType.ShortText:
-                            <input id="@answer.Question.QuestionId" class="form-control" value="@answer.Text"
-                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                            break;
-
-                        case TeamApplicationQuestionType.LongText:
-                            <textarea id="@answer.Question.QuestionId" class="form-control" rows="7" value="@answer.Text"
-                                      @onchange="e => SetText(answer, e.Value?.ToString())"></textarea>
-                            <span class="field__hint tnum">@answer.Text.Trim().Length Zeichen@(LengthHint(answer.Question))</span>
-                            break;
-
-                        case TeamApplicationQuestionType.Number:
-                            <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
-                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                            break;
-
-                        case TeamApplicationQuestionType.SingleChoice:
-                            @for (var i = 0; i < answer.Question.Options.Count; i++)
-                            {
-                                var current = answer.Question.Options[i];
-                                var inputId = $"{answer.Question.QuestionId}-{i}";
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" id="@inputId"
-                                           name="@answer.Question.QuestionId" checked="@(answer.Text == current)"
-                                           @onchange="() => SetText(answer, current)"/>
-                                    <label class="form-check-label" for="@inputId">@current</label>
-                                </div>
-                            }
-                            break;
-
-                        case TeamApplicationQuestionType.MultipleChoice:
-                            @for (var i = 0; i < answer.Question.Options.Count; i++)
-                            {
-                                var current = answer.Question.Options[i];
-                                var inputId = $"{answer.Question.QuestionId}-{i}";
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="@inputId"
-                                           checked="@answer.Selected.Contains(current)"
-                                           @onchange="e => ToggleOption(answer, current, e.Value is true)"/>
-                                    <label class="form-check-label" for="@inputId">@current</label>
-                                </div>
-                            }
-                            @if (SelectionHint(answer.Question) is { } hint)
-                            {
-                                <span class="field__hint">@hint</span>
-                            }
-                            break;
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(answer.Error))
-                    {
-                        <span class="field__error" role="alert">@answer.Error</span>
-                    }
-                </div>
-            }
-        </div>
+        <QuestionAnswerForm Answers="answers"/>
 
         <div class="form-foot">
             <button type="button" class="btn btn-primary" disabled="@submitting" @onclick="Submit">
@@ -193,7 +119,7 @@ else
     private TeamApplicationPhase? phase;
     private TeamApplicationOpening? opening;
     private TeamApplicationReapplyGrant? grant;
-    private List<AnswerVm> answers = new();
+    private List<QuestionAnswerVm> answers = new();
 
     private long nextOpensAt;
     private string closedText = "Bewerbungen aktuell geschlossen";
@@ -256,49 +182,11 @@ else
             return;
         }
 
-        answers = questions.Select(q => new AnswerVm { Question = q }).ToList();
+        answers = questions.Select(q => new QuestionAnswerVm { Question = q }).ToList();
         stage = Stage.Form;
     }
 
-    private static string LengthHint(TeamApplicationQuestion question)
-    {
-        if (question.MinLength > 0 && question.MaxLength > 0)
-            return $" (erlaubt: {question.MinLength} bis {question.MaxLength})";
-        if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
-        if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
-        return "";
-    }
-
-    private static string? SelectionHint(TeamApplicationQuestion question)
-    {
-        if (question.MinSelections > 0 && question.MaxSelections > 0)
-            return $"Wähle {question.MinSelections} bis {question.MaxSelections} Optionen.";
-        if (question.MinSelections > 0) return $"Wähle mindestens {question.MinSelections} Optionen.";
-        if (question.MaxSelections > 0) return $"Wähle höchstens {question.MaxSelections} Optionen.";
-        return null;
-    }
-
-    private void SetText(AnswerVm answer, string? value)
-    {
-        answer.Text = value ?? "";
-        Validate(answer);
-    }
-
-    private void ToggleOption(AnswerVm answer, string option, bool selected)
-    {
-        if (selected)
-        {
-            if (!answer.Selected.Contains(option)) answer.Selected.Add(option);
-        }
-        else
-        {
-            answer.Selected.Remove(option);
-        }
-
-        Validate(answer);
-    }
-
-    private static void Validate(AnswerVm answer)
+    private static void Validate(QuestionAnswerVm answer)
     {
         answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
     }
@@ -415,13 +303,5 @@ else
             await TeamApplicationNotificationService.SendSubmitConfirmationAsync(application);
             await TeamApplicationNotificationService.PostNewApplicationAsync(application);
         });
-    }
-
-    private sealed class AnswerVm
-    {
-        public TeamApplicationQuestion Question { get; init; } = new();
-        public string Text { get; set; } = "";
-        public List<string> Selected { get; set; } = [];
-        public string? Error { get; set; }
     }
 }

@@ -61,7 +61,15 @@ else
 
     @if (draft != null)
     {
-        <h2 class="section-title">Entwurf, Version @draft.Version</h2>
+        <div class="section-title-row">
+            <h2 class="section-title">Entwurf, Version @draft.Version</h2>
+            @if (questions.Count > 0)
+            {
+                <a class="btn btn-ghost btn-sm" href="/konfiguration/applysystem/questions/@PositionId/preview/@draft.Version">
+                    Vorschau
+                </a>
+            }
+        </div>
 
         @if (questions.Count == 0)
         {
@@ -183,7 +191,12 @@ else
 
     @if (published != null)
     {
-        <h2 class="section-title">Veröffentlicht, Version @published.Version</h2>
+        <div class="section-title-row">
+            <h2 class="section-title">Veröffentlicht, Version @published.Version</h2>
+            <a class="btn btn-ghost btn-sm" href="/konfiguration/applysystem/questions/@PositionId/preview/@published.Version">
+                Vorschau
+            </a>
+        </div>
         <Panel Flush="true">
             <ul class="rows">
                 @foreach (var question in publishedQuestions)

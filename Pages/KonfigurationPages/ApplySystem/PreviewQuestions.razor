@@ -1,0 +1,89 @@
+@page "/konfiguration/applysystem/questions/{PositionId}/preview/{Version:int}"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<PageHeader Title="Vorschau: Fragenkatalog"
+            Lead="@(position?.PositionName)"
+            BackHref="@($"/konfiguration/applysystem/questions/{PositionId}")" BackText="Fragenkatalog"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Vorschau wird geladen"
+                Description="Fragen und deine Rechte werden abgefragt."/>
+}
+else if (!mayManage)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Keine Berechtigung"
+                Description="Den Fragenkatalog dieser Position darfst du nicht einsehen. Rechte vergibt ein Administrator in der Rechte-Matrix."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
+}
+else if (position == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Position nicht gefunden"
+                Description="Diese Position existiert nicht, oder sie wurde gelöscht."
+                ActionText="Zu den Positionen" ActionHref="/konfiguration/applysystem/positions"/>
+}
+else if (answers.Count == 0)
+{
+    <StateBlock Title="Diese Version hat keine Fragen"
+                Description="@($"Version {Version} des Fragenkatalogs enthält keine Fragen.")"
+                ActionText="Zurück zum Fragenkatalog" ActionHref="@($"/konfiguration/applysystem/questions/{PositionId}")"/>
+}
+else
+{
+    <div class="notice notice--info mb-3">
+        So sieht dieses Formular für Bewerbende aus. Eingaben hier werden nicht gespeichert, es wird keine
+        Bewerbung abgeschickt.
+    </div>
+
+    <Panel>
+        <QuestionAnswerForm Answers="answers"/>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled>Bewerbung abschicken</button>
+            <span class="meta">Nur Vorschau, dieser Button ist deaktiviert.</span>
+        </div>
+    </Panel>
+}
+
+@code {
+    [Parameter] public string PositionId { get; set; } = "";
+    [Parameter] public int Version { get; set; }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private bool mayManage;
+    private TeamApplicationPosition? position;
+    private List<QuestionAnswerVm> answers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        mayManage = await TeamApplicationPermissionService.HasAsync(userId,
+            TeamApplicationPermission.ManageQuestions, PositionId);
+
+        if (mayManage)
+        {
+            position = await TeamApplicationService.GetPositionAsync(PositionId);
+            if (position != null)
+            {
+                var questions = await TeamApplicationService.GetQuestionsAsync(PositionId, Version);
+                answers = questions.Select(q => new QuestionAnswerVm { Question = q }).ToList();
+            }
+        }
+
+        loaded = true;
+    }
+}

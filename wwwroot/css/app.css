@@ -269,6 +269,19 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     margin: var(--s-6) 0 var(--s-3);
 }
 
+/* A section-title with a trailing action (e.g. a preview link) - the row carries the spacing
+   that .section-title normally carries on its own, so the heading's own margin resets to 0. */
+.section-title-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    justify-content: space-between;
+    margin: var(--s-6) 0 var(--s-3);
+}
+
+.section-title-row > .section-title { margin: 0; }
+
 /* ==========================================================================
    6. Buttons
    ========================================================================== */
