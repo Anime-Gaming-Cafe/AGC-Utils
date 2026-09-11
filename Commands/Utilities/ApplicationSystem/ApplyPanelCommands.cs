@@ -152,8 +152,10 @@ public sealed class ApplyPanelCommands : BaseCommandModule
             msgb.AddComponents(new DiscordStringSelectComponent("Wähle die gewünschte Bewerbungsposition aus",
                 options, SelectorId));
 
-        msgb.AddComponents(new DiscordButtonComponent(ButtonStyle.Secondary, MyApplicationsId,
-            "Meine Bewerbungen"));
+        var applyNowButton = new DiscordLinkButtonComponent(ToolSet.GetDashboardUrl("apply"), "Jetzt bewerben");
+        var myApplicationsButton = new DiscordButtonComponent(ButtonStyle.Secondary, MyApplicationsId,
+            "Meine Bewerbungen");
+        msgb.AddComponents(applyNowButton, myApplicationsButton);
 
         return msgb;
     }
