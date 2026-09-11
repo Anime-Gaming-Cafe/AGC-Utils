@@ -1,127 +1,23 @@
-@using AGC_Management.Entities.ApplicationSystem
-@using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
-@* The exact field markup an applicant sees on /apply/{PositionId}. Reused by TeamApplyForm (real
-   submission) and by the admin preview, so the two can never drift apart. *@
+@* Reused by TeamApplyForm (real submission) and the admin preview, so the two can never drift
+   apart. Renders top-level questions in order; a question's follow-ups render directly under it
+   (QuestionAnswerField, indented), regardless of where their own sort_order falls in the set -
+   they belong to the question above them, not to their position in the flat list. *@
 
 <div class="question-list">
-    @foreach (var answer in Answers)
+    @foreach (var answer in TopLevelAnswers)
     {
         @if (QuestionConditionalLogic.IsVisible(answer, Answers))
         {
-        <div class="field">
-            <label class="field__label" for="@(answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : answer.Question.QuestionId)">
-                @answer.Question.Text
-                @if (answer.Question.Required)
+            <QuestionAnswerField Answer="answer" OnChanged="StateHasChanged"/>
+
+            @foreach (var followUp in FollowUpsOf(answer))
+            {
+                @if (QuestionConditionalLogic.IsVisible(followUp, Answers))
                 {
-                    <span class="field__req" aria-label="Pflichtfeld">*</span>
+                    <QuestionAnswerField Answer="followUp" Nested="true" OnChanged="StateHasChanged"/>
                 }
-            </label>
-
-            @if (!string.IsNullOrWhiteSpace(answer.Question.Description))
-            {
-                <span class="field__hint mb-2">@answer.Question.Description</span>
             }
-
-            @switch (answer.Question.Type)
-            {
-                case TeamApplicationQuestionType.ShortText:
-                    <input id="@answer.Question.QuestionId" class="form-control" value="@answer.Text"
-                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                    break;
-
-                case TeamApplicationQuestionType.LongText:
-                    <textarea id="@answer.Question.QuestionId" class="form-control" rows="7" value="@answer.Text"
-                              @onchange="e => SetText(answer, e.Value?.ToString())"></textarea>
-                    <span class="field__hint tnum">@answer.Text.Trim().Length Zeichen@(LengthHint(answer.Question))</span>
-                    break;
-
-                case TeamApplicationQuestionType.Number:
-                    @switch (answer.Question.NumberDisplay)
-                    {
-                        case NumberDisplay.Slider:
-                            <div class="range-field">
-                                <input type="range" id="@answer.Question.QuestionId" class="form-range"
-                                       min="@answer.Question.MinValue" max="@answer.Question.MaxValue" step="@answer.Question.NumberStep"
-                                       value="@RangeValue(answer)"
-                                       oninput="this.nextElementSibling.textContent=this.value"
-                                       @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                                <output class="tnum">@RangeValue(answer)</output>
-                            </div>
-                            break;
-
-                        case NumberDisplay.Dropdown:
-                            <select id="@answer.Question.QuestionId" class="form-select" value="@answer.Text"
-                                    @onchange="e => SetText(answer, e.Value?.ToString())">
-                                <option value="">Bitte wählen</option>
-                                @foreach (var value in NumberRangeValues(answer.Question))
-                                {
-                                    <option value="@value">@value</option>
-                                }
-                            </select>
-                            break;
-
-                        default:
-                            <input id="@answer.Question.QuestionId" type="number" class="form-control" value="@answer.Text"
-                                   @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                            break;
-                    }
-                    break;
-
-                case TeamApplicationQuestionType.Date:
-                    <input id="@answer.Question.QuestionId" type="date" class="form-control" value="@answer.Text"
-                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
-                    break;
-
-                case TeamApplicationQuestionType.Dropdown:
-                    <select id="@answer.Question.QuestionId" class="form-select" value="@answer.Text"
-                            @onchange="e => SetText(answer, e.Value?.ToString())">
-                        <option value="">Bitte wählen</option>
-                        @foreach (var option in answer.Question.Options)
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    </select>
-                    break;
-
-                case TeamApplicationQuestionType.SingleChoice:
-                    @for (var i = 0; i < answer.Question.Options.Count; i++)
-                    {
-                        var current = answer.Question.Options[i];
-                        var inputId = $"{answer.Question.QuestionId}-{i}";
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" id="@inputId"
-                                   name="@answer.Question.QuestionId" checked="@(answer.Text == current)"
-                                   @onchange="() => SetText(answer, current)"/>
-                            <label class="form-check-label" for="@inputId">@current</label>
-                        </div>
-                    }
-                    break;
-
-                case TeamApplicationQuestionType.MultipleChoice:
-                    @for (var i = 0; i < answer.Question.Options.Count; i++)
-                    {
-                        var current = answer.Question.Options[i];
-                        var inputId = $"{answer.Question.QuestionId}-{i}";
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="@inputId"
-                                   checked="@answer.Selected.Contains(current)"
-                                   @onchange="e => ToggleOption(answer, current, e.Value is true)"/>
-                            <label class="form-check-label" for="@inputId">@current</label>
-                        </div>
-                    }
-                    @if (SelectionHint(answer.Question) is { } hint)
-                    {
-                        <span class="field__hint">@hint</span>
-                    }
-                    break;
-            }
-
-            @if (!string.IsNullOrWhiteSpace(answer.Error))
-            {
-                <span class="field__error" role="alert">@answer.Error</span>
-            }
-        </div>
         }
     }
 </div>
@@ -129,60 +25,11 @@
 @code {
     [Parameter] [EditorRequired] public List<QuestionAnswerVm> Answers { get; set; } = new();
 
-    private static string LengthHint(TeamApplicationQuestion question)
-    {
-        if (question.MinLength > 0 && question.MaxLength > 0)
-            return $" (erlaubt: {question.MinLength} bis {question.MaxLength})";
-        if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
-        if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
-        return "";
-    }
+    private IEnumerable<QuestionAnswerVm> TopLevelAnswers =>
+        Answers.Where(a => string.IsNullOrEmpty(a.Question.ConditionQuestionId));
 
-    private static string RangeValue(QuestionAnswerVm answer) =>
-        string.IsNullOrEmpty(answer.Text) ? answer.Question.MinValue.ToString() : answer.Text;
-
-    // Capped so a misconfigured huge range (or a step of 0) can't generate thousands of options.
-    private static IEnumerable<long> NumberRangeValues(TeamApplicationQuestion question)
-    {
-        var step = question.NumberStep <= 0 ? 1 : question.NumberStep;
-        var count = 0;
-        for (var value = question.MinValue; value <= question.MaxValue && count < 500; value += step, count++)
-            yield return value;
-    }
-
-    private static string? SelectionHint(TeamApplicationQuestion question)
-    {
-        if (question.MinSelections > 0 && question.MaxSelections > 0)
-            return $"Wähle {question.MinSelections} bis {question.MaxSelections} Optionen.";
-        if (question.MinSelections > 0) return $"Wähle mindestens {question.MinSelections} Optionen.";
-        if (question.MaxSelections > 0) return $"Wähle höchstens {question.MaxSelections} Optionen.";
-        return null;
-    }
-
-    private void SetText(QuestionAnswerVm answer, string? value)
-    {
-        answer.Text = value ?? "";
-        Validate(answer);
-    }
-
-    private void ToggleOption(QuestionAnswerVm answer, string option, bool selected)
-    {
-        if (selected)
-        {
-            if (!answer.Selected.Contains(option)) answer.Selected.Add(option);
-        }
-        else
-        {
-            answer.Selected.Remove(option);
-        }
-
-        Validate(answer);
-    }
-
-    private static void Validate(QuestionAnswerVm answer)
-    {
-        answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
-    }
+    private IEnumerable<QuestionAnswerVm> FollowUpsOf(QuestionAnswerVm trigger) =>
+        Answers.Where(a => a.Question.ConditionQuestionId == trigger.Question.QuestionId);
 
     // Called by the parent (via @ref) right before submit. Hidden (conditionally-invisible)
     // answers are never required - they're cleared instead of validated, since the applicant
@@ -198,7 +45,7 @@
                 continue;
             }
 
-            Validate(answer);
+            answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
             if (answer.Error != null) allValid = false;
         }
 

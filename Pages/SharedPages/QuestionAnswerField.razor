@@ -1,0 +1,181 @@
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@* One question's answer field. QuestionAnswerForm renders one of these per visible top-level
+   question, then one more per its visible follow-ups - directly underneath, not wherever its
+   own sort_order happens to fall, since a follow-up belongs to the question above it. *@
+
+<div class="field @(Nested ? "field--followup" : null)">
+    <label class="field__label" for="@(Answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : Answer.Question.QuestionId)">
+        @Answer.Question.Text
+        @if (Answer.Question.Required)
+        {
+            <span class="field__req" aria-label="Pflichtfeld">*</span>
+        }
+    </label>
+
+    @if (!string.IsNullOrWhiteSpace(Answer.Question.Description))
+    {
+        <span class="field__hint mb-2">@Answer.Question.Description</span>
+    }
+
+    @switch (Answer.Question.Type)
+    {
+        case TeamApplicationQuestionType.ShortText:
+            <input id="@Answer.Question.QuestionId" class="form-control" value="@Answer.Text"
+                   @onchange="e => SetText(e.Value?.ToString())"/>
+            break;
+
+        case TeamApplicationQuestionType.LongText:
+            <textarea id="@Answer.Question.QuestionId" class="form-control" rows="7" value="@Answer.Text"
+                      @onchange="e => SetText(e.Value?.ToString())"></textarea>
+            <span class="field__hint tnum">@Answer.Text.Trim().Length Zeichen@(LengthHint(Answer.Question))</span>
+            break;
+
+        case TeamApplicationQuestionType.Number:
+            @switch (Answer.Question.NumberDisplay)
+            {
+                case NumberDisplay.Slider:
+                    <div class="range-field">
+                        <input type="range" id="@Answer.Question.QuestionId" class="form-range"
+                               min="@Answer.Question.MinValue" max="@Answer.Question.MaxValue" step="@Answer.Question.NumberStep"
+                               value="@RangeValue(Answer)"
+                               oninput="this.nextElementSibling.textContent=this.value"
+                               @onchange="e => SetText(e.Value?.ToString())"/>
+                        <output class="tnum">@RangeValue(Answer)</output>
+                    </div>
+                    break;
+
+                case NumberDisplay.Dropdown:
+                    <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
+                            @onchange="e => SetText(e.Value?.ToString())">
+                        <option value="">Bitte wählen</option>
+                        @foreach (var value in NumberRangeValues(Answer.Question))
+                        {
+                            <option value="@value">@value</option>
+                        }
+                    </select>
+                    break;
+
+                default:
+                    <input id="@Answer.Question.QuestionId" type="number" class="form-control" value="@Answer.Text"
+                           @onchange="e => SetText(e.Value?.ToString())"/>
+                    break;
+            }
+            break;
+
+        case TeamApplicationQuestionType.Date:
+            <input id="@Answer.Question.QuestionId" type="date" class="form-control" value="@Answer.Text"
+                   @onchange="e => SetText(e.Value?.ToString())"/>
+            break;
+
+        case TeamApplicationQuestionType.Dropdown:
+            <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
+                    @onchange="e => SetText(e.Value?.ToString())">
+                <option value="">Bitte wählen</option>
+                @foreach (var option in Answer.Question.Options)
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+            break;
+
+        case TeamApplicationQuestionType.SingleChoice:
+            @for (var i = 0; i < Answer.Question.Options.Count; i++)
+            {
+                var current = Answer.Question.Options[i];
+                var inputId = $"{Answer.Question.QuestionId}-{i}";
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" id="@inputId"
+                           name="@Answer.Question.QuestionId" checked="@(Answer.Text == current)"
+                           @onchange="() => SetText(current)"/>
+                    <label class="form-check-label" for="@inputId">@current</label>
+                </div>
+            }
+            break;
+
+        case TeamApplicationQuestionType.MultipleChoice:
+            @for (var i = 0; i < Answer.Question.Options.Count; i++)
+            {
+                var current = Answer.Question.Options[i];
+                var inputId = $"{Answer.Question.QuestionId}-{i}";
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="@inputId"
+                           checked="@Answer.Selected.Contains(current)"
+                           @onchange="e => ToggleOption(current, e.Value is true)"/>
+                    <label class="form-check-label" for="@inputId">@current</label>
+                </div>
+            }
+            @if (SelectionHint(Answer.Question) is { } hint)
+            {
+                <span class="field__hint">@hint</span>
+            }
+            break;
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Answer.Error))
+    {
+        <span class="field__error" role="alert">@Answer.Error</span>
+    }
+</div>
+
+@code {
+    [Parameter] [EditorRequired] public QuestionAnswerVm Answer { get; set; } = null!;
+    [Parameter] public bool Nested { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static string LengthHint(TeamApplicationQuestion question)
+    {
+        if (question.MinLength > 0 && question.MaxLength > 0)
+            return $" (erlaubt: {question.MinLength} bis {question.MaxLength})";
+        if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
+        if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
+        return "";
+    }
+
+    private static string RangeValue(QuestionAnswerVm answer) =>
+        string.IsNullOrEmpty(answer.Text) ? answer.Question.MinValue.ToString() : answer.Text;
+
+    // Capped so a misconfigured huge range (or a step of 0) can't generate thousands of options.
+    private static IEnumerable<long> NumberRangeValues(TeamApplicationQuestion question)
+    {
+        var step = question.NumberStep <= 0 ? 1 : question.NumberStep;
+        var count = 0;
+        for (var value = question.MinValue; value <= question.MaxValue && count < 500; value += step, count++)
+            yield return value;
+    }
+
+    private static string? SelectionHint(TeamApplicationQuestion question)
+    {
+        if (question.MinSelections > 0 && question.MaxSelections > 0)
+            return $"Wähle {question.MinSelections} bis {question.MaxSelections} Optionen.";
+        if (question.MinSelections > 0) return $"Wähle mindestens {question.MinSelections} Optionen.";
+        if (question.MaxSelections > 0) return $"Wähle höchstens {question.MaxSelections} Optionen.";
+        return null;
+    }
+
+    private async Task SetText(string? value)
+    {
+        Answer.Text = value ?? "";
+        Validate();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ToggleOption(string option, bool selected)
+    {
+        if (selected)
+        {
+            if (!Answer.Selected.Contains(option)) Answer.Selected.Add(option);
+        }
+        else
+        {
+            Answer.Selected.Remove(option);
+        }
+
+        Validate();
+        await OnChanged.InvokeAsync();
+    }
+
+    private void Validate() =>
+        Answer.Error = TeamApplicationService.ValidateAnswer(Answer.Question, Answer.Text, Answer.Selected);
+}
