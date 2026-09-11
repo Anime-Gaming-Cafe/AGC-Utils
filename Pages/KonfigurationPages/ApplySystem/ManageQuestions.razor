@@ -158,8 +158,7 @@ else
     private List<TeamApplicationQuestion> questions = new();
     private List<TeamApplicationQuestion> publishedQuestions = new();
 
-    // Snapshot of the last DB-persisted state per question, keyed by id. Field edits are only
-    // ever applied to `questions` in memory; SaveAllQuestions/Discard read and write against this.
+    // Last DB-persisted state per question, keyed by id; SaveAllQuestions/Discard work against this.
     private Dictionary<string, TeamApplicationQuestion> originalQuestions = new();
 
     protected override async Task OnInitializedAsync()
@@ -210,9 +209,7 @@ else
         _ => type.ToString()
     };
 
-    // Only top-level choice questions are valid triggers: a follow-up can't itself be a trigger,
-    // which keeps nesting to exactly one level (matches how it's rendered - a follow-up sits
-    // inside its trigger's own panel, so a trigger-of-a-trigger has nowhere to nest into).
+    // A follow-up can't itself be a trigger, which keeps nesting to exactly one level.
     private static bool IsTopLevel(TeamApplicationQuestion question) =>
         string.IsNullOrEmpty(question.ConditionQuestionId);
 
@@ -233,8 +230,8 @@ else
 
     private void OnConditionChanged(TeamApplicationQuestion question)
     {
-        // A question that just became a follow-up can't itself be a trigger any more (only
-        // top-level questions can) - orphan (not delete) anything that depended on it.
+        // Only top-level questions can be triggers, so orphan (not delete) anything that
+        // depended on this one now that it's become a follow-up itself.
         if (!string.IsNullOrEmpty(question.ConditionQuestionId))
         {
             var orphaned = questions.Where(q => q.ConditionQuestionId == question.QuestionId).ToList();
@@ -390,8 +387,6 @@ else
         ToastService.Notify("Folgefrage hinzugefügt.", "ok");
     }
 
-    // The registered save delegate: persists every question's current in-memory state at once,
-    // which is the whole point of the unsaved-changes bar - no per-question save button anymore.
     private async Task SaveAllQuestions()
     {
         if (!await EnsurePermission()) return;
@@ -406,7 +401,6 @@ else
         ToastService.Notify("Fragen gespeichert.", "ok");
     }
 
-    // The registered discard delegate: reverts every question back to its last-saved state.
     // Runs from the UnsavedChangesBar component, so it has to drive its own re-render.
     private void Discard()
     {

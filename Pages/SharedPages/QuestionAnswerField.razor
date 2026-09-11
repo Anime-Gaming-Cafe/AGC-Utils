@@ -29,7 +29,10 @@
         case TeamApplicationQuestionType.LongText:
             <textarea id="@Answer.Question.QuestionId" class="form-control" rows="7" value="@Answer.Text"
                       @onchange="e => SetText(e.Value?.ToString())"></textarea>
-            <span class="field__hint tnum">@Answer.Text.Trim().Length Zeichen@(LengthHint(Answer.Question))</span>
+            @if (Answer.Question.MaxLength > 0)
+            {
+                <span class="field__hint tnum">Maximal @Answer.Question.MaxLength Zeichen</span>
+            }
             break;
 
         case TeamApplicationQuestionType.Number:
@@ -123,15 +126,6 @@
     [Parameter] [EditorRequired] public QuestionAnswerVm Answer { get; set; } = null!;
     [Parameter] public bool Nested { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
-
-    private static string LengthHint(TeamApplicationQuestion question)
-    {
-        if (question.MinLength > 0 && question.MaxLength > 0)
-            return $" (erlaubt: {question.MinLength} bis {question.MaxLength})";
-        if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
-        if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
-        return "";
-    }
 
     private static string RangeValue(QuestionAnswerVm answer) =>
         string.IsNullOrEmpty(answer.Text) ? answer.Question.MinValue.ToString() : answer.Text;

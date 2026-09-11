@@ -1,8 +1,7 @@
 namespace AGC_Management.Services;
 
-// Scoped: one dirty-state per Blazor Server circuit. The currently displayed page registers its
-// own save/discard logic on load and unregisters on dispose; UnsavedChangesBar (hosted once in
-// MainLayout) is the only thing that renders against it, so pages never need to know about each other.
+// Scoped: one dirty-state per Blazor Server circuit. The displayed page registers its save/discard
+// logic on load and unregisters on dispose; UnsavedChangesBar is the only thing that reads it.
 public sealed class UnsavedChangesTracker
 {
     public bool IsDirty { get; private set; }

@@ -1,11 +1,7 @@
 /* Application styles. Replaces the former glass.css + site.css.
    Rules and reasoning live in DESIGN.md - do not add paint here that contradicts it. */
 
-/* ==========================================================================
-   1. Bootstrap bindings
-   Bootstrap 5.3 is driven by custom properties, so the design system is applied
-   once here instead of overpainting each component.
-   ========================================================================== */
+/* 1. Bootstrap bindings. Bootstrap 5.3 is driven by custom properties, so the design system is applied once here instead of overpainting each component. */
 
 :root,
 [data-bs-theme="dark"] {
@@ -56,9 +52,7 @@
     --bs-form-valid-border-color: var(--ok);
 }
 
-/* ==========================================================================
-   2. Base
-   ========================================================================== */
+/* 2. Base */
 
 html {
     -webkit-text-size-adjust: 100%;
@@ -151,9 +145,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     outline-offset: -1px;
 }
 
-/* ==========================================================================
-   3. Layout shell
-   ========================================================================== */
+/* 3. Layout shell */
 
 .app {
     display: flex;
@@ -176,9 +168,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .app__content { padding: var(--s-6) var(--s-5) var(--s-7); }
 }
 
-/* ==========================================================================
-   4. Page header
-   ========================================================================== */
+/* 4. Page header */
 
 .page-header {
     align-items: flex-start;
@@ -217,9 +207,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .page-back { text-decoration: none; }
 .page-back:hover { color: var(--fg); text-decoration: none; }
 
-/* ==========================================================================
-   5. Panel - the one surface
-   ========================================================================== */
+/* 5. Panel - the one surface */
 
 .panel {
     background-color: var(--surface);
@@ -305,9 +293,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .section-title-row > .section-title { margin: 0; }
 
-/* ==========================================================================
-   6. Buttons
-   ========================================================================== */
+/* 6. Buttons */
 
 .btn {
     --bs-btn-border-radius: var(--r-control);
@@ -390,9 +376,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     gap: var(--s-2);
 }
 
-/* ==========================================================================
-   7. Forms
-   ========================================================================== */
+/* 7. Forms */
 
 .form-control,
 .form-select {
@@ -507,9 +491,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-/* ==========================================================================
-   8. Tables
-   ========================================================================== */
+/* 8. Tables */
 
 .table-wrap {
     overflow-x: auto;
@@ -541,9 +523,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .table > tbody tr:last-child td { border-bottom: 0; }
 
-/* ==========================================================================
-   9. Record list - the scannable list of decisions
-   ========================================================================== */
+/* 9. Record list - the scannable list of decisions */
 
 .record-list {
     display: flex;
@@ -702,9 +682,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-4);
 }
 
-/* ==========================================================================
-   10. Status pill
-   ========================================================================== */
+/* 10. Status pill */
 
 .pill {
     border: 1px solid transparent;
@@ -722,9 +700,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .pill--warn { background-color: var(--warn-tint); border-color: var(--warn); color: var(--warn-text); }
 .pill--bad { background-color: var(--bad-tint); border-color: var(--bad); color: var(--bad-text); }
 
-/* ==========================================================================
-   11. Notices
-   ========================================================================== */
+/* 11. Notices */
 
 .notice {
     background-color: var(--surface-raised);
@@ -749,9 +725,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .notice--warn { border-left-color: var(--warn); }
 .notice--bad { border-left-color: var(--bad); }
 
-/* ==========================================================================
-   12. State block - loading / empty / error
-   ========================================================================== */
+/* 12. State block - loading / empty / error */
 
 .state {
     align-items: center;
@@ -811,9 +785,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .spinner { animation-duration: 2s; }
 }
 
-/* ==========================================================================
-   13. Pager
-   ========================================================================== */
+/* 13. Pager */
 
 .pager {
     align-items: center;
@@ -834,9 +806,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     gap: var(--s-2);
 }
 
-/* ==========================================================================
-   14. Inline confirm - this codebase has no modals, on purpose
-   ========================================================================== */
+/* 14. Inline confirm - this codebase has no modals, on purpose */
 
 .confirm {
     background-color: var(--bad-tint);
@@ -867,9 +837,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     --bs-btn-hover-color: var(--fg);
 }
 
-/* ==========================================================================
-   15. Icons
-   ========================================================================== */
+/* 15. Icons */
 
 .icon {
     display: inline-block;
@@ -884,11 +852,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     width: 1em;
 }
 
-/* ==========================================================================
-   16. Top bar
-   One navigation level with at most six entries. The bar shares the content's
-   max width and side padding, so its left edge lines up with the page below.
-   ========================================================================== */
+/* 16. Top bar. One navigation level with at most six entries. The bar shares the content's max width and side padding, so its left edge lines up with the page below. */
 
 .topbar {
     background-color: var(--surface);
@@ -1047,9 +1011,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .topbar__toggle { display: none; }
 }
 
-/* ==========================================================================
-   17. Blazor chrome
-   ========================================================================== */
+/* 17. Blazor chrome */
 
 #blazor-error-ui {
     background-color: var(--bad-tint);
@@ -1072,10 +1034,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     top: var(--s-3);
 }
 
-/* ==========================================================================
-   18. Link list - hub pages
-   A card wrapped around a single link carried no information, so hubs are lists.
-   ========================================================================== */
+/* 18. Link list - hub pages. A card wrapped around a single link carried no information, so hubs are lists. */
 
 .nav-links {
     display: flex;
@@ -1107,9 +1066,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     font-size: var(--f-sm);
 }
 
-/* ==========================================================================
-   19. Rows - a plain list inside a flush panel
-   ========================================================================== */
+/* 19. Rows - a plain list inside a flush panel */
 
 .rows {
     list-style: none;
@@ -1156,9 +1113,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-3);
 }
 
-/* ==========================================================================
-   20. Question list - one form, not one card per question
-   ========================================================================== */
+/* 20. Question list - one form, not one card per question */
 
 .question-list > .field {
     margin: 0;
@@ -1186,11 +1141,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-4);
 }
 
-/* ==========================================================================
-   21. Detail layout
-   The page's weight sits in the main column (answers, decision, notes);
-   facts about the applicant are supporting material and go to the side.
-   ========================================================================== */
+/* 21. Detail layout. The page's weight sits in the main column (answers, decision, notes); facts about the applicant are supporting material and go to the side. */
 
 .detail-grid {
     align-items: start;
@@ -1242,9 +1193,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .filter-bar .field { margin: 0; }
 
-/* ==========================================================================
-   22. Form helpers
-   ========================================================================== */
+/* 22. Form helpers */
 
 .field--wide { grid-column: 1 / -1; }
 
@@ -1256,9 +1205,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .option-row .form-control { flex: 1; min-width: 0; }
 
-/* ==========================================================================
-   23. Page helpers
-   ========================================================================== */
+/* 23. Page helpers */
 
 .panel-grid {
     align-items: start;
@@ -1393,11 +1340,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 /* A row list inside a padded panel body that has to run to the panel's edges. */
 .rows--bleed { margin-inline: calc(var(--s-4) * -1); }
 
-/* ==========================================================================
-   24. Toasts
-   Replaces the inline .notice confirmation that used to sit under the page
-   title. Same tone classes, just floated instead of pinned to the page.
-   ========================================================================== */
+/* 24. Toasts. Replaces the inline .notice confirmation that used to sit under the page title. Same tone classes, just floated instead of pinned to the page. */
 
 .toast-host {
     display: flex;
@@ -1434,12 +1377,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .toast-host { left: var(--s-4); max-width: none; right: var(--s-4); }
 }
 
-/* ==========================================================================
-   25. Unsaved changes bar
-   A floating pill, not a docked bar: it sits above the page with a gap on
-   every side, same reasoning for --shadow-overlay as the other floating
-   elements (see DESIGN.md, "Elevation").
-   ========================================================================== */
+/* 25. Unsaved changes bar. A floating pill, not a docked bar: it sits above the page with a gap on every side, same reasoning for --shadow-overlay as the other floating elements (see DESIGN.md, "Elevation"). */
 
 .unsaved-bar {
     align-items: center;
