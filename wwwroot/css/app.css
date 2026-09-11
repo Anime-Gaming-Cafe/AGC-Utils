@@ -1279,10 +1279,17 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     min-width: 3ch;
-    text-align: right;
+    text-align: center;
 }
 
 .rank--top { color: var(--fg); }
+
+.rank__medal {
+    display: inline-block;
+    height: 22px;
+    vertical-align: middle;
+    width: auto;
+}
 
 .avatar--md {
     height: 32px;

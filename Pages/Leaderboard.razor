@@ -27,7 +27,16 @@ else
         <Panel Title="Dein Platz" Flush="true">
             <ul class="rows">
                 <li class="is-self">
-                    <span class="rank @(self.Rank <= 3 ? "rank--top" : null)">@self.Rank</span>
+                    <span class="rank @(self.Rank <= 3 ? "rank--top" : null)">
+                        @if (MedalSrc(self.Rank) is { } selfMedal)
+                        {
+                            <img class="rank__medal" src="@selfMedal" alt="@($"Platz {self.Rank}")"/>
+                        }
+                        else
+                        {
+                            @self.Rank
+                        }
+                    </span>
                     <img class="avatar avatar--md" src="@self.Avatar" alt=""/>
                     <div class="rows__main">
                         <p class="rows__title">@self.Username</p>
@@ -46,8 +55,17 @@ else
             @foreach (var item in currentPageData)
             {
                 <li class="@(item.UserId == SelfId ? "is-self" : null)">
-                    @* Rank 1 to 3 used remote medal images from an external host; brightness carries it now. *@
-                    <span class="rank @(item.Rank <= 3 ? "rank--top" : null)">@item.Rank</span>
+                    @* Rank 1 to 3 used remote medal images from an external host; these are self-hosted now. *@
+                    <span class="rank @(item.Rank <= 3 ? "rank--top" : null)">
+                        @if (MedalSrc(item.Rank) is { } medal)
+                        {
+                            <img class="rank__medal" src="@medal" alt="@($"Platz {item.Rank}")"/>
+                        }
+                        else
+                        {
+                            @item.Rank
+                        }
+                    </span>
                     <img class="avatar avatar--md" loading="lazy" src="@item.Avatar" alt=""/>
                     <div class="rows__main">
                         <p class="rows__title">@item.Username</p>
@@ -78,6 +96,14 @@ else
     private ulong? SelfId => ToolSet.GetUserIdFromPrincipal(_principal);
 
     private WebLeaderboardData? Self => LevelUtils.cachedLeaderboardData.FirstOrDefault(i => i.UserId == SelfId);
+
+    private static string? MedalSrc(int rank) => rank switch
+    {
+        1 => "img/medaille-gold.png",
+        2 => "img/medaille-silber.png",
+        3 => "img/medaille-bronze.png",
+        _ => null
+    };
 
     protected override async Task OnInitializedAsync()
     {
