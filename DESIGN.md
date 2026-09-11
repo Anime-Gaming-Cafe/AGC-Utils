@@ -194,6 +194,8 @@ calls `UnsavedChangesTracker.Register(saveAsync, discard)` instead of a per-fiel
 - **The coloured left edge on application rows** encodes the application's real status (new, read,
   shortlisted, accepted, rejected, withdrawn). It is a signal, not a stripe added to make a card look
   designed, and it stays.
+- **The left border on a nested follow-up question** (Fragenkatalog editor) marks "child of the
+  question above", the same hierarchy-signal reasoning as the application-row edge - not decoration.
 - **The loading spinner** loops forever by nature. It is the only perpetual motion allowed, and it reports
   real progress.
 - **The unsaved-changes bar's shake** is the one MOTION-1 exception that is not a state change: a single

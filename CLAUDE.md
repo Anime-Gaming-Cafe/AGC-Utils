@@ -83,7 +83,7 @@ Discord only ships a subset of members and DisCatSharp clears `guild.Members` on
 
 ## Conventions
 
-- **User-facing strings are German; code and comments are English.** Keep new comments sparse and only where the logic is non-obvious.
+- **User-facing strings are German; code and comments are English.** Keep new comments sparse and only where the logic is non-obvious. Avoid comments in the code.
 - File-scoped namespaces; usings wrapped in `#region` blocks at the top of files; common usings are in `Utils/GlobalUsings.cs`.
 - Discord ids are `ulong` in C# and `BIGINT` in Postgres — cast with `(long)id` when parameterizing.
 - Errors reach the dev via `ErrorReporting.SendErrorToDev` (posts to `ErrorTrackingChannelId`). There is no Sentry; DisCatSharp only pulls the package in transitively. Logging is Serilog (`CurrentApplication.Logger`) to console and `logs/`.

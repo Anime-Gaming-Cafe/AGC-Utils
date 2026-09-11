@@ -263,6 +263,16 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .panel--flush > .panel__body { padding: 0; }
 
+/* A follow-up question, rendered inside its trigger's own panel body instead of as a separate
+   numbered "Frage N". The left border is the same hierarchy signal as the application-row status
+   edge (see DESIGN.md, "Exceptions on record") - it marks "child of", not decoration. */
+.panel--nested {
+    background-color: var(--surface-sunken);
+    border-left: 3px solid var(--border-strong);
+}
+
+.panel--nested .panel__title { font-size: var(--f-md); }
+
 .section-title {
     font-size: var(--f-md);
     font-weight: 600;
