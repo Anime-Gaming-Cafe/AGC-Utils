@@ -1,0 +1,25 @@
+@using AGC_Management.Services
+@implements IDisposable
+@inject ToastService ToastService
+@* Hosted once in MainLayout so it survives navigation. Reuses the .notice tone classes. *@
+
+@if (ToastService.Toasts.Count > 0)
+{
+    <div class="toast-host" aria-live="polite">
+        @foreach (var toast in ToastService.Toasts)
+        {
+            <div class="notice notice--@toast.Tone toast" role="status">
+                <span class="toast__text">@toast.Message</span>
+                <button type="button" class="toast__dismiss" aria-label="Schließen" @onclick="() => ToastService.Dismiss(toast.Id)">×</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => ToastService.OnChange += HandleChange;
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ToastService.OnChange -= HandleChange;
+}

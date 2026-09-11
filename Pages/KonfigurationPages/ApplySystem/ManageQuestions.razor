@@ -3,7 +3,10 @@
 @using AGC_Management.Entities.ApplicationSystem
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
+@implements IDisposable
 @inject UserService UserService
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
 <PageHeader Title="Fragenkatalog"
@@ -32,11 +35,6 @@ else if (position == null)
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
-
     <Panel Title="Versionen"
            Lead="Eine veröffentlichte Version wird nie mehr verändert. Laufende Phasen behalten die Version, die beim Öffnen eingefroren wurde.">
         <dl class="facts">
@@ -90,11 +88,11 @@ else
                     <div class="field-grid">
                         <div class="field field--wide">
                             <label class="field__label" for="q-text-@question.QuestionId">Fragetext</label>
-                            <input id="q-text-@question.QuestionId" class="form-control" @bind="question.Text"/>
+                            <input id="q-text-@question.QuestionId" class="form-control" @bind="question.Text" @bind:after="OnFieldChanged"/>
                         </div>
                         <div class="field">
                             <label class="field__label" for="q-type-@question.QuestionId">Typ</label>
-                            <select id="q-type-@question.QuestionId" class="form-select" @bind="question.Type">
+                            <select id="q-type-@question.QuestionId" class="form-select" @bind="question.Type" @bind:after="OnFieldChanged">
                                 @foreach (var type in Enum.GetValues<TeamApplicationQuestionType>())
                                 {
                                     <option value="@type">@TypeLabel(type)</option>
@@ -103,18 +101,18 @@ else
                         </div>
                         <div class="field">
                             <label class="field__label" for="q-desc-@question.QuestionId">Hilfetext (optional)</label>
-                            <input id="q-desc-@question.QuestionId" class="form-control" @bind="question.Description"/>
+                            <input id="q-desc-@question.QuestionId" class="form-control" @bind="question.Description" @bind:after="OnFieldChanged"/>
                         </div>
 
                         @if (question.SupportsLength)
                         {
                             <div class="field">
                                 <label class="field__label" for="q-min-@question.QuestionId">Minimale Länge</label>
-                                <input id="q-min-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinLength"/>
+                                <input id="q-min-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinLength" @bind:after="OnFieldChanged"/>
                             </div>
                             <div class="field">
                                 <label class="field__label" for="q-max-@question.QuestionId">Maximale Länge</label>
-                                <input id="q-max-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxLength"/>
+                                <input id="q-max-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxLength" @bind:after="OnFieldChanged"/>
                                 <span class="field__hint">0 heißt ohne Grenze.</span>
                             </div>
                         }
@@ -123,11 +121,11 @@ else
                         {
                             <div class="field">
                                 <label class="field__label" for="q-vmin-@question.QuestionId">Kleinster Wert</label>
-                                <input id="q-vmin-@question.QuestionId" type="number" class="form-control" @bind="question.MinValue"/>
+                                <input id="q-vmin-@question.QuestionId" type="number" class="form-control" @bind="question.MinValue" @bind:after="OnFieldChanged"/>
                             </div>
                             <div class="field">
                                 <label class="field__label" for="q-vmax-@question.QuestionId">Größter Wert</label>
-                                <input id="q-vmax-@question.QuestionId" type="number" class="form-control" @bind="question.MaxValue"/>
+                                <input id="q-vmax-@question.QuestionId" type="number" class="form-control" @bind="question.MaxValue" @bind:after="OnFieldChanged"/>
                             </div>
                         }
 
@@ -135,11 +133,11 @@ else
                         {
                             <div class="field">
                                 <label class="field__label" for="q-smin-@question.QuestionId">Mindestens auswählen</label>
-                                <input id="q-smin-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinSelections"/>
+                                <input id="q-smin-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MinSelections" @bind:after="OnFieldChanged"/>
                             </div>
                             <div class="field">
                                 <label class="field__label" for="q-smax-@question.QuestionId">Höchstens auswählen</label>
-                                <input id="q-smax-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxSelections"/>
+                                <input id="q-smax-@question.QuestionId" type="number" min="0" class="form-control" @bind="question.MaxSelections" @bind:after="OnFieldChanged"/>
                             </div>
                         }
                     </div>
@@ -153,12 +151,12 @@ else
                                 var current = optionIndex;
                                 <div class="option-row">
                                     <input class="form-control" aria-label="@($"Option {current + 1}")"
-                                           @bind="question.Options[current]"/>
+                                           @bind="question.Options[current]" @bind:after="OnFieldChanged"/>
                                     <button type="button" class="btn btn-ghost btn-sm"
-                                            @onclick="() => question.Options.RemoveAt(current)">Entfernen</button>
+                                            @onclick="() => RemoveOption(question, current)">Entfernen</button>
                                 </div>
                             }
-                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => question.Options.Add(string.Empty)">
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => AddOption(question)">
                                 Option hinzufügen
                             </button>
                             @if (question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2)
@@ -170,12 +168,8 @@ else
 
                     <div class="form-check form-switch mt-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="q-req-@question.QuestionId"
-                               @bind="question.Required"/>
+                               @bind="question.Required" @bind:after="OnFieldChanged"/>
                         <label class="form-check-label" for="q-req-@question.QuestionId">Pflichtfeld</label>
-                    </div>
-
-                    <div class="form-foot">
-                        <button type="button" class="btn btn-secondary" @onclick="() => SaveQuestion(question)">Frage speichern</button>
                     </div>
                 </ChildContent>
             </Panel>
@@ -215,14 +209,16 @@ else
 
     private bool loaded;
     private bool mayManage;
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private TeamApplicationPosition? position;
     private TeamApplicationQuestionSet? draft;
     private TeamApplicationQuestionSet? published;
     private List<TeamApplicationQuestion> questions = new();
     private List<TeamApplicationQuestion> publishedQuestions = new();
+
+    // Snapshot of the last DB-persisted state per question, keyed by id. Field edits are only
+    // ever applied to `questions` in memory; SaveAllQuestions/Discard read and write against this.
+    private Dictionary<string, TeamApplicationQuestion> originalQuestions = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -232,9 +228,17 @@ else
         mayManage = await TeamApplicationPermissionService.HasAsync(userId,
             TeamApplicationPermission.ManageQuestions, PositionId);
 
-        if (mayManage) await LoadAll();
+        if (mayManage)
+        {
+            await LoadAll();
+            RebuildSnapshot();
+            Tracker.Register(SaveAllQuestions, Discard);
+        }
+
         loaded = true;
     }
+
+    public void Dispose() => Tracker.Unregister();
 
     private async Task LoadAll()
     {
@@ -262,10 +266,56 @@ else
         _ => type.ToString()
     };
 
-    private void Say(string message, string tone)
+    private static TeamApplicationQuestion CloneQuestion(TeamApplicationQuestion source) => new()
     {
-        statusMessage = message;
-        statusTone = tone;
+        QuestionId = source.QuestionId,
+        PositionId = source.PositionId,
+        Version = source.Version,
+        SortOrder = source.SortOrder,
+        Type = source.Type,
+        Text = source.Text,
+        Description = source.Description,
+        Required = source.Required,
+        MinLength = source.MinLength,
+        MaxLength = source.MaxLength,
+        MinValue = source.MinValue,
+        MaxValue = source.MaxValue,
+        Options = new List<string>(source.Options),
+        MinSelections = source.MinSelections,
+        MaxSelections = source.MaxSelections
+    };
+
+    // Copies every editable field except identity/sort - used by Discard to revert in place
+    // without breaking the @for loop's object references.
+    private static void CopyEditableFields(TeamApplicationQuestion target, TeamApplicationQuestion source)
+    {
+        target.Type = source.Type;
+        target.Text = source.Text;
+        target.Description = source.Description;
+        target.Required = source.Required;
+        target.MinLength = source.MinLength;
+        target.MaxLength = source.MaxLength;
+        target.MinValue = source.MinValue;
+        target.MaxValue = source.MaxValue;
+        target.Options = new List<string>(source.Options);
+        target.MinSelections = source.MinSelections;
+        target.MaxSelections = source.MaxSelections;
+    }
+
+    private void RebuildSnapshot() => originalQuestions = questions.ToDictionary(q => q.QuestionId, CloneQuestion);
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private void AddOption(TeamApplicationQuestion question)
+    {
+        question.Options.Add(string.Empty);
+        OnFieldChanged();
+    }
+
+    private void RemoveOption(TeamApplicationQuestion question, int index)
+    {
+        question.Options.RemoveAt(index);
+        OnFieldChanged();
     }
 
     private async Task<bool> EnsurePermission()
@@ -273,7 +323,7 @@ else
         if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
                 PositionId)) return true;
 
-        Say("Dafür fehlt dir die Berechtigung.", "bad");
+        ToastService.Notify("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -283,7 +333,8 @@ else
 
         await TeamApplicationService.CreateDraftAsync(PositionId, userId);
         await LoadAll();
-        Say("Entwurf angelegt.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Entwurf angelegt.", "ok");
     }
 
     private async Task PublishDraft()
@@ -292,7 +343,7 @@ else
 
         if (questions.Count == 0)
         {
-            Say("Ein leerer Katalog kann nicht veröffentlicht werden.", "bad");
+            ToastService.Notify("Ein leerer Katalog kann nicht veröffentlicht werden.", "bad");
             return;
         }
 
@@ -300,13 +351,14 @@ else
                                                     (q.IsChoice && q.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2));
         if (invalid != null)
         {
-            Say("Jede Frage braucht einen Text, Auswahlfragen brauchen mindestens zwei Optionen.", "bad");
+            ToastService.Notify("Jede Frage braucht einen Text, Auswahlfragen brauchen mindestens zwei Optionen.", "bad");
             return;
         }
 
         await TeamApplicationService.PublishDraftAsync(PositionId);
         await LoadAll();
-        Say("Entwurf veröffentlicht.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Entwurf veröffentlicht.", "ok");
     }
 
     private async Task AddQuestion()
@@ -323,17 +375,37 @@ else
 
         await TeamApplicationService.UpsertQuestionAsync(question);
         questions.Add(question);
-        Say("Frage hinzugefügt.", "ok");
+        originalQuestions[question.QuestionId] = CloneQuestion(question);
+        ToastService.Notify("Frage hinzugefügt.", "ok");
     }
 
-    private async Task SaveQuestion(TeamApplicationQuestion question)
+    // The registered save delegate: persists every question's current in-memory state at once,
+    // which is the whole point of the unsaved-changes bar - no per-question save button anymore.
+    private async Task SaveAllQuestions()
     {
         if (!await EnsurePermission()) return;
 
-        question.Options = question.Options.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
+        foreach (var question in questions)
+            question.Options = question.Options.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
 
-        await TeamApplicationService.UpsertQuestionAsync(question);
-        Say("Frage gespeichert.", "ok");
+        foreach (var question in questions)
+            await TeamApplicationService.UpsertQuestionAsync(question);
+
+        RebuildSnapshot();
+        ToastService.Notify("Fragen gespeichert.", "ok");
+    }
+
+    // The registered discard delegate: reverts every question back to its last-saved state.
+    // Runs from the UnsavedChangesBar component, so it has to drive its own re-render.
+    private void Discard()
+    {
+        foreach (var question in questions)
+        {
+            if (originalQuestions.TryGetValue(question.QuestionId, out var original))
+                CopyEditableFields(question, original);
+        }
+
+        StateHasChanged();
     }
 
     private async Task DeleteQuestion(TeamApplicationQuestion question)
@@ -342,8 +414,9 @@ else
 
         await TeamApplicationService.DeleteQuestionAsync(question.QuestionId);
         questions.Remove(question);
+        originalQuestions.Remove(question.QuestionId);
         await PersistOrder();
-        Say("Frage gelöscht.", "ok");
+        ToastService.Notify("Frage gelöscht.", "ok");
     }
 
     private async Task MoveQuestion(int index, int offset)
@@ -357,12 +430,24 @@ else
         await PersistOrder();
     }
 
+    // Reordering only ever touches sort_order in the DB - it must never carry along whatever a
+    // still-unsaved field edit currently holds, so it upserts a clone of the last-saved content
+    // (not the live, possibly-dirty, object) with just the new sort order.
     private async Task PersistOrder()
     {
         for (var i = 0; i < questions.Count; i++)
         {
             questions[i].SortOrder = i;
-            await TeamApplicationService.UpsertQuestionAsync(questions[i]);
+
+            var persisted = originalQuestions.TryGetValue(questions[i].QuestionId, out var original)
+                ? CloneQuestion(original)
+                : CloneQuestion(questions[i]);
+            persisted.SortOrder = i;
+
+            await TeamApplicationService.UpsertQuestionAsync(persisted);
+
+            if (originalQuestions.TryGetValue(questions[i].QuestionId, out var snapshot))
+                snapshot.SortOrder = i;
         }
     }
 }

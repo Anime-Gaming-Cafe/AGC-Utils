@@ -2,6 +2,7 @@
 @using AGC_Management.Entities.ApplicationSystem
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator")]
 
 <PageHeader Title="Rechte-Matrix"
@@ -16,11 +17,6 @@
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
-
     @if (rules.Count == 0)
     {
         <StateBlock Title="Noch kein Recht vergeben"
@@ -108,8 +104,6 @@ else
 
 @code {
     private bool loaded;
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private List<TeamApplicationPermissionRule> rules = new();
     private List<TeamApplicationPosition> positions = new();
@@ -133,12 +127,6 @@ else
             .Where(r => !r.IsManaged && r.Name != "@everyone")
             .OrderByDescending(r => r.Position)
             .ToList();
-    }
-
-    private void Say(string message, string tone)
-    {
-        statusMessage = message;
-        statusTone = tone;
     }
 
     private string RoleName(ulong roleId)
@@ -171,20 +159,20 @@ else
     {
         if (newRoleId == 0)
         {
-            Say("Bitte eine Rolle wählen.", "bad");
+            ToastService.Notify("Bitte eine Rolle wählen.", "bad");
             return;
         }
 
         await TeamApplicationPermissionService.AddRuleAsync(newRoleId,
             string.IsNullOrWhiteSpace(newPositionId) ? null : newPositionId, null, newPermission);
         await LoadAll();
-        Say("Recht vergeben.", "ok");
+        ToastService.Notify("Recht vergeben.", "ok");
     }
 
     private async Task RemoveRule(TeamApplicationPermissionRule rule)
     {
         await TeamApplicationPermissionService.RemoveRuleAsync(rule.PermissionId);
         await LoadAll();
-        Say("Recht entfernt.", "ok");
+        ToastService.Notify("Recht entfernt.", "ok");
     }
 }

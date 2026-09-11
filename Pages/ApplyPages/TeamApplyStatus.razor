@@ -5,6 +5,7 @@
 @using AGC_Management.Services
 @using AGC_Management.Utils
 @inject UserService UserService
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
 <PageHeader Title="Meine Bewerbungen">
@@ -21,11 +22,6 @@
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--ok" role="status">@statusMessage</div>
-    }
-
     @if (applications.Count == 0)
     {
         <StateBlock Title="Du hast dich noch nicht beworben"
@@ -118,7 +114,6 @@ else
     private ulong userId;
 
     private bool loaded;
-    private string statusMessage = "";
     private string? pendingWithdraw;
 
     private List<TeamApplication> applications = new();
@@ -162,6 +157,6 @@ else
 
         await TeamApplicationService.WithdrawAsync(application.ApplicationId, userId);
         await LoadAll();
-        statusMessage = "Deine Bewerbung wurde zurückgezogen.";
+        ToastService.Notify("Deine Bewerbung wurde zurückgezogen.", "ok");
     }
 }

@@ -3,16 +3,12 @@
 @using AGC_Management.Enums
 @using AGC_Management.ApplicationSystem
 @using DisCatSharp.Enums
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
 <PageHeader Title="Bewerbungspanel"
             Lead="Die Nachricht in Discord, über die sich Mitglieder bewerben."
             BackHref="/konfiguration" BackText="Administration"/>
-
-@if (!string.IsNullOrWhiteSpace(statusMessage))
-{
-    <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-}
 
 <div class="detail-grid">
     <div>
@@ -89,8 +85,6 @@
 @code {
     private string panelmessage = "";
     private string panelmessagepreview = "";
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private List<DiscordChannel> textChannels = new();
     private ulong selectedChannelId;
@@ -125,17 +119,11 @@
         (panelChannelId, panelMessageId) = await ApplyPanelCommands.GetPanelLocationAsync();
     }
 
-    private void Say(string message, string tone)
-    {
-        statusMessage = message;
-        statusTone = tone;
-    }
-
     private async Task SendPanel()
     {
         if (selectedChannelId == 0)
         {
-            Say("Bitte zuerst einen Channel wählen.", "bad");
+            ToastService.Notify("Bitte zuerst einen Channel wählen.", "bad");
             return;
         }
 
@@ -144,12 +132,12 @@
         {
             await ApplyPanelCommands.SendPanelToChannelAsync(selectedChannelId);
             await LoadPanelLocation();
-            Say("Panel wurde gesendet.", "ok");
+            ToastService.Notify("Panel wurde gesendet.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Panel senden fehlgeschlagen");
-            Say("Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?", "bad");
+            ToastService.Notify("Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?", "bad");
         }
         finally
         {
@@ -160,7 +148,7 @@
     private void RefreshPanel()
     {
         ApplyPanelCommands.QueueRefreshPanel();
-        Say("Panel wird aktualisiert.", "ok");
+        ToastService.Notify("Panel wird aktualisiert.", "ok");
     }
 
     private void UpdatePreview(ChangeEventArgs e)
@@ -172,6 +160,6 @@
     {
         await CachingService.SetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache, "applypaneltext", panelmessage);
         ApplyPanelCommands.QueueRefreshPanel();
-        Say("Panel-Text gespeichert.", "ok");
+        ToastService.Notify("Panel-Text gespeichert.", "ok");
     }
 }

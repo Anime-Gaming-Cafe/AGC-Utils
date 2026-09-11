@@ -5,7 +5,10 @@
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
 @using AGC_Management.Utils
+@implements IDisposable
 @inject UserService UserService
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
 <PageHeader Title="Bewerbungsphasen"
@@ -34,11 +37,6 @@ else if (position == null)
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
-
     @if (published == null)
     {
         @* The old page stated this and offered no way out, although the route existed. *@
@@ -66,21 +64,21 @@ else
                 <div class="field-grid">
                     <div class="field">
                         <label class="field__label" for="p-name-@phase.PhaseId">Name</label>
-                        <input id="p-name-@phase.PhaseId" class="form-control" @bind="phase.Name"
+                        <input id="p-name-@phase.PhaseId" class="form-control" @bind="phase.Name" @bind:after="OnFieldChanged"
                                disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
                     </div>
                     <div class="field">
                         <label class="field__label" for="p-open-@phase.PhaseId">Öffnet am (optional)</label>
                         <input id="p-open-@phase.PhaseId" type="datetime-local" class="form-control"
                                value="@ToLocalInput(phase.OpensAt)"
-                               @onchange="e => phase.OpensAt = FromLocalInput(e.Value?.ToString())"
+                               @onchange="e => { phase.OpensAt = FromLocalInput(e.Value?.ToString()); OnFieldChanged(); }"
                                disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
                     </div>
                     <div class="field">
                         <label class="field__label" for="p-close-@phase.PhaseId">Schließt am (optional)</label>
                         <input id="p-close-@phase.PhaseId" type="datetime-local" class="form-control"
                                value="@ToLocalInput(phase.ClosesAt)"
-                               @onchange="e => phase.ClosesAt = FromLocalInput(e.Value?.ToString())"
+                               @onchange="e => { phase.ClosesAt = FromLocalInput(e.Value?.ToString()); OnFieldChanged(); }"
                                disabled="@(phase.State == TeamApplicationPhaseState.Archived)"/>
                     </div>
                 </div>
@@ -88,8 +86,6 @@ else
                 @if (phase.State != TeamApplicationPhaseState.Archived)
                 {
                     <div class="form-foot">
-                        <button type="button" class="btn btn-secondary" @onclick="() => SaveSchedule(phase)">Termine speichern</button>
-
                         @if (phase.State == TeamApplicationPhaseState.Draft)
                         {
                             <button type="button" class="btn btn-secondary" disabled="@(published == null)"
@@ -168,12 +164,11 @@ else
 
     private bool loaded;
     private bool mayManage;
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private TeamApplicationPosition? position;
     private TeamApplicationQuestionSet? published;
     private List<TeamApplicationPhase> phases = new();
+    private Dictionary<string, TeamApplicationPhase> originalPhases = new();
 
     private TeamApplicationPhase? pendingPhase;
     private bool pendingArchive;
@@ -191,9 +186,17 @@ else
         mayManage = await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManagePhases,
             PositionId);
 
-        if (mayManage) await LoadAll();
+        if (mayManage)
+        {
+            await LoadAll();
+            RebuildSnapshot();
+            Tracker.Register(SaveAllSchedules, Discard);
+        }
+
         loaded = true;
     }
+
+    public void Dispose() => Tracker.Unregister();
 
     private async Task LoadAll()
     {
@@ -236,10 +239,47 @@ else
         return new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds();
     }
 
-    private void Say(string message, string tone)
+    private static TeamApplicationPhase ClonePhase(TeamApplicationPhase source) => new()
     {
-        statusMessage = message;
-        statusTone = tone;
+        PhaseId = source.PhaseId,
+        PositionId = source.PositionId,
+        Name = source.Name,
+        State = source.State,
+        QuestionSetVersion = source.QuestionSetVersion,
+        OpensAt = source.OpensAt,
+        ClosesAt = source.ClosesAt,
+        CreatedBy = source.CreatedBy,
+        CreatedAt = source.CreatedAt
+    };
+
+    private void RebuildSnapshot() => originalPhases = phases.ToDictionary(p => p.PhaseId, ClonePhase);
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task SaveAllSchedules()
+    {
+        if (!await EnsurePermission()) return;
+
+        foreach (var phase in phases.Where(p => p.State != TeamApplicationPhaseState.Archived))
+            await TeamApplicationService.UpdatePhaseScheduleAsync(phase.PhaseId, phase.Name, phase.OpensAt,
+                phase.ClosesAt);
+
+        ApplyPanelCommands.QueueRefreshPanel();
+        RebuildSnapshot();
+        ToastService.Notify("Termine gespeichert.", "ok");
+    }
+
+    private void Discard()
+    {
+        foreach (var phase in phases)
+        {
+            if (!originalPhases.TryGetValue(phase.PhaseId, out var original)) continue;
+            phase.Name = original.Name;
+            phase.OpensAt = original.OpensAt;
+            phase.ClosesAt = original.ClosesAt;
+        }
+
+        StateHasChanged();
     }
 
     private async Task<bool> EnsurePermission()
@@ -247,7 +287,7 @@ else
         if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManagePhases,
                 PositionId)) return true;
 
-        Say("Dafür fehlt dir die Berechtigung.", "bad");
+        ToastService.Notify("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -257,7 +297,7 @@ else
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            Say("Bitte einen Namen angeben.", "bad");
+            ToastService.Notify("Bitte einen Namen angeben.", "bad");
             return;
         }
 
@@ -266,17 +306,8 @@ else
         newOpensAt = 0;
         newClosesAt = 0;
         await LoadAll();
-        Say("Phase angelegt.", "ok");
-    }
-
-    private async Task SaveSchedule(TeamApplicationPhase phase)
-    {
-        if (!await EnsurePermission()) return;
-
-        await TeamApplicationService.UpdatePhaseScheduleAsync(phase.PhaseId, phase.Name, phase.OpensAt,
-            phase.ClosesAt);
-        ApplyPanelCommands.QueueRefreshPanel();
-        Say("Termine gespeichert.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Phase angelegt.", "ok");
     }
 
     private async Task OpenPhase(TeamApplicationPhase phase)
@@ -290,18 +321,19 @@ else
         var result = await TeamApplicationService.OpenPhaseAsync(phase.PhaseId);
         if (result != TeamApplicationPhaseOpenResult.Opened)
         {
-            Say(OpenResultMessage(result), "bad");
+            ToastService.Notify(OpenResultMessage(result), "bad");
             return;
         }
 
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
+        RebuildSnapshot();
 
         var message = reopened ? "Phase wieder geöffnet." : "Phase geöffnet.";
         if (reopened && hadExpiredEnd)
             message += " Der abgelaufene Endtermin wurde entfernt, sonst hätte der Hintergrund-Task " +
                        "die Phase sofort wieder geschlossen.";
-        Say(message, "ok");
+        ToastService.Notify(message, "ok");
     }
 
     private static string OpenResultMessage(TeamApplicationPhaseOpenResult result) => result switch
@@ -356,7 +388,8 @@ else
         await TeamApplicationService.ClosePhaseAsync(phase.PhaseId);
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
-        Say("Phase geschlossen. Vorhandene Bewerbungen bleiben entscheidbar, die Phase lässt sich wieder öffnen.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Phase geschlossen. Vorhandene Bewerbungen bleiben entscheidbar, die Phase lässt sich wieder öffnen.", "ok");
     }
 
     private async Task ArchivePhase(TeamApplicationPhase phase)
@@ -366,6 +399,7 @@ else
         await TeamApplicationService.ArchivePhaseAsync(phase.PhaseId);
         ApplyPanelCommands.QueueRefreshPanel();
         await LoadAll();
-        Say("Phase endgültig geschlossen. Vorhandene Bewerbungen bleiben entscheidbar.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Phase endgültig geschlossen. Vorhandene Bewerbungen bleiben entscheidbar.", "ok");
     }
 }

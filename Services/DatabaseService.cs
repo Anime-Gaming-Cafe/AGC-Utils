@@ -396,35 +396,6 @@ public static class DatabaseService
                 }
             },
             {
-                "pollsystem",
-                new Dictionary<string, string>
-                {
-                    { "id", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS id TEXT" },
-                    { "name", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS name TEXT" },
-                    { "text", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS text TEXT" },
-                    { "channelid", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS channelid BIGINT" },
-                    { "messageid", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS messageid BIGINT" },
-                    {
-                        "isexpiring", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS isexpiring BOOLEAN DEFAULT false"
-                    },
-                    { "expirydate", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS expirydate BIGINT DEFAULT 0" },
-                    {
-                        "dmcreatoronfinish",
-                        "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS dmcreatoronfinish BOOLEAN DEFAULT false"
-                    },
-                    {
-                        "isanonymous",
-                        "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS isanonymous BOOLEAN DEFAULT false"
-                    },
-                    {
-                        "ismultiplechoice",
-                        "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS ismultiplechoice BOOLEAN DEFAULT false"
-                    },
-                    { "creatorid", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS creatorid BIGINT" },
-                    { "options", "ALTER TABLE pollsystem ADD COLUMN IF NOT EXISTS options JSONB" }
-                }
-            },
-            {
                 "tempvoicesession_unique",
                 new Dictionary<string, string>
                 {
@@ -1154,10 +1125,21 @@ public static class DatabaseService
                 }
             },
             {
-                // Dashboard logins are not recorded any more; this removes what was.
                 "dashboardlogins", new Dictionary<string, string>
                 {
                     { "drop", "DROP TABLE IF EXISTS dashboardlogins" }
+                }
+            },
+            {
+                "pollsystem", new Dictionary<string, string>
+                {
+                    { "drop", "DROP TABLE IF EXISTS pollsystem" }
+                }
+            },
+            {
+                "pollvotes", new Dictionary<string, string>
+                {
+                    { "drop", "DROP TABLE IF EXISTS pollvotes" }
                 }
             }
         };

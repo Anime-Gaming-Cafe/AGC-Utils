@@ -69,7 +69,9 @@ Failed slash-command checks are swallowed and answered with an ephemeral error e
 
 ### Web dashboard
 
-Discord OAuth2 (`Discord.OAuth2.AspNetCore`) → cookie auth. `AuthUtils.RetrieveRole` maps the user's guild roles to an `Enums/Web/AccessLevel` name, which is stored as the `ClaimTypes.Role` claim; `RoleRefreshMiddleware` recomputes it on every request so role changes take effect without re-login. Razor pages gate with `@attribute [Authorize(Roles = "BotOwner, Administrator, …")]` and `<AuthorizeView Roles="…">` using those enum names. Blazor Server + BlazorBootstrap; `_Host` is the fallback page. The WebUI runs only when `[WebUI] Active = true`; `Program.RunAspAsync` also rewrites `Request.Host`/`Scheme` from `DashboardURL`/`UseHttps` so the OAuth `redirect_uri` is correct behind a proxy.
+Discord OAuth2 (`Discord.OAuth2.AspNetCore`) → cookie auth. `AuthUtils.RetrieveRole` maps the user's guild roles to an `Enums/Web/AccessLevel` name, which is stored as the `ClaimTypes.Role` claim; `RoleRefreshMiddleware` recomputes it on every request so role changes take effect without re-login. Razor pages gate with `@attribute [Authorize(Roles = "BotOwner, Administrator, …")]` and `<AuthorizeView Roles="…">` using those enum names. Blazor Server; `_Host` is the fallback page. Toasts and the "unsaved changes" bar are homegrown (`Services/ToastService.cs`, `Services/UnsavedChangesTracker.cs`, `Pages/SharedPages/ToastHost.razor`, `Pages/SharedPages/UnsavedChangesBar.razor`), no BlazorBootstrap. The WebUI runs only when `[WebUI] Active = true`; `Program.RunAspAsync` also rewrites `Request.Host`/`Scheme` from `DashboardURL`/`UseHttps` so the OAuth `redirect_uri` is correct behind a proxy.
+
+If you work on the Web UI, stick to `.claude/rules/ui-anti-slop.md`!
 
 ### Member cache
 

@@ -1324,3 +1324,104 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 /* A row list inside a padded panel body that has to run to the panel's edges. */
 .rows--bleed { margin-inline: calc(var(--s-4) * -1); }
+
+/* ==========================================================================
+   24. Toasts
+   Replaces the inline .notice confirmation that used to sit under the page
+   title. Same tone classes, just floated instead of pinned to the page.
+   ========================================================================== */
+
+.toast-host {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-width: 360px;
+    position: fixed;
+    right: var(--s-4);
+    top: calc(var(--topbar-h) + var(--s-4));
+    z-index: 1060;
+}
+
+.notice.toast {
+    align-items: flex-start;
+    box-shadow: var(--shadow-overlay);
+    display: flex;
+    gap: var(--s-3);
+    justify-content: space-between;
+}
+
+.toast__dismiss {
+    background: none;
+    border: 0;
+    color: var(--fg-subtle);
+    cursor: pointer;
+    font-size: var(--f-lg);
+    line-height: 1;
+    padding: 0;
+}
+
+.toast__dismiss:hover { color: var(--fg); }
+
+@media (max-width: 480px) {
+    .toast-host { left: var(--s-4); max-width: none; right: var(--s-4); }
+}
+
+/* ==========================================================================
+   25. Unsaved changes bar
+   A floating pill, not a docked bar: it sits above the page with a gap on
+   every side, same reasoning for --shadow-overlay as the other floating
+   elements (see DESIGN.md, "Elevation").
+   ========================================================================== */
+
+.unsaved-bar {
+    align-items: center;
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-surface);
+    bottom: var(--s-5);
+    box-shadow: var(--shadow-overlay);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-4);
+    justify-content: space-between;
+    left: 50%;
+    max-width: calc(100% - var(--s-5) * 2);
+    opacity: 0;
+    padding: var(--s-3) var(--s-4);
+    pointer-events: none;
+    position: fixed;
+    /* Resting (hidden) position: pushed below its own box plus a margin, so it starts fully out of view
+       and slides up into place instead of appearing out of nothing. */
+    transform: translate(-50%, calc(100% + var(--s-6)));
+    transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+    z-index: 1040;
+}
+
+/* Save/Discard both clear IsDirty, which drops this class again and slides the bar back down. */
+.unsaved-bar.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+}
+
+.unsaved-bar__actions {
+    display: flex;
+    gap: var(--s-2);
+}
+
+/* The one deliberate exception to MOTION 1 (see DESIGN.md, "Exceptions on
+   record"): a single non-looping shake when a blocked navigation attempt
+   needs to be felt, not just read. */
+.unsaved-bar.is-shaking { animation: shake 0.4s var(--ease); }
+
+/* Offsets stack onto the visible resting transform, not replace it. */
+@keyframes shake {
+    10%, 90% { transform: translate(calc(-50% - 1px), 0); }
+    20%, 80% { transform: translate(calc(-50% + 2px), 0); }
+    30%, 50%, 70% { transform: translate(calc(-50% - 4px), 0); }
+    40%, 60% { transform: translate(calc(-50% + 4px), 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .unsaved-bar.is-shaking { animation: none; }
+}

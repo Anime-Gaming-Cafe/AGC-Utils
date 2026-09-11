@@ -91,10 +91,11 @@ No pill-shaped buttons. Radius is a hierarchy tool here, not decoration.
 
 **Flat by default.** Surfaces separate through a background step plus a 1px border, not through shadow.
 
-Exactly two elements carry `--shadow-overlay`, because they genuinely float above the page and have to read as
-detached: the user dropdown and the error bar Blazor pins to the bottom of the viewport. Nothing else. The
-top bar stays flat too: a border separates it from the page, and on small screens its menu expands the bar
-itself instead of floating a drawer over the content.
+Exactly four elements carry `--shadow-overlay`, because they genuinely float above the page and have to read
+as detached: the user dropdown, the error bar Blazor pins to the bottom of the viewport, the unsaved-changes
+bar (a floating pill centered above the bottom edge, not docked to it), and a toast. Nothing else. The top bar
+stays flat too: a border separates it from the page, and on small screens its menu expands the bar itself
+instead of floating a drawer over the content.
 
 ## Glass and glow
 
@@ -178,9 +179,15 @@ padding, so its left edge lines up with the page beneath it.
 
 Shared components live in `Pages/SharedPages/` and are picked up automatically by `_Imports.razor`.
 
-`PageHeader` · `Panel` · `StateBlock` · `Pager` · `StatusPill` · `ApplicationStatusPill` · `ApplicantStatusPill` · `ConfirmInline` · `CopyId` · `SeenByAvatars` · `AppIcon`
+`PageHeader` · `Panel` · `StateBlock` · `Pager` · `StatusPill` · `ApplicationStatusPill` · `ApplicantStatusPill` · `ConfirmInline` · `CopyId` · `SeenByAvatars` · `AppIcon` · `ToastHost` · `UnsavedChangesBar`
 
 Before adding a page-local variant of one of these, change the component instead.
+
+`ToastHost` and `UnsavedChangesBar` are hosted once in `MainLayout` and driven by two scoped services
+(`Services/ToastService.cs`, `Services/UnsavedChangesTracker.cs`) instead of page-local state, so every page
+gets the same save-confirmation and dirty-tracking behaviour for free: a page calls
+`ToastService.Notify(message, tone)` instead of rendering its own `.notice`, and a page with editable fields
+calls `UnsavedChangesTracker.Register(saveAsync, discard)` instead of a per-field save button.
 
 ## Exceptions on record
 
@@ -189,6 +196,10 @@ Before adding a page-local variant of one of these, change the component instead
   designed, and it stays.
 - **The loading spinner** loops forever by nature. It is the only perpetual motion allowed, and it reports
   real progress.
+- **The unsaved-changes bar's shake** is the one MOTION-1 exception that is not a state change: a single
+  400ms, non-looping shake plays when a blocked navigation attempt needs to be *felt*, not just read as a
+  bar that failed to disappear. It fires once per blocked attempt, never loops, and respects
+  `prefers-reduced-motion`.
 - **The panel preview** on the panel editor imitates Discord's own embed rendering. Its surface and text
   colours are Discord's, and its left bar is the panel embed's colour (`DiscordColor.Gold`), not the dashboard
   accent. It exists to show the team what members will see, so fidelity to Discord wins over the palette there.

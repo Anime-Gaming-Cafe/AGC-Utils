@@ -1,0 +1,60 @@
+@using AGC_Management.Services
+@implements IDisposable
+@inject UnsavedChangesTracker Tracker
+@* Hosted once in MainLayout. Pages register Save/Discard delegates with UnsavedChangesTracker instead
+   of rendering their own save button; this bar is the single place that triggers them. *@
+
+<NavigationLock ConfirmExternalNavigation="Tracker.IsDirty" OnBeforeInternalNavigation="OnBeforeInternalNavigation"/>
+
+@* Always rendered (not @if) so the show/hide transform below can actually transition instead of
+   the element just appearing/disappearing with the render. *@
+<div class="unsaved-bar @(Tracker.IsDirty ? "is-visible" : null) @(_shaking ? "is-shaking" : null)">
+    <span class="unsaved-bar__text">Du hast ungespeicherte Änderungen.</span>
+    <div class="unsaved-bar__actions">
+        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="Discard">Zurücksetzen</button>
+        <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="Save">Speichern</button>
+    </div>
+</div>
+
+@code {
+    private bool _busy;
+    private bool _shaking;
+
+    protected override void OnInitialized() => Tracker.OnChange += HandleChange;
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private async Task Save()
+    {
+        _busy = true;
+        try
+        {
+            await Tracker.SaveAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Discard() => Tracker.Discard();
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (!Tracker.IsDirty) return;
+
+        context.PreventNavigation();
+        await Shake();
+    }
+
+    private async Task Shake()
+    {
+        _shaking = true;
+        StateHasChanged();
+        await Task.Delay(400);
+        _shaking = false;
+        StateHasChanged();
+    }
+
+    public void Dispose() => Tracker.OnChange -= HandleChange;
+}

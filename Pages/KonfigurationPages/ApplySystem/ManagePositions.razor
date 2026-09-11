@@ -5,7 +5,10 @@
 @using AGC_Management.Services
 @using AGC_Management.ApplicationSystem
 @using DisCatSharp.Enums
+@implements IDisposable
 @inject UserService UserService
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
 <PageHeader Title="Bewerbungspositionen"
@@ -26,11 +29,6 @@ else if (!mayManage)
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
-
     @if (positions.Count == 0)
     {
         <StateBlock Title="Noch keine Position angelegt"
@@ -52,16 +50,16 @@ else
                 <div class="field-grid">
                     <div class="field">
                         <label class="field__label" for="name-@position.PositionId">Anzeigename</label>
-                        <input id="name-@position.PositionId" class="form-control" @bind="position.PositionName"/>
+                        <input id="name-@position.PositionId" class="form-control" @bind="position.PositionName" @bind:after="OnFieldChanged"/>
                     </div>
                     <div class="field">
                         <label class="field__label" for="lvl-@position.PositionId">Mindestlevel</label>
-                        <input id="lvl-@position.PositionId" type="number" min="0" class="form-control" @bind="position.MinLevel"/>
+                        <input id="lvl-@position.PositionId" type="number" min="0" class="form-control" @bind="position.MinLevel" @bind:after="OnFieldChanged"/>
                         <span class="field__hint">Bewerber sehen diese Zahl nie.</span>
                     </div>
                     <div class="field">
                         <label class="field__label" for="ch-@position.PositionId">Benachrichtigungs-Channel</label>
-                        <select id="ch-@position.PositionId" class="form-select" @bind="position.NotifyChannelId">
+                        <select id="ch-@position.PositionId" class="form-select" @bind="position.NotifyChannelId" @bind:after="OnFieldChanged">
                             <option value="0">Kein Channel</option>
                             @foreach (var channel in textChannels)
                             {
@@ -71,18 +69,18 @@ else
                     </div>
                     <div class="field field--wide">
                         <label class="field__label" for="desc-@position.PositionId">Beschreibung</label>
-                        <textarea id="desc-@position.PositionId" class="form-control" rows="2" @bind="position.Description"></textarea>
+                        <textarea id="desc-@position.PositionId" class="form-control" rows="2" @bind="position.Description" @bind:after="OnFieldChanged"></textarea>
                     </div>
                 </div>
 
                 <div class="form-check form-switch mt-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="active-@position.PositionId"
-                           @bind="position.Active"/>
+                           @bind="position.Active" @bind:after="OnFieldChanged"/>
                     <label class="form-check-label" for="active-@position.PositionId">Im Bewerbungspanel anzeigen</label>
                 </div>
                 <div class="form-check form-switch mt-2">
                     <input class="form-check-input" type="checkbox" role="switch" id="alwaysopen-@position.PositionId"
-                           @bind="position.AlwaysOpen"/>
+                           @bind="position.AlwaysOpen" @bind:after="OnFieldChanged"/>
                     <label class="form-check-label" for="alwaysopen-@position.PositionId">
                         Bewerbungseinsendung immer erlauben
                     </label>
@@ -93,7 +91,6 @@ else
                 </div>
 
                 <div class="form-foot">
-                    <button type="button" class="btn btn-secondary" @onclick="() => SavePosition(position)">Speichern</button>
                     <a class="btn btn-ghost" href="/konfiguration/applysystem/questions/@position.PositionId">Fragenkatalog</a>
                     <a class="btn btn-ghost" href="/konfiguration/applysystem/phases/@position.PositionId">Phasen</a>
                     @if (isAdministrator && pendingDelete != position.PositionId)
@@ -154,14 +151,13 @@ else
     private bool mayManage;
     private bool isAdministrator;
     private bool deleting;
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private string? pendingDelete;
     private int pendingDeleteApplications;
 
     private List<TeamApplicationPosition> positions = new();
     private List<DiscordChannel> textChannels = new();
+    private Dictionary<string, TeamApplicationPosition> originalPositions = new();
 
     private string newName = "";
     private int newMinLevel = 20;
@@ -175,9 +171,17 @@ else
             TeamApplicationPermission.ManageQuestions);
         isAdministrator = await TeamApplicationPermissionService.IsAdministratorAsync(userId);
 
-        if (mayManage) await LoadAll();
+        if (mayManage)
+        {
+            await LoadAll();
+            RebuildSnapshot();
+            Tracker.Register(SaveAllPositions, Discard);
+        }
+
         loaded = true;
     }
+
+    public void Dispose() => Tracker.Unregister();
 
     private async Task LoadAll()
     {
@@ -189,39 +193,75 @@ else
         positions = await TeamApplicationService.GetPositionsAsync();
     }
 
-    private void Say(string message, string tone)
+    private static TeamApplicationPosition ClonePosition(TeamApplicationPosition source) => new()
     {
-        statusMessage = message;
-        statusTone = tone;
+        PositionId = source.PositionId,
+        PositionName = source.PositionName,
+        Description = source.Description,
+        MinLevel = source.MinLevel,
+        NotifyChannelId = source.NotifyChannelId,
+        Active = source.Active,
+        AlwaysOpen = source.AlwaysOpen,
+        CreatedAt = source.CreatedAt
+    };
+
+    private static void CopyEditableFields(TeamApplicationPosition target, TeamApplicationPosition source)
+    {
+        target.PositionName = source.PositionName;
+        target.Description = source.Description;
+        target.MinLevel = source.MinLevel;
+        target.NotifyChannelId = source.NotifyChannelId;
+        target.Active = source.Active;
+        target.AlwaysOpen = source.AlwaysOpen;
     }
 
-    private async Task SavePosition(TeamApplicationPosition position)
+    private void RebuildSnapshot() => originalPositions = positions.ToDictionary(p => p.PositionId, ClonePosition);
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    // The registered save delegate: every position is re-checked individually because
+    // ManagePermissions can grant "Fragenkatalog verwalten" per position, not just globally.
+    private async Task SaveAllPositions()
     {
-        if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
-                position.PositionId))
+        var denied = new List<string>();
+
+        foreach (var position in positions)
         {
-            Say("Für diese Position fehlt dir die Berechtigung.", "bad");
-            return;
+            if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
+                    position.PositionId))
+            {
+                denied.Add(position.PositionName);
+                continue;
+            }
+
+            await TeamApplicationService.UpdatePositionAsync(position);
         }
 
-        try
+        ApplyPanelCommands.QueueRefreshPanel();
+        RebuildSnapshot();
+
+        if (denied.Count > 0)
+            ToastService.Notify($"Für folgende Positionen fehlt dir die Berechtigung, sie wurden nicht gespeichert: {string.Join(", ", denied)}", "bad");
+        else
+            ToastService.Notify("Positionen gespeichert.", "ok");
+    }
+
+    private void Discard()
+    {
+        foreach (var position in positions)
         {
-            await TeamApplicationService.UpdatePositionAsync(position);
-            ApplyPanelCommands.QueueRefreshPanel();
-            Say($"„{position.PositionName}“ gespeichert.", "ok");
+            if (originalPositions.TryGetValue(position.PositionId, out var original))
+                CopyEditableFields(position, original);
         }
-        catch (Exception e)
-        {
-            CurrentApplication.Logger.Error(e, "TeamApplications: Position speichern fehlgeschlagen");
-            Say("Die Position konnte nicht gespeichert werden.", "bad");
-        }
+
+        StateHasChanged();
     }
 
     private async Task RequestDelete(TeamApplicationPosition position)
     {
         if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
         {
-            Say("Positionen dürfen nur Administratoren löschen.", "bad");
+            ToastService.Notify("Positionen dürfen nur Administratoren löschen.", "bad");
             return;
         }
 
@@ -237,7 +277,7 @@ else
         // Re-checked here, not just when the button was rendered.
         if (!await TeamApplicationPermissionService.IsAdministratorAsync(userId))
         {
-            Say("Positionen dürfen nur Administratoren löschen.", "bad");
+            ToastService.Notify("Positionen dürfen nur Administratoren löschen.", "bad");
             pendingDelete = null;
             return;
         }
@@ -254,12 +294,13 @@ else
 
             pendingDelete = null;
             await LoadAll();
-            Say($"„{position.PositionName}“ wurde gelöscht.", "ok");
+            RebuildSnapshot();
+            ToastService.Notify($"„{position.PositionName}“ wurde gelöscht.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Position löschen fehlgeschlagen");
-            Say("Die Position konnte nicht gelöscht werden. Es wurde nichts verändert.", "bad");
+            ToastService.Notify("Die Position konnte nicht gelöscht werden. Es wurde nichts verändert.", "bad");
         }
         finally
         {
@@ -271,33 +312,34 @@ else
     {
         if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions))
         {
-            Say("Dafür fehlt dir die Berechtigung.", "bad");
+            ToastService.Notify("Dafür fehlt dir die Berechtigung.", "bad");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            Say("Bitte einen Namen angeben.", "bad");
+            ToastService.Notify("Bitte einen Namen angeben.", "bad");
             return;
         }
 
         var slug = TeamApplicationService.Slugify(newName);
         if (string.IsNullOrEmpty(slug) || TeamApplicationService.IsReservedSlug(slug))
         {
-            Say("Aus diesem Namen lässt sich keine gültige URL bilden. Bitte einen anderen wählen.", "bad");
+            ToastService.Notify("Aus diesem Namen lässt sich keine gültige URL bilden. Bitte einen anderen wählen.", "bad");
             return;
         }
 
         var created = await TeamApplicationService.CreatePositionAsync(newName, newMinLevel, 0, "");
         if (created == null)
         {
-            Say("Es gibt bereits eine Position mit dieser URL.", "bad");
+            ToastService.Notify("Es gibt bereits eine Position mit dieser URL.", "bad");
             return;
         }
 
         newName = "";
         newMinLevel = 20;
         await LoadAll();
-        Say("Position angelegt. Als Nächstes den Fragenkatalog anlegen.", "ok");
+        RebuildSnapshot();
+        ToastService.Notify("Position angelegt. Als Nächstes den Fragenkatalog anlegen.", "ok");
     }
 }

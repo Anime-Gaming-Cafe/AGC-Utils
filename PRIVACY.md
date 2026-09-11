@@ -91,7 +91,6 @@ fetched from elsewhere are Discord avatars, which your browser loads from Discor
 | Feature | Data |
 |---|---|
 | Counting game | Your user ID, your correct-count total, your failure count, your saves, and high score entries with timestamps. |
-| Polls | Poll configuration and, for each vote, the poll ID, the chosen option, and **your user ID**. Note that this applies to polls marked as anonymous too. Anonymity is only applied when results are displayed; the vote is not anonymous in the database. |
 | Temporary voice channels | The channel owner's user ID, your saved channel name, bitrate and user limit, your block list and permit list, and your lock and hide preferences. |
 | Introduction cooldown | Your user ID and the time of your last post in the introduction channel. |
 
@@ -117,7 +116,7 @@ the database:
 | Moderation, safety, anti-raid, abuse prevention, ban and warning records, evidence retention | Art. 6(1)(f) GDPR, legitimate interests: keeping the server safe and enforcing its rules. Without a durable moderation record the moderation system cannot function. |
 | Activity metrics used for moderation context and for role and permission conditions | Art. 6(1)(f) GDPR, legitimate interests. |
 | Support tickets and their transcripts | Art. 6(1)(b) GDPR where the ticket concerns your participation on the server, otherwise Art. 6(1)(f). |
-| Leveling, rank cards, counting, polls, temporary voice channels, staff applications | Art. 6(1)(a) GDPR, consent, given by choosing to use the feature. You can stop using these features at any time. |
+| Leveling, rank cards, counting, temporary voice channels, staff applications | Art. 6(1)(a) GDPR, consent, given by choosing to use the feature. You can stop using these features at any time. |
 | Dashboard authentication and session cookies | Art. 6(1)(b) GDPR, necessary to provide the service you requested by logging in. |
 | Error reporting | Art. 6(1)(f) GDPR, legitimate interests: keeping the bot working. |
 

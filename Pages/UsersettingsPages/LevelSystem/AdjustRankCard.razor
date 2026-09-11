@@ -2,8 +2,10 @@
 @using AGC_Management.Controller
 @using System.Text.Json
 @using AGC_Management.Utils
+@using AGC_Management.Services
 @using SkiaSharp
 @inject UserService UserService
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
 <PageHeader Title="Rangkarte"
@@ -47,16 +49,6 @@ else
                     <label class="field__label" for="rc-image">Hintergrundbild</label>
                     <InputFile id="rc-image" class="form-control" accept="image/png,image/jpeg,image/webp" OnChange="UploadFile"/>
                     <span class="field__hint">Empfohlen 930 × 280 Pixel, höchstens 5 MB. PNG, JPG oder WebP.</span>
-                    @if (!string.IsNullOrWhiteSpace(uploadStatus))
-                    {
-                        <span class="field__hint" role="status">@uploadStatus</span>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(errorMessage))
-                    {
-                        @* Rendered as text now. It used to go through MarkupString, and it can carry
-                           exception messages and reasons returned by the image check API. *@
-                        <span class="field__error" role="alert">@errorMessage</span>
-                    }
                 </div>
 
                 <div class="form-foot">
@@ -143,8 +135,6 @@ else
     private bool hasColorChanged;
     private bool hasFontChanged;
     private bool hasBoxAlphaChanged;
-    private string uploadStatus = "";
-    private string errorMessage = "";
 
     private bool cardsRequested;
     private bool cardFailed;
@@ -163,23 +153,19 @@ else
         var file = e.File;
         if (file == null)
         {
-            uploadStatus = "Keine Datei ausgewählt.";
+            ToastService.Notify("Keine Datei ausgewählt.", "bad");
             return;
         }
 
-        uploadStatus = "Datei wird hochgeladen.";
-
         if (file.Size > 5242880)
         {
-            errorMessage = "Die Datei ist zu groß. Bitte wähle eine Datei, die kleiner als 5MB ist.";
-            uploadStatus = "";
+            ToastService.Notify("Die Datei ist zu groß. Bitte wähle eine Datei, die kleiner als 5MB ist.", "bad");
             return;
         }
 
         if (file.ContentType != "image/png" && file.ContentType != "image/jpg" && file.ContentType != "image/jpeg" && file.ContentType != "image/webp")
         {
-            errorMessage = "Die Datei hat ein ungültiges Format!";
-            uploadStatus = "";
+            ToastService.Notify("Die Datei hat ein ungültiges Format!", "bad");
             return;
         }
 
@@ -190,15 +176,13 @@ else
             await file.OpenReadStream(5242880).CopyToAsync(ms);
             imageToInstall = Convert.ToBase64String(ms.ToArray());
             hasImageChanged = true;
-            uploadStatus = "Bild erfolgreich hochgeladen.";
-            errorMessage = "";
+            ToastService.Notify("Bild erfolgreich hochgeladen.", "ok");
             await CopySettingsToPreview();
         }
         catch (Exception ex)
         {
             imageToInstall = old_data;
-            errorMessage = $"Fehler beim Hochladen der Datei: {ex.Message}";
-            uploadStatus = "";
+            ToastService.Notify($"Fehler beim Hochladen der Datei: {ex.Message}", "bad");
         }
     }
 
@@ -257,7 +241,7 @@ else
                 {
                     if (isActivated)
                     {
-                        uploadStatus = "Bild wird geprüft.";
+                        ToastService.Notify("Bild wird geprüft.", "ok");
                         using var client = new HttpClient();
                         var apikey = BotConfig.GetConfig()["LinkLens"]["API-KEY"];
                         client.DefaultRequestHeaders.Add("api-key", apikey);
@@ -279,26 +263,24 @@ else
                                 }
                             }
 
-                            errorMessage = $"Das Bild wurde abgelehnt, da es folgende Gründe hat: {rejectReasons}";
-                            uploadStatus = "";
+                            ToastService.Notify($"Das Bild wurde abgelehnt, da es folgende Gründe hat: {rejectReasons}", "bad");
                             await LogRuleViolatingImageUpload(userId, rejectReasons, imageToInstall);
                             return;
                         }
 
-                        uploadStatus = "Bild wurde moderativ geprüft und ist in Ordnung. Bild wird gespeichert...";
+                        ToastService.Notify("Bild wurde moderativ geprüft und ist in Ordnung. Bild wird gespeichert...", "ok");
 
                         await Task.Delay(500);
                     }
                 }
                 catch (Exception ex)
                 {
-                    errorMessage = $"Fehler beim moderativen prüfen der Datei: {ex.Message}";
-                    uploadStatus = "";
+                    ToastService.Notify($"Fehler beim moderativen prüfen der Datei: {ex.Message}", "bad");
                     return;
                 }
 
                 await SaveCustomRankCardSetting("imagedata", imageToInstall, userId);
-                uploadStatus = "Bild wurde erfolgreich gespeichert.";
+                ToastService.Notify("Bild wurde erfolgreich gespeichert.", "ok");
                 hasImageChanged = false;
             }
         }
@@ -430,8 +412,7 @@ else
             previewFailed = true;
             if (hasImageChanged)
             {
-                errorMessage = "Mit diesem Bild ließ sich keine Vorschau erzeugen. Die Datei ist vermutlich kein gültiges Bild.";
-                uploadStatus = "";
+                ToastService.Notify("Mit diesem Bild ließ sich keine Vorschau erzeugen. Die Datei ist vermutlich kein gültiges Bild.", "bad");
             }
             else
             {

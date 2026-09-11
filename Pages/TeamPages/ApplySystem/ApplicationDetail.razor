@@ -5,6 +5,7 @@
 @using AGC_Management.Services
 @using AGC_Management.Utils
 @inject UserService UserService
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
 
 @if (!loaded)
@@ -39,11 +40,6 @@ else
             <ApplicationStatusPill Status="@application.Status"/>
         </Actions>
     </PageHeader>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
 
     @if (application.DmDelivered == false)
     {
@@ -366,8 +362,6 @@ else
     private ulong userId;
 
     private bool loaded;
-    private string statusMessage = "";
-    private string statusTone = "ok";
 
     private TeamApplication? application;
     private TeamApplicationPermissionSet perms = new();
@@ -528,18 +522,12 @@ else
         return entries.OrderByDescending(e => e.Timestamp).ToList();
     }
 
-    private void Say(string message, string tone)
-    {
-        statusMessage = message;
-        statusTone = tone;
-    }
-
     private async Task<bool> Ensure(TeamApplicationPermission permission)
     {
         if (application != null && await TeamApplicationPermissionService.HasAsync(userId, permission,
                 application.PositionId, application.PhaseId)) return true;
 
-        Say("Dafür fehlt dir die Berechtigung.", "bad");
+        ToastService.Notify("Dafür fehlt dir die Berechtigung.", "bad");
         return false;
     }
 
@@ -549,7 +537,7 @@ else
 
         await TeamApplicationService.SetStatusAsync(ApplicationId, status);
         application.Status = status;
-        Say("Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.", "ok");
+        ToastService.Notify("Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.", "ok");
     }
 
     private async Task AddNote()
@@ -558,14 +546,14 @@ else
 
         if (string.IsNullOrWhiteSpace(newNote))
         {
-            Say("Die Notiz ist leer.", "bad");
+            ToastService.Notify("Die Notiz ist leer.", "bad");
             return;
         }
 
         await TeamApplicationService.AddNoteAsync(ApplicationId, userId, newNote.Trim());
         newNote = "";
         notes = await TeamApplicationService.GetNotesAsync(ApplicationId);
-        Say("Notiz gespeichert.", "ok");
+        ToastService.Notify("Notiz gespeichert.", "ok");
     }
 
     private void ApplyTemplate(ChangeEventArgs e)
@@ -581,7 +569,7 @@ else
 
         if (status == TeamApplicationStatus.Abgelehnt && string.IsNullOrWhiteSpace(decisionText))
         {
-            Say("Bei einer Absage ist eine Begründung Pflicht.", "bad");
+            ToastService.Notify("Bei einer Absage ist eine Begründung Pflicht.", "bad");
             return;
         }
 
@@ -602,14 +590,14 @@ else
             decideOpen = false;
 
             if (application?.DmDelivered == false)
-                Say("Entscheidung gespeichert, die DM konnte aber nicht zugestellt werden.", "warn");
+                ToastService.Notify("Entscheidung gespeichert, die DM konnte aber nicht zugestellt werden.", "warn");
             else
-                Say("Entscheidung gespeichert und dem Bewerber zugestellt.", "ok");
+                ToastService.Notify("Entscheidung gespeichert und dem Bewerber zugestellt.", "ok");
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Entscheidung fehlgeschlagen");
-            Say("Die Entscheidung konnte nicht gespeichert werden. Es wurde nichts verschickt.", "bad");
+            ToastService.Notify("Die Entscheidung konnte nicht gespeichert werden. Es wurde nichts verschickt.", "bad");
         }
         finally
         {
@@ -627,7 +615,7 @@ else
         grantReason = "";
 
         await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
-        Say("Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
+        ToastService.Notify("Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
     }
 
     private sealed class ModerationEntry

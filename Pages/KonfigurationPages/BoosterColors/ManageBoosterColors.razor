@@ -2,6 +2,9 @@
 @using AGC_Management.Services
 @using AGC_Management.BoosterColors
 @using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
 <PageHeader Title="Booster Farben"
@@ -16,11 +19,6 @@
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="notice notice--@statusTone mb-3" role="status">@statusMessage</div>
-    }
-
     @if (boundariesMissing)
     {
         <div class="notice notice--warn mb-3">
@@ -59,23 +57,22 @@ else
                     {
                         <tr>
                             <td><span class="swatch" style="background:@PreviewBackground(role);"></span></td>
-                            <td><input class="form-control form-control-sm" aria-label="Name" @bind="role.Name"/></td>
-                            <td><input type="color" class="form-control form-control-color" aria-label="Farbe" @bind="role.Hex"/></td>
+                            <td><input class="form-control form-control-sm" aria-label="Name" @bind="role.Name" @bind:after="OnFieldChanged"/></td>
+                            <td><input type="color" class="form-control form-control-color" aria-label="Farbe" @bind="role.Hex" @bind:after="OnFieldChanged"/></td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="form-check form-switch m-0">
-                                        <input class="form-check-input" type="checkbox" role="switch" aria-label="Verlauf" @bind="role.Gradient"/>
+                                        <input class="form-check-input" type="checkbox" role="switch" aria-label="Verlauf" @bind="role.Gradient" @bind:after="OnFieldChanged"/>
                                     </div>
                                     @if (role.Gradient)
                                     {
-                                        <input type="color" class="form-control form-control-color" aria-label="Zweite Farbe" @bind="role.SecondaryHex"/>
+                                        <input type="color" class="form-control form-control-color" aria-label="Zweite Farbe" @bind="role.SecondaryHex" @bind:after="OnFieldChanged"/>
                                     }
                                 </div>
                             </td>
                             <td class="tnum text-end">@role.MemberCount</td>
                             <td>
                                 <div class="row-actions justify-content-end">
-                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => SaveRole(role)">Speichern</button>
                                     <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteRole = role.Id">Löschen</button>
                                 </div>
                             </td>
@@ -176,12 +173,11 @@ else
 @code {
     private bool loaded;
     private bool boundariesMissing;
-    private string statusMessage = "";
-    private string statusTone = "ok";
     private ulong pendingDeleteRole;
 
     private List<ColorRoleVm> colorRoles = new();
     private List<DiscordChannel> textChannels = new();
+    private Dictionary<ulong, ColorRoleVm> originalColorRoles = new();
 
     private ulong panelChannelId;
     private string embedTitle = "";
@@ -197,8 +193,12 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadAll();
+        RebuildSnapshot();
+        Tracker.Register(SaveAllRoles, Discard);
         loaded = true;
     }
+
+    public void Dispose() => Tracker.Unregister();
 
     private async Task LoadAll()
     {
@@ -239,6 +239,20 @@ else
             .ToList();
     }
 
+    private static ColorRoleVm CloneColorRole(ColorRoleVm source) => new()
+    {
+        Id = source.Id,
+        Name = source.Name,
+        Hex = source.Hex,
+        Gradient = source.Gradient,
+        SecondaryHex = source.SecondaryHex,
+        MemberCount = source.MemberCount
+    };
+
+    private void RebuildSnapshot() => originalColorRoles = colorRoles.ToDictionary(r => r.Id, CloneColorRole);
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
     private async Task SaveSettings()
     {
         await BoosterColorService.SetEmbedTitleAsync(embedTitle);
@@ -246,39 +260,39 @@ else
         await BoosterColorService.SetEnabledAsync(enabled);
         await BoosterColorService.SetBypassEligibilityAsync(bypassEligibility);
         BoosterColorPanelCommands.QueueRefreshPanel();
-        Say("Einstellungen gespeichert.", "ok");
+        ToastService.Notify("Einstellungen gespeichert.", "ok");
     }
 
     private async Task SendPanel()
     {
         if (panelChannelId == 0)
         {
-            Say("Bitte zuerst einen Panel-Channel wählen.", "bad");
+            ToastService.Notify("Bitte zuerst einen Panel-Channel wählen.", "bad");
             return;
         }
 
         try
         {
             await BoosterColorPanelCommands.SendPanelToChannelAsync(panelChannelId);
-            Say("Panel wurde gesendet.", "ok");
+            ToastService.Notify("Panel wurde gesendet.", "ok");
         }
         catch (Exception e)
         {
-            Say($"Fehler beim Senden des Panels: {e.Message}", "bad");
+            ToastService.Notify($"Fehler beim Senden des Panels: {e.Message}", "bad");
         }
     }
 
     private async Task RefreshPanel()
     {
         await BoosterColorPanelCommands.RefreshPanel();
-        Say("Panel wird aktualisiert.", "ok");
+        ToastService.Notify("Panel wird aktualisiert.", "ok");
     }
 
     private async Task CreateRole()
     {
         if (string.IsNullOrWhiteSpace(newRoleName))
         {
-            Say("Bitte einen Namen angeben.", "bad");
+            ToastService.Notify("Bitte einen Namen angeben.", "bad");
             return;
         }
 
@@ -295,7 +309,7 @@ else
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "BoosterColors: failed to create role");
-            Say($"Fehler beim Anlegen der Rolle: {DescribeError(e)}", "bad");
+            ToastService.Notify($"Fehler beim Anlegen der Rolle: {DescribeError(e)}", "bad");
             return;
         }
 
@@ -352,9 +366,10 @@ else
         newRoleHex = "#9f00ff";
         newRoleGradient = false;
         newRoleSecondaryHex = "#00b3ff";
-        Say($"Farbrolle „{role.Name}“ wurde angelegt.{positionWarning}{colorWarning}",
+        ToastService.Notify($"Farbrolle „{role.Name}“ wurde angelegt.{positionWarning}{colorWarning}",
             positionWarning.Length > 0 || colorWarning.Length > 0 ? "warn" : "ok");
         LoadColorRoles(guild);
+        RebuildSnapshot();
     }
 
     /// <summary>
@@ -409,29 +424,55 @@ else
         }
     }
 
-    private async Task SaveRole(ColorRoleVm vm)
+    // The registered save delegate: every dirty row is written back to Discord at once.
+    private async Task SaveAllRoles()
     {
         var guild = CurrentApplication.TargetGuild;
-        try
-        {
-            var role = guild.GetRole(vm.Id);
-            if (role == null)
-            {
-                Say("Rolle nicht gefunden.", "bad");
-                return;
-            }
+        var errors = new List<string>();
 
-            await role.ModifyAsync(name: vm.Name, reason: "Booster color role edited via WebUI");
-            await ApplyColorsAsync(role, vm.Hex, vm.Gradient, vm.SecondaryHex);
-            BoosterColorPanelCommands.QueueRefreshPanel();
-            Say($"Farbrolle „{vm.Name}“ wurde gespeichert.", "ok");
-            LoadColorRoles(guild);
-        }
-        catch (Exception e)
+        foreach (var vm in colorRoles)
         {
-            CurrentApplication.Logger.Error(e, "BoosterColors: failed to save role");
-            Say($"Fehler beim Speichern: {DescribeError(e)}", "bad");
+            try
+            {
+                var role = guild.GetRole(vm.Id);
+                if (role == null)
+                {
+                    errors.Add($"„{vm.Name}“ nicht gefunden");
+                    continue;
+                }
+
+                await role.ModifyAsync(name: vm.Name, reason: "Booster color role edited via WebUI");
+                await ApplyColorsAsync(role, vm.Hex, vm.Gradient, vm.SecondaryHex);
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e, "BoosterColors: failed to save role");
+                errors.Add($"„{vm.Name}“: {DescribeError(e)}");
+            }
         }
+
+        BoosterColorPanelCommands.QueueRefreshPanel();
+        LoadColorRoles(guild);
+        RebuildSnapshot();
+
+        if (errors.Count > 0)
+            ToastService.Notify($"Farbrollen gespeichert, mit Fehlern: {string.Join("; ", errors)}", "warn");
+        else
+            ToastService.Notify("Farbrollen gespeichert.", "ok");
+    }
+
+    private void Discard()
+    {
+        foreach (var vm in colorRoles)
+        {
+            if (!originalColorRoles.TryGetValue(vm.Id, out var original)) continue;
+            vm.Name = original.Name;
+            vm.Hex = original.Hex;
+            vm.Gradient = original.Gradient;
+            vm.SecondaryHex = original.SecondaryHex;
+        }
+
+        StateHasChanged();
     }
 
     private async Task DeleteRole(ColorRoleVm vm)
@@ -445,20 +486,15 @@ else
                 await role.DeleteAsync("Booster color role deleted via WebUI");
             await BoosterColorService.DeleteEmojiAsync(vm.Id);
             BoosterColorPanelCommands.QueueRefreshPanel();
-            Say($"Farbrolle „{vm.Name}“ wurde gelöscht.", "ok");
+            ToastService.Notify($"Farbrolle „{vm.Name}“ wurde gelöscht.", "ok");
             LoadColorRoles(guild);
+            RebuildSnapshot();
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "BoosterColors: failed to delete role");
-            Say($"Fehler beim Löschen: {DescribeError(e)}", "bad");
+            ToastService.Notify($"Fehler beim Löschen: {DescribeError(e)}", "bad");
         }
-    }
-
-    private void Say(string message, string tone)
-    {
-        statusMessage = message;
-        statusTone = tone;
     }
 
     private static string HexOf(DiscordColor c)

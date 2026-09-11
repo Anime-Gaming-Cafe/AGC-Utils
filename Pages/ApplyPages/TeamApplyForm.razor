@@ -5,6 +5,7 @@
 @using AGC_Management.Services
 @using AGC_Management.Utils
 @inject UserService UserService
+@inject ToastService ToastService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
 
 <PageHeader Title="@($"Bewerbung: {position?.PositionName ?? PositionId}")"
@@ -162,10 +163,6 @@ else
                 }
                 Bewerbung abschicken
             </button>
-            @if (!string.IsNullOrWhiteSpace(statusMessage))
-            {
-                <span class="field__error" role="alert">@statusMessage</span>
-            }
         </div>
     </Panel>
 }
@@ -191,7 +188,6 @@ else
     private bool loaded;
     private bool submitting;
     private Stage stage = Stage.NotFound;
-    private string statusMessage = "";
 
     private TeamApplicationPosition? position;
     private TeamApplicationPhase? phase;
@@ -311,7 +307,6 @@ else
     {
         if (submitting) return;
         submitting = true;
-        statusMessage = "";
 
         try
         {
@@ -348,7 +343,7 @@ else
             foreach (var answer in answers) Validate(answer);
             if (answers.Any(a => a.Error != null))
             {
-                statusMessage = "Bitte korrigiere die markierten Antworten.";
+                ToastService.Notify("Bitte korrigiere die markierten Antworten.", "bad");
                 return;
             }
 
@@ -357,7 +352,7 @@ else
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "TeamApplications: Bewerbung konnte nicht gespeichert werden");
-            statusMessage = "Deine Bewerbung konnte nicht gespeichert werden. Bitte versuche es erneut.";
+            ToastService.Notify("Deine Bewerbung konnte nicht gespeichert werden. Bitte versuche es erneut.", "bad");
         }
         finally
         {

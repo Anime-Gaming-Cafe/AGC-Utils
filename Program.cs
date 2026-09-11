@@ -5,7 +5,6 @@ using System.Security.Claims;
 using AGC_Management.Controller;
 using AGC_Management.Services;
 using AGC_Management.Utils;
-using BlazorBootstrap;
 using DisCatSharp;
 using DisCatSharp.Entities;
 using Discord.OAuth2;
@@ -179,8 +178,9 @@ internal class Program : BaseCommandModule
             .AddHubOptions(options => { options.MaximumReceiveMessageSize = 32 * 1024 * 100; });
         builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog());
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddBlazorBootstrap();
         builder.Services.AddSingleton<UserService>();
+        builder.Services.AddScoped<ToastService>();
+        builder.Services.AddScoped<UnsavedChangesTracker>();
         builder.Services.AddSession(options =>
         {
             options.IdleTimeout = TimeSpan.FromMinutes(30);
