@@ -1,0 +1,224 @@
+@page "/teamarea/applysystem/applications"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@implements IDisposable
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<h1>Bewerbungen</h1>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else if (allowedPositions.Count == 0)
+{
+    <div class="alert alert-danger-glass mt-3" role="alert">
+        Du hast für keine Position das Recht, Bewerbungen einzusehen.
+    </div>
+}
+else
+{
+    <div class="glass-card mt-3 p-3">
+        <div class="row g-2">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label">Position</label>
+                <select class="form-select glassy-input" @bind="filterPosition" @bind:after="ApplyFilters">
+                    <option value="">Alle Positionen</option>
+                    @foreach (var position in positions)
+                    {
+                        <option value="@position.PositionId">@position.PositionName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label">Phase</label>
+                <select class="form-select glassy-input" @bind="filterPhase" @bind:after="ApplyFilters">
+                    <option value="">Alle Phasen</option>
+                    @foreach (var phase in VisiblePhases)
+                    {
+                        <option value="@phase.PhaseId">@phase.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label">Status</label>
+                <select class="form-select glassy-input" @bind="filterStatus" @bind:after="ApplyFilters">
+                    <option value="">Alle Status</option>
+                    @foreach (var status in Enum.GetValues<TeamApplicationStatus>())
+                    {
+                        <option value="@status">@StatusLabel(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label">Suche</label>
+                <input class="form-control glassy-input" placeholder="Name oder Nutzer-ID"
+                       value="@searchTerm" @oninput="OnSearchChanged"/>
+            </div>
+        </div>
+        <button class="btn btn-secondary-glass mt-3" @onclick="Reload">Aktualisieren</button>
+    </div>
+
+    @if (filtered.Count == 0)
+    {
+        <div class="alert alert-warning-glass mt-3" role="alert">
+            Es wurden keine Bewerbungen gefunden.
+        </div>
+    }
+
+    @foreach (var application in filtered)
+    {
+        <div class="glass-card mt-3">
+            <ul class="list-group @StatusCss(application.Status) list-group-flush">
+                <li class="list-group-item">
+                    <a href="/teamarea/applysystem/application/@application.ApplicationId">
+                        <h5 class="mb-1">@ToolSet.GetFormattedName(application.UserId)</h5>
+                        <p class="mb-1">Nutzer-ID: @application.UserId</p>
+                        <p class="mb-1">@application.PositionName &middot; @application.PhaseName</p>
+                        <small>
+                            Eingereicht am @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)
+                        </small>
+                        <p class="mb-1">Status: <strong>@StatusLabel(application.Status)</strong></p>
+
+                        @if (application.IsWithdrawn)
+                        {
+                            <span class="badge-danger-glass">Zurückgezogen</span>
+                        }
+
+                        @if (application.SeenBy.Count > 0)
+                        {
+                            <div class="seen-by">
+                                <div class="seen-by-title">Gesehen von:</div>
+                                @foreach (var seen in application.SeenBy)
+                                {
+                                    <img title="@ToolSet.GetFormattedName(seen)" src="@AvatarUrl(seen)"
+                                         alt="profile" class="profile-image"/>
+                                }
+                            </div>
+                        }
+                    </a>
+                </li>
+            </ul>
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private HashSet<string> allowedPositions = new();
+    private List<TeamApplicationPosition> positions = new();
+    private List<TeamApplicationPhase> phases = new();
+    private List<TeamApplication> applications = new();
+    private List<TeamApplication> filtered = new();
+
+    private string filterPosition = "";
+    private string filterPhase = "";
+    private string filterStatus = "";
+    private string searchTerm = "";
+    private Timer? debounceTimer;
+
+    private IEnumerable<TeamApplicationPhase> VisiblePhases => string.IsNullOrEmpty(filterPosition)
+        ? phases
+        : phases.Where(p => p.PositionId == filterPosition);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        allowedPositions = await TeamApplicationPermissionService.GetAllowedPositionsAsync(userId,
+            TeamApplicationPermission.ViewApplications);
+
+        if (allowedPositions.Count > 0) await Reload();
+        loaded = true;
+    }
+
+    private async Task Reload()
+    {
+        positions = (await TeamApplicationService.GetPositionsAsync())
+            .Where(p => allowedPositions.Contains(p.PositionId))
+            .ToList();
+        phases = (await TeamApplicationService.GetPhasesAsync())
+            .Where(p => allowedPositions.Contains(p.PositionId))
+            .ToList();
+
+        applications = await TeamApplicationService.GetApplicationsAsync(allowedPositions);
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<TeamApplication> query = applications;
+
+        if (!string.IsNullOrEmpty(filterPosition))
+            query = query.Where(a => a.PositionId == filterPosition);
+        if (!string.IsNullOrEmpty(filterPhase))
+            query = query.Where(a => a.PhaseId == filterPhase);
+        if (Enum.TryParse<TeamApplicationStatus>(filterStatus, out var status))
+            query = query.Where(a => a.Status == status);
+
+        var term = searchTerm.Trim();
+        if (term.Length > 0)
+            query = query.Where(a => a.UserId.ToString().Contains(term) ||
+                                     ToolSet.GetFormattedName(a.UserId)
+                                         .Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        filtered = query.ToList();
+        StateHasChanged();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? "";
+
+        if (debounceTimer == null)
+            debounceTimer = new Timer(_ => InvokeAsync(ApplyFilters), null, 250, Timeout.Infinite);
+        else
+            debounceTimer.Change(250, Timeout.Infinite);
+    }
+
+    private static string StatusLabel(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Eingereicht => "Eingereicht",
+        TeamApplicationStatus.Gelesen => "Gelesen",
+        TeamApplicationStatus.Vorgemerkt => "Vorgemerkt",
+        TeamApplicationStatus.WartetAufRueckfrage => "Wartet auf Rückfrage",
+        TeamApplicationStatus.Angenommen => "Angenommen",
+        TeamApplicationStatus.Abgelehnt => "Abgelehnt",
+        TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
+        _ => status.ToString()
+    };
+
+    private static string StatusCss(TeamApplicationStatus status) => status switch
+    {
+        TeamApplicationStatus.Eingereicht => "status-new",
+        TeamApplicationStatus.Gelesen => "status-read",
+        TeamApplicationStatus.Vorgemerkt => "status-shortlisted",
+        TeamApplicationStatus.WartetAufRueckfrage => "status-waiting",
+        TeamApplicationStatus.Angenommen => "status-accepted",
+        TeamApplicationStatus.Abgelehnt => "status-rejected",
+        TeamApplicationStatus.Zurueckgezogen => "status-withdrawn",
+        _ => "status-new"
+    };
+
+    private static string AvatarUrl(ulong id)
+    {
+        var user = CurrentApplication.DiscordClient.UserCache.Values.FirstOrDefault(u => u.Id == id);
+        return user?.AvatarUrl ?? ToolSet.GetFallbackUser(id).Avatar;
+    }
+
+    public void Dispose()
+    {
+        debounceTimer?.Dispose();
+    }
+}

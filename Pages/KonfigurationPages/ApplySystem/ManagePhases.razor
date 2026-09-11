@@ -1,0 +1,374 @@
+@page "/konfiguration/applysystem/phases/{PositionId}"
+@using AGC_Management.ApplicationSystem
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+
+<h1>Phasen: @(position?.PositionName ?? PositionId)</h1>
+<a class="btn btn-secondary-glass mb-3" href="/konfiguration/applysystem/positions">Zurück zu den Positionen</a>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else if (!mayManage)
+{
+    <div class="alert alert-danger-glass mt-3" role="alert">
+        Du hast keine Berechtigung, die Phasen dieser Position zu verwalten.
+    </div>
+}
+else if (position == null)
+{
+    <div class="alert alert-danger-glass mt-3" role="alert">Diese Position existiert nicht.</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+    }
+
+    @if (published == null)
+    {
+        <div class="alert alert-warning-glass mt-2" role="alert">
+            Für diese Position ist noch kein Fragenkatalog veröffentlicht. Eine Phase lässt sich erst öffnen,
+            wenn es einen gibt.
+        </div>
+    }
+
+    @if (pendingPhase != null)
+    {
+        <div class="alert alert-warning-glass mt-2" role="alert">
+            <h4 class="alert-heading">
+                @(pendingArchive ? "Phase endgültig schließen?" : "Phase wirklich schließen?")
+            </h4>
+            <hr>
+            @if (pendingUndecided > 0)
+            {
+                <p>
+                    In der Phase <strong>@pendingPhase.Name</strong> sind noch @pendingUndecided Bewerbungen
+                    unentschieden. Sie bleiben in jedem Fall entscheidbar, auch danach.
+                </p>
+            }
+            <p>
+                @if (pendingArchive)
+                {
+                    <text>
+                        Endgültig schließen lässt sich nicht rückgängig machen: die Phase kann danach nicht
+                        mehr geöffnet werden.
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        Schließen heißt nur, dass keine neuen Bewerbungen mehr angenommen werden. Die Phase
+                        lässt sich jederzeit wieder öffnen.
+                    </text>
+                }
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-danger-glass" @onclick="ConfirmPending">
+                    @(pendingArchive ? "Ja, endgültig schließen" : "Trotzdem schließen")
+                </button>
+                <button class="btn btn-secondary-glass" @onclick="() => pendingPhase = null">Abbrechen</button>
+            </div>
+        </div>
+    }
+
+    @foreach (var phase in phases)
+    {
+        <div class="glass-card mt-3 p-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h5 class="mb-0">@(string.IsNullOrWhiteSpace(phase.Name) ? "Unbenannte Phase" : phase.Name)</h5>
+                <span class="@StateBadge(phase.State)">@StateLabel(phase.State)</span>
+            </div>
+
+            <p class="text-muted mb-3">
+                Eingefrorene Katalogversion:
+                @(phase.QuestionSetVersion > 0 ? phase.QuestionSetVersion.ToString() : "noch keine")
+            </p>
+
+            <div class="row g-2">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Name</label>
+                    <input class="form-control glassy-input" @bind="phase.Name"
+                           disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Öffnet am (optional)</label>
+                    <input type="datetime-local" class="form-control glassy-input"
+                           value="@ToLocalInput(phase.OpensAt)"
+                           @onchange="e => phase.OpensAt = FromLocalInput(e.Value?.ToString())"
+                           disabled="@(phase.State != TeamApplicationPhaseState.Draft)"/>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Schließt am (optional)</label>
+                    <input type="datetime-local" class="form-control glassy-input"
+                           value="@ToLocalInput(phase.ClosesAt)"
+                           @onchange="e => phase.ClosesAt = FromLocalInput(e.Value?.ToString())"
+                           disabled="@(phase.State == TeamApplicationPhaseState.Archived)"/>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                @if (phase.State != TeamApplicationPhaseState.Archived)
+                {
+                    <button class="btn btn-primary-glass" @onclick="() => SaveSchedule(phase)">Termine speichern</button>
+                }
+                @if (phase.State == TeamApplicationPhaseState.Draft)
+                {
+                    <button class="btn btn-success-glass" disabled="@(published == null)"
+                            @onclick="() => OpenPhase(phase)">Jetzt öffnen</button>
+                }
+                @if (phase.State == TeamApplicationPhaseState.Open)
+                {
+                    <button class="btn btn-danger-glass" @onclick="() => RequestClose(phase, false)">Schließen</button>
+                }
+                @if (phase.State == TeamApplicationPhaseState.Closed)
+                {
+                    <button class="btn btn-success-glass" @onclick="() => OpenPhase(phase)">Wieder öffnen</button>
+                    <button class="btn btn-danger-glass" @onclick="() => RequestClose(phase, true)">
+                        Endgültig schließen
+                    </button>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="glass-card mt-4 p-3">
+        <h3>Neue Phase anlegen</h3>
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Name</label>
+                <input class="form-control glassy-input" @bind="newName" placeholder="z.B. Runde Frühling"/>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">Öffnet am (optional)</label>
+                <input type="datetime-local" class="form-control glassy-input"
+                       value="@ToLocalInput(newOpensAt)"
+                       @onchange="e => newOpensAt = FromLocalInput(e.Value?.ToString())"/>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">Schließt am (optional)</label>
+                <input type="datetime-local" class="form-control glassy-input"
+                       value="@ToLocalInput(newClosesAt)"
+                       @onchange="e => newClosesAt = FromLocalInput(e.Value?.ToString())"/>
+            </div>
+            <div class="col-12 col-md-2">
+                <button class="btn btn-primary-glass w-100" @onclick="CreatePhase">Anlegen</button>
+            </div>
+        </div>
+        <p class="text-muted mt-2 mb-0">
+            Ohne Termine wird die Phase nur von Hand geöffnet und geschlossen.
+        </p>
+    </div>
+}
+
+@code {
+    [Parameter] public string PositionId { get; set; } = "";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private bool mayManage;
+    private string statusMessage = "";
+
+    private TeamApplicationPosition? position;
+    private TeamApplicationQuestionSet? published;
+    private List<TeamApplicationPhase> phases = new();
+
+    private TeamApplicationPhase? pendingPhase;
+    private bool pendingArchive;
+    private int pendingUndecided;
+
+    private string newName = "";
+    private long newOpensAt;
+    private long newClosesAt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        mayManage = await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManagePhases,
+            PositionId);
+
+        if (mayManage) await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        position = await TeamApplicationService.GetPositionAsync(PositionId);
+        if (position == null) return;
+
+        published = await TeamApplicationService.GetPublishedAsync(PositionId);
+        phases = await TeamApplicationService.GetPhasesAsync(PositionId);
+    }
+
+    private static string StateLabel(TeamApplicationPhaseState state) => state switch
+    {
+        TeamApplicationPhaseState.Draft => "Entwurf",
+        TeamApplicationPhaseState.Open => "Offen",
+        TeamApplicationPhaseState.Closed => "Geschlossen",
+        TeamApplicationPhaseState.Archived => "Endgültig geschlossen",
+        _ => state.ToString()
+    };
+
+    private static string StateBadge(TeamApplicationPhaseState state) =>
+        state == TeamApplicationPhaseState.Open ? "badge-success-glass" : "badge-danger-glass";
+
+    /// <summary>The inputs work in server local time, the same frame the rest of the dashboard renders in.</summary>
+    private static string ToLocalInput(long unix)
+    {
+        if (unix <= 0) return "";
+
+        var utc = DateTimeOffset.FromUnixTimeSeconds(unix).UtcDateTime;
+        return TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.Local).ToString("yyyy-MM-ddTHH:mm");
+    }
+
+    private static long FromLocalInput(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0;
+        if (!DateTime.TryParse(value, out var local)) return 0;
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified),
+            TimeZoneInfo.Local);
+        return new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds();
+    }
+
+    private async Task<bool> EnsurePermission()
+    {
+        if (await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManagePhases,
+                PositionId)) return true;
+
+        statusMessage = "Keine Berechtigung.";
+        return false;
+    }
+
+    private async Task CreatePhase()
+    {
+        if (!await EnsurePermission()) return;
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            statusMessage = "Bitte einen Namen angeben.";
+            return;
+        }
+
+        await TeamApplicationService.CreatePhaseAsync(PositionId, newName.Trim(), newOpensAt, newClosesAt, userId);
+        newName = "";
+        newOpensAt = 0;
+        newClosesAt = 0;
+        await LoadAll();
+        statusMessage = "Phase angelegt.";
+    }
+
+    private async Task SaveSchedule(TeamApplicationPhase phase)
+    {
+        if (!await EnsurePermission()) return;
+
+        await TeamApplicationService.UpdatePhaseScheduleAsync(phase.PhaseId, phase.Name, phase.OpensAt,
+            phase.ClosesAt);
+        ApplyPanelCommands.QueueRefreshPanel();
+        statusMessage = "Termine gespeichert.";
+    }
+
+    private async Task OpenPhase(TeamApplicationPhase phase)
+    {
+        if (!await EnsurePermission()) return;
+
+        var reopened = phase.State == TeamApplicationPhaseState.Closed;
+        var hadExpiredEnd = phase.ClosesAt > 0 &&
+                            phase.ClosesAt <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        var result = await TeamApplicationService.OpenPhaseAsync(phase.PhaseId);
+        if (result != TeamApplicationPhaseOpenResult.Opened)
+        {
+            statusMessage = OpenResultMessage(result);
+            return;
+        }
+
+        ApplyPanelCommands.QueueRefreshPanel();
+        await LoadAll();
+
+        statusMessage = reopened ? "Phase wieder geöffnet." : "Phase geöffnet.";
+        if (reopened && hadExpiredEnd)
+            statusMessage += " Der abgelaufene Endtermin wurde entfernt, sonst hätte der Hintergrund-Task " +
+                             "die Phase sofort wieder geschlossen.";
+    }
+
+    private static string OpenResultMessage(TeamApplicationPhaseOpenResult result) => result switch
+    {
+        TeamApplicationPhaseOpenResult.NotFound => "Diese Phase existiert nicht mehr.",
+        TeamApplicationPhaseOpenResult.AlreadyOpen => "Diese Phase ist bereits offen.",
+        TeamApplicationPhaseOpenResult.Archived =>
+            "Diese Phase wurde endgültig geschlossen und lässt sich nicht mehr öffnen.",
+        TeamApplicationPhaseOpenResult.OtherPhaseOpen =>
+            "Für diese Position ist bereits eine andere Phase offen. Schließe sie zuerst.",
+        TeamApplicationPhaseOpenResult.NoPublishedCatalogue =>
+            "Es ist kein Fragenkatalog veröffentlicht.",
+        _ => "Die Phase konnte nicht geöffnet werden."
+    };
+
+    private async Task RequestClose(TeamApplicationPhase phase, bool archive)
+    {
+        if (!await EnsurePermission()) return;
+
+        pendingUndecided = await TeamApplicationService.CountUndecidedAsync(phase.PhaseId);
+
+        // Closing is reversible, so it only needs a prompt when something is still undecided.
+        // Closing for good always asks.
+        if (!archive && pendingUndecided == 0)
+        {
+            await ClosePhase(phase);
+            return;
+        }
+
+        pendingArchive = archive;
+        pendingPhase = phase;
+    }
+
+    private async Task ConfirmPending()
+    {
+        if (pendingPhase == null) return;
+
+        var phase = pendingPhase;
+        var archive = pendingArchive;
+        pendingPhase = null;
+
+        if (archive)
+            await ArchivePhase(phase);
+        else
+            await ClosePhase(phase);
+    }
+
+    private async Task ClosePhase(TeamApplicationPhase phase)
+    {
+        if (!await EnsurePermission()) return;
+
+        await TeamApplicationService.ClosePhaseAsync(phase.PhaseId);
+        ApplyPanelCommands.QueueRefreshPanel();
+        await LoadAll();
+        statusMessage = "Phase geschlossen. Vorhandene Bewerbungen bleiben entscheidbar, " +
+                        "die Phase lässt sich wieder öffnen.";
+    }
+
+    private async Task ArchivePhase(TeamApplicationPhase phase)
+    {
+        if (!await EnsurePermission()) return;
+
+        await TeamApplicationService.ArchivePhaseAsync(phase.PhaseId);
+        ApplyPanelCommands.QueueRefreshPanel();
+        await LoadAll();
+        statusMessage = "Phase endgültig geschlossen. Vorhandene Bewerbungen bleiben entscheidbar.";
+    }
+}

@@ -29,17 +29,29 @@
                         <i class="bi bi-journals"></i>
                     </span>
                 </h5>
+                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
+                    <a href="/teamarea/applysystem/applications" class="btn btn-primary-glass mt-2 mb-2">Bewerbungen ansehen</a>
+                </AuthorizeView>
+                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
+                    <a href="/konfiguration/applysystem/positions" class="btn btn-primary-glass mt-2 mb-2">Bewerbungssystem konfigurieren</a>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 mb-4">
+        <div class="glass-card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    Bewerbungen (Altsystem, nur lesend)
+                    <span>
+                        <i class="bi bi-archive"></i>
+                    </span>
+                </h5>
                 <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                    <a href="/teamarea/applysystem/viewapplications" class="btn btn-primary-glass mt-2 mb-2">Bewerbungen ansehen (Team allgemein)</a>
+                    <a href="/teamarea/applysystem/legacy/applications" class="btn btn-secondary-glass mt-2 mb-2">Alte Bewerbungen (Team allgemein)</a>
                 </AuthorizeView>
                 <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, HeadEventmanager">
-                    <a href="/teamarea/applysystem/vieweventapplications" class="btn btn-primary-glass mt-2 mb-2">Bewerbungen ansehen (Eventteam, nur Eventmanager)</a>
-                </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                    <a href="/konfiguration/applysystem/modifypanelmessage" class="btn btn-primary-glass mt-2 mb-2">Bewerbungspanel Text bearbeiten</a>
-                </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                    <a href="/konfiguration/applysystem/modifypositions" class="btn btn-primary-glass mt-2 mb-2">Bewerbungspositionen bearbeiten</a>
+                    <a href="/teamarea/applysystem/legacy/eventapplications" class="btn btn-secondary-glass mt-2 mb-2">Alte Bewerbungen (Eventteam)</a>
                 </AuthorizeView>
             </div>
         </div>

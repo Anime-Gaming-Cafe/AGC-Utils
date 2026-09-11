@@ -1,0 +1,174 @@
+@page "/apply/status"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<h1>Meine Bewerbungen</h1>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+    <a class="btn btn-secondary-glass mb-3" href="/apply">Zur Bewerbungsübersicht</a>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-info-glass" role="alert">@statusMessage</div>
+    }
+
+    @if (applications.Count == 0)
+    {
+        <div class="alert alert-warning-glass" role="alert">Du hast dich bisher nicht beworben.</div>
+    }
+
+    @foreach (var application in applications)
+    {
+        <div class="glass-card mt-3 p-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h5 class="mb-0">@application.PositionName</h5>
+                <span class="@CoarseBadge(application)">@CoarseLabel(application)</span>
+            </div>
+
+            <p class="text-muted mb-2">
+                Phase: @application.PhaseName<br/>
+                Eingereicht am @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(application.SubmittedAt)
+            </p>
+
+            @if (application.IsDecided && !string.IsNullOrWhiteSpace(application.DecisionText))
+            {
+                <div class="alert @(application.Status == TeamApplicationStatus.Angenommen ? "alert-success-glass" : "alert-danger-glass")" role="alert">
+                    @application.DecisionText
+                </div>
+            }
+
+            <button class="btn btn-secondary-glass btn-sm"
+                    @onclick="() => ToggleAnswers(application.ApplicationId)">
+                @(expanded.Contains(application.ApplicationId) ? "Antworten ausblenden" : "Meine Antworten ansehen")
+            </button>
+
+            @if (application.IsOpen)
+            {
+                @if (pendingWithdraw == application.ApplicationId)
+                {
+                    <div class="alert alert-warning-glass mt-3" role="alert">
+                        <p>
+                            Möchtest du deine Bewerbung wirklich zurückziehen? Du kannst dich danach in dieser
+                            Phase erneut bewerben.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-danger-glass" @onclick="() => Withdraw(application)">
+                                Ja, zurückziehen
+                            </button>
+                            <button class="btn btn-secondary-glass" @onclick="() => pendingWithdraw = null">
+                                Abbrechen
+                            </button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-danger-glass btn-sm ms-2"
+                            @onclick="() => pendingWithdraw = application.ApplicationId">
+                        Bewerbung zurückziehen
+                    </button>
+                }
+            }
+
+            @if (expanded.Contains(application.ApplicationId) &&
+                 answers.TryGetValue(application.ApplicationId, out var list))
+            {
+                <ul class="list-group list-group-flush mt-3">
+                    @foreach (var answer in list)
+                    {
+                        <li class="list-group-item">
+                            <strong>@answer.QuestionTextSnapshot</strong>
+                            <p class="mb-0 mt-1" style="white-space: pre-wrap;">@Render(answer)</p>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private bool loaded;
+    private string statusMessage = "";
+    private string? pendingWithdraw;
+
+    private List<TeamApplication> applications = new();
+    private readonly Dictionary<string, List<TeamApplicationAnswer>> answers = new();
+    private readonly HashSet<string> expanded = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        await LoadAll();
+        loaded = true;
+    }
+
+    private async Task LoadAll()
+    {
+        applications = await TeamApplicationService.GetOwnApplicationsAsync(userId);
+    }
+
+    /// <summary>
+    ///     Internal markings stay invisible here: Gelesen, Vorgemerkt and WartetAufRueckfrage all read as
+    ///     "In Bearbeitung", so the applicant cannot tell them apart.
+    /// </summary>
+    private static string CoarseLabel(TeamApplication application) => application.Status switch
+    {
+        TeamApplicationStatus.Eingereicht => "Eingegangen",
+        TeamApplicationStatus.Angenommen => "Angenommen",
+        TeamApplicationStatus.Abgelehnt => "Abgelehnt",
+        TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
+        _ => "In Bearbeitung"
+    };
+
+    private static string CoarseBadge(TeamApplication application) => application.Status switch
+    {
+        TeamApplicationStatus.Angenommen => "badge-success-glass",
+        TeamApplicationStatus.Abgelehnt => "badge-danger-glass",
+        _ => "badge bg-secondary"
+    };
+
+    private static string Render(TeamApplicationAnswer answer) =>
+        answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
+            ? string.Join(", ", answer.AnswerOptions)
+            : answer.Answer;
+
+    private async Task ToggleAnswers(string applicationId)
+    {
+        if (!expanded.Add(applicationId))
+        {
+            expanded.Remove(applicationId);
+            return;
+        }
+
+        if (!answers.ContainsKey(applicationId))
+            answers[applicationId] = await TeamApplicationService.GetAnswersAsync(applicationId);
+    }
+
+    private async Task Withdraw(TeamApplication application)
+    {
+        pendingWithdraw = null;
+
+        await TeamApplicationService.WithdrawAsync(application.ApplicationId, userId);
+        await LoadAll();
+        statusMessage = "Deine Bewerbung wurde zurückgezogen.";
+    }
+}

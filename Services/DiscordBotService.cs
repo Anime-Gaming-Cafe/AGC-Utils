@@ -1,4 +1,4 @@
-using AGC_Management.Attributes;
+﻿using AGC_Management.Attributes;
 using System.Reflection;
 using DisCatSharp;
 using DisCatSharp.ApplicationCommands;
@@ -200,6 +200,7 @@ public class DiscordBotService : IHostedService
         _ = TicketSearchTools.LoadTicketsIntoCache();
         _ = BoosterColorCleanupTask.LaunchLoops();
         _ = ExtraPermissionSyncTask.LaunchLoops();
+        _ = TeamApplicationPhaseTask.LaunchLoops();
 
         return Task.CompletedTask;
     }

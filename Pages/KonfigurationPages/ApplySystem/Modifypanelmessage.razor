@@ -2,6 +2,7 @@
 @using AGC_Management.Services
 @using AGC_Management.Enums
 @using AGC_Management.ApplicationSystem
+@using DisCatSharp.Enums
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
 
 
@@ -9,7 +10,7 @@
 
 <div class="d-flex justify-content-center">
     <div class="form-group w-75">
-        <h1>Bewerbungs-Panel Nachricht bearbeiten</h1>
+        <h1>Bewerbungs-Panel</h1>
         <textarea class="form-control glassy-input" id="panelmessage" @bind="panelmessage" @oninput="UpdatePreview" rows="20"></textarea>
 
         <button class="btn btn-primary-glass mt-2 mb-2" @onclick="savePanelMessage">Speichern</button>
@@ -32,6 +33,52 @@
     <h4 class="alert-heading">Hinweis</h4>
     <hr>
     <p>Die Nachricht wird im Bewerbungs-Panel angezeigt. Sie kann Markdown-Formatierungen enthalten.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-info-glass mt-2" role="alert">@statusMessage</div>
+}
+
+<div class="glass-card mt-4 p-3">
+    <h3>Panel</h3>
+
+    @if (panelMessageId == 0)
+    {
+        <div class="alert alert-warning-glass" role="alert">
+            Es wurde noch kein Bewerbungspanel gesendet.
+        </div>
+    }
+    else
+    {
+        <p class="mb-3">
+            Aktuelles Panel: @CurrentPanelChannelName
+            <a class="ms-2" href="@PanelLink" target="_blank" rel="noopener">In Discord öffnen</a>
+        </p>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Channel</label>
+        <select class="form-select glassy-input" @bind="selectedChannelId">
+            <option value="0">-- Channel wählen --</option>
+            @foreach (var channel in textChannels)
+            {
+                <option value="@channel.Id">#@channel.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-primary-glass" disabled="@sending" @onclick="SendPanel">Panel senden</button>
+        <button class="btn btn-secondary-glass" disabled="@(panelMessageId == 0)" @onclick="RefreshPanel">
+            Panel aktualisieren
+        </button>
+    </div>
+
+    <p class="text-muted mt-2 mb-0">
+        "Panel senden" postet ein neues Panel. Ein zuvor gesendetes bleibt stehen, wird aber nicht mehr
+        aktualisiert &ndash; lösche es in Discord von Hand.
+    </p>
 </div>
 
 @if (showPreview)
@@ -65,10 +112,23 @@
 
 @code {
     private string panelmessage = "";
-    private string newpanelmessage = "";
     private bool showPreview;
     private string panelmessagepreview = "";
+    private string statusMessage = "";
 
+    private List<DiscordChannel> textChannels = new();
+    private ulong selectedChannelId;
+    private ulong panelChannelId;
+    private ulong panelMessageId;
+    private bool sending;
+
+    private string CurrentPanelChannelName =>
+        CurrentApplication.TargetGuild.Channels.TryGetValue(panelChannelId, out var channel)
+            ? "#" + channel.Name
+            : panelChannelId.ToString();
+
+    private string PanelLink =>
+        $"https://discord.com/channels/{CurrentApplication.TargetGuild.Id}/{panelChannelId}/{panelMessageId}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,6 +142,51 @@
         {
             panelmessage = "";
         }
+
+        textChannels = CurrentApplication.TargetGuild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+
+        await LoadPanelLocation();
+        selectedChannelId = panelChannelId;
+    }
+
+    private async Task LoadPanelLocation()
+    {
+        (panelChannelId, panelMessageId) = await ApplyPanelCommands.GetPanelLocationAsync();
+    }
+
+    private async Task SendPanel()
+    {
+        if (selectedChannelId == 0)
+        {
+            statusMessage = "Bitte zuerst einen Channel wählen.";
+            return;
+        }
+
+        sending = true;
+        try
+        {
+            await ApplyPanelCommands.SendPanelToChannelAsync(selectedChannelId);
+            await LoadPanelLocation();
+            statusMessage = "Panel wurde gesendet.";
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "TeamApplications: Panel senden fehlgeschlagen");
+            statusMessage = "Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?";
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+
+    private void RefreshPanel()
+    {
+        ApplyPanelCommands.QueueRefreshPanel();
+        statusMessage = "Panel wird aktualisiert.";
     }
 
     private void UpdatePreview(ChangeEventArgs e)
@@ -99,6 +204,7 @@
     {
         await CachingService.SetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache, "applypaneltext", panelmessage);
         ApplyPanelCommands.QueueRefreshPanel();
+        statusMessage = "Panel-Text gespeichert.";
         StateHasChanged();
     }
 

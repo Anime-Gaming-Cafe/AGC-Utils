@@ -18,21 +18,22 @@
     </div>
 </div>
 
-<!--
-
 <div class="container mt-5 mb-5">
     <div class="row">
         <div class="col-12 mb-4">
             <div class="glass-card">
                 <div class="card-body">
-                    <h5 class="card-title">Bewerbungssystemkonfiguration</h5>
+                    <h5 class="card-title">Bewerbungssystem</h5>
                     <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
-                        <a href="/konfiguration/applysystem/modifypanelmessage" class="btn btn-primary-glass">Panel Text bearbeiten</a>
+                        <a href="/konfiguration/applysystem/positions" class="btn btn-primary-glass mt-2 mb-2">Positionen</a>
+                        <a href="/konfiguration/applysystem/templates" class="btn btn-primary-glass mt-2 mb-2">Textbausteine und Bot-Texte</a>
+                        <a href="/konfiguration/applysystem/modifypanelmessage" class="btn btn-primary-glass mt-2 mb-2">Panel senden und Text bearbeiten</a>
+                    </AuthorizeView>
+                    <AuthorizeView Roles="BotOwner, Administrator">
+                        <a href="/konfiguration/applysystem/permissions" class="btn btn-primary-glass mt-2 mb-2">Rechte-Matrix</a>
                     </AuthorizeView>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
--->

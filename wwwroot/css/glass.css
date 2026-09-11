@@ -234,6 +234,12 @@
     border: 1px solid rgba(108, 117, 125, 0.25);
 }
 
+.btn-secondary-glass:hover {
+    color: white;
+    background: rgba(108, 117, 125, 0.47);
+    border: 1px solid rgba(108, 117, 125, 0.35);
+}
+
 .glassy-input {
     background: rgba(0, 0, 0, 0.25) !important;
     border-radius: 15px !important;
@@ -352,6 +358,12 @@
     border: 1px solid rgba(255, 193, 7, 0.25);
 }
 
+.btn-warning-glass:hover {
+    color: white;
+    background: rgba(255, 193, 7, 0.47);
+    border: 1px solid rgba(255, 193, 7, 0.35);
+}
+
 .btn-info-glass {
     background: rgba(23, 162, 184, 0.2);
     border-radius: 15px;
@@ -360,6 +372,12 @@
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1px solid rgba(23, 162, 184, 0.25);
+}
+
+.btn-info-glass:hover {
+    color: white;
+    background: rgba(23, 162, 184, 0.47);
+    border: 1px solid rgba(23, 162, 184, 0.35);
 }
 
 .btn-light-glass {
@@ -372,6 +390,12 @@
     border: 1px solid rgba(248, 249, 250, 0.25);
 }
 
+.btn-light-glass:hover {
+    color: white;
+    background: rgba(248, 249, 250, 0.3);
+    border: 1px solid rgba(248, 249, 250, 0.35);
+}
+
 .btn-dark-glass {
     background: rgba(52, 58, 64, 0.2);
     border-radius: 15px;
@@ -380,4 +404,10 @@
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1px solid rgba(52, 58, 64, 0.25);
+}
+
+.btn-dark-glass:hover {
+    color: white;
+    background: rgba(52, 58, 64, 0.47);
+    border: 1px solid rgba(52, 58, 64, 0.35);
 }

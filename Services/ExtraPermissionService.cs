@@ -392,21 +392,30 @@ public static class ExtraPermissionService
         return type == ExtraPermissionConditionType.Messages ? "metrics_messages" : "metrics_voice";
     }
 
-    private static async Task<long> CountMetricAsync(string table, DiscordMember member,
+    private static Task<long> CountMetricAsync(string table, DiscordMember member,
         ExtraPermissionCondition condition)
     {
-        var scope = ExpandScope(member.Guild, condition.ScopeIds);
+        return CountMetricAsync(table, member.Id, condition.WindowDays, condition.ScopeIds, member.Guild);
+    }
+
+    /// <summary>
+    ///     Both metric tables are row logs, so a count is the metric: one row per message, and one row per
+    ///     user and minute for voice. A window of 0 counts everything ever recorded.
+    /// </summary>
+    public static async Task<long> CountMetricAsync(string table, ulong userId, int windowDays,
+        long[] scopeIds, DiscordGuild? guild = null)
+    {
+        var scope = ExpandScope(guild, scopeIds);
         var sql = new StringBuilder($"SELECT COUNT(*) FROM {table} WHERE userid = @userid");
         if (scope.Count > 0) sql.Append(" AND channelid = ANY(@channels)");
-        if (condition.WindowDays > 0) sql.Append(" AND timestamp >= @since");
+        if (windowDays > 0) sql.Append(" AND timestamp >= @since");
 
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand(sql.ToString());
-        cmd.Parameters.AddWithValue("userid", (long)member.Id);
+        cmd.Parameters.AddWithValue("userid", (long)userId);
         if (scope.Count > 0) cmd.Parameters.AddWithValue("channels", scope.Select(x => (long)x).ToArray());
-        if (condition.WindowDays > 0)
-            cmd.Parameters.AddWithValue("since",
-                DateTimeOffset.UtcNow.AddDays(-condition.WindowDays).ToUnixTimeSeconds());
+        if (windowDays > 0)
+            cmd.Parameters.AddWithValue("since", DateTimeOffset.UtcNow.AddDays(-windowDays).ToUnixTimeSeconds());
 
         var result = await cmd.ExecuteScalarAsync();
         return result is long count ? count : 0;

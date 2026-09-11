@@ -1,4 +1,8 @@
-﻿#region
+#region
+
+using AGC_Management.ApplicationSystem;
+using AGC_Management.Services;
+using AGC_Management.Utils;
 
 #endregion
 
@@ -11,73 +15,88 @@ public sealed class OnApplyComponentInteraction : BaseCommandModule
     public Task ComponentInteractionCreated(DiscordClient client, ComponentInteractionCreateEventArgs args)
     {
         _ = Task.Run(async () =>
+        {
+            try
             {
-                var cid = args.Interaction.Data.CustomId;
-                var values = args.Interaction.Data.Values;
-                if (cid != "applypanelselector") return;
-                var randomid = new Random();
-                var ncid = randomid.Next(100000, 999999).ToString();
-                var pos = $"{values[0][..1].ToUpper()}{values[0][1..]}";
-                var applicable = await IsApplicable(pos.ToLower());
-                Console.WriteLine(applicable);
-                if (!applicable)
+                var customId = args.Interaction.Data.CustomId;
+
+                if (customId == ApplyPanelCommands.MyApplicationsId)
                 {
-                    var embed = new DiscordEmbedBuilder();
-                    embed.WithTitle("Bewerbung");
-                    embed.WithDescription($"Die Position ``{pos}`` ist aktuell nicht bewerbbar.");
-                    embed.WithColor(DiscordColor.Red);
-                    await args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                        new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
+                    await RespondAsync(args, "Meine Bewerbungen",
+                        $"[Hier siehst du den Status deiner Bewerbungen]({ToolSet.GetDashboardUrl("apply/status")})",
+                        DiscordColor.Green);
                     return;
                 }
 
-                bool useHttps;
-                try
-                {
-                    useHttps = bool.Parse(BotConfig.GetConfig()["WebUI"]["UseHttps"]);
-                }
-                catch
-                {
-                    useHttps = false;
-                }
+                if (customId != ApplyPanelCommands.SelectorId) return;
 
-                string dashboardUrl;
-                try
-                {
-                    dashboardUrl = BotConfig.GetConfig()["WebUI"]["DashboardURL"];
-                }
-                catch
-                {
-                    dashboardUrl = "localhost";
-                }
+                var values = args.Interaction.Data.Values;
+                if (values == null || !values.Any()) return;
 
-                var url = $"{(useHttps ? "https" : "http")}://{dashboardUrl}/apply/{pos.ToLower()}";
-                var _embed = new DiscordEmbedBuilder();
-                _embed.WithTitle("Bewerbung");
-                _embed.WithDescription($"[Klicke hier um dich für die Position ``{pos}`` zu bewerben]({url})");
-                _embed.WithColor(DiscordColor.Green);
-                await args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder().AddEmbed(_embed).AsEphemeral());
+                await HandleSelectAsync(args, values.First());
             }
-        );
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e, "TeamApplications: Panel-Interaktion fehlgeschlagen");
+            }
+        });
 
         return Task.CompletedTask;
     }
 
-
-    private static async Task<bool> IsApplicable(string Position)
+    private static async Task HandleSelectAsync(ComponentInteractionCreateEventArgs args, string positionId)
     {
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command =
-            db.CreateCommand("SELECT applicable FROM applicationcategories WHERE positionid = @positionname");
-        command.Parameters.AddWithValue("positionname", Position);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (reader.HasRows)
+        var position = await TeamApplicationService.GetPositionAsync(positionId);
+        if (position is not { Active: true })
         {
-            await reader.ReadAsync();
-            return reader.GetBoolean(0);
+            await RespondAsync(args, "Bewerbung", "Diese Position gibt es nicht mehr.", DiscordColor.Red);
+            return;
         }
 
-        return false;
+        var opening = await TeamApplicationService.ResolveOpeningAsync(position);
+        if (!opening.CanApply)
+        {
+            var closedText = await TeamApplicationService.GetTextAsync("PanelClosedText",
+                "Bewerbungen aktuell geschlossen");
+            var description = $"**{position.PositionName}**: {closedText}.";
+
+            if (opening.NextOpensAt > 0)
+            {
+                var opensAtText = await TeamApplicationService.GetTextAsync("PanelOpensAtText",
+                    "Naechste Bewerbungsphase ab");
+                description +=
+                    $"\n{opensAtText} {ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(opening.NextOpensAt)}.";
+            }
+
+            await RespondAsync(args, "Bewerbung", description, DiscordColor.Red);
+            return;
+        }
+
+        // The level gate never names a number, neither the required one nor the applicant's own.
+        var level = await LevelUtils.GetLevel(args.Interaction.User.Id);
+        if (!opening.Bypassed && level < position.MinLevel)
+        {
+            var gateText = await TeamApplicationService.GetTextAsync("LevelGateText",
+                "Bring dich doch gerne etwas mehr in den Server ein, bevor du dich bewirbst.");
+            await RespondAsync(args, "Bewerbung", gateText, DiscordColor.Orange);
+            return;
+        }
+
+        var url = ToolSet.GetDashboardUrl($"apply/{position.PositionId}");
+        await RespondAsync(args, "Bewerbung",
+            $"[Klicke hier um dich für die Position ``{position.PositionName}`` zu bewerben]({url})",
+            DiscordColor.Green);
+    }
+
+    private static async Task RespondAsync(ComponentInteractionCreateEventArgs args, string title,
+        string description, DiscordColor color)
+    {
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle(title)
+            .WithDescription(description)
+            .WithColor(color);
+
+        await args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
     }
 }

@@ -380,6 +380,37 @@ public static class ToolSet
     }
 
 
+    /// <summary>
+    ///     Builds an absolute dashboard link. Both keys are optional in config.ini, so each read falls back
+    ///     the same way Program.RunAspAsync does when it rewrites the request host.
+    /// </summary>
+    public static string GetDashboardUrl(string relativePath = "")
+    {
+        bool useHttps;
+        try
+        {
+            useHttps = bool.Parse(BotConfig.GetConfig()["WebUI"]["UseHttps"]);
+        }
+        catch
+        {
+            useHttps = false;
+        }
+
+        string dashboardUrl;
+        try
+        {
+            dashboardUrl = BotConfig.GetConfig()["WebUI"]["DashboardURL"];
+        }
+        catch
+        {
+            dashboardUrl = "localhost";
+        }
+
+        var path = relativePath.TrimStart('/');
+        var baseUrl = $"{(useHttps ? "https" : "http")}://{dashboardUrl.TrimEnd('/')}";
+        return string.IsNullOrEmpty(path) ? baseUrl : $"{baseUrl}/{path}";
+    }
+
     public static string GenerateCaseID()
     {
         var guid = Guid.NewGuid().ToString("N");

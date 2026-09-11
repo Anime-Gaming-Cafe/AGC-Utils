@@ -1,6 +1,7 @@
 #region
 
 using System.Text;
+using AGC_Management.Entities.ApplicationSystem;
 using AGC_Management.Enums;
 using AGC_Management.Services;
 using AGC_Management.Utils;
@@ -11,34 +12,20 @@ namespace AGC_Management.ApplicationSystem;
 
 public sealed class ApplyPanelCommands : BaseCommandModule
 {
-    private static readonly Queue<Task> refreshQueue = new();
-    private static Timer timer;
+    public const string SelectorId = "applypanelselector";
+    public const string MyApplicationsId = "applypanel_myapplications";
 
-    public ApplyPanelCommands()
-    {
-        timer = new Timer(RefreshPanelFromQueue, null, Timeout.Infinite, Timeout.Infinite);
-    }
+    /// <summary>Discord caps a string select at 25 options.</summary>
+    private const int MaxSelectOptions = 25;
 
+    // Static so a refresh queued from a Razor page works before CommandsNext ever built an instance.
+    private static readonly Timer RefreshTimer =
+        new(_ => _ = RefreshPanel(), null, Timeout.Infinite, Timeout.Infinite);
 
+    /// <summary>Debounced: every call pushes the refresh two seconds out instead of queueing another one.</summary>
     public static void QueueRefreshPanel()
     {
-        refreshQueue.Clear();
-        refreshQueue.Enqueue(new Task(async () => await RefreshPanel()));
-        timer.Change(2000, Timeout.Infinite);
-    }
-
-    private static void RefreshPanelFromQueue(object state)
-    {
-        if (refreshQueue.Count > 0)
-        {
-            var task = refreshQueue.Dequeue();
-            task.Start();
-
-            if (refreshQueue.Count > 0)
-                timer.Change(5000, Timeout.Infinite);
-            else
-                timer.Change(Timeout.Infinite, Timeout.Infinite);
-        }
+        RefreshTimer.Change(2000, Timeout.Infinite);
     }
 
     [RequirePermissions(Permissions.Administrator)]
@@ -57,13 +44,38 @@ public sealed class ApplyPanelCommands : BaseCommandModule
 
         var msgb = await BuildMessage();
         var m = await ctx.Channel.SendMessageAsync(msgb);
-        var id = m.Id;
-        var channelId = m.ChannelId;
+        await StorePanelLocationAsync(m.ChannelId, m.Id);
+    }
+
+    /// <summary>Sends the panel to a specific channel (used by the WebUI) and stores its location.</summary>
+    public static async Task SendPanelToChannelAsync(ulong channelId)
+    {
+        var channel = await CurrentApplication.DiscordClient.GetChannelAsync(channelId);
+        var msgb = await BuildMessage();
+        var m = await channel.SendMessageAsync(msgb);
+        await StorePanelLocationAsync(m.ChannelId, m.Id);
+    }
+
+    private static async Task StorePanelLocationAsync(ulong channelId, ulong messageId)
+    {
         await CachingService.SetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache, "applymessageid",
-            id.ToString());
+            messageId.ToString());
         await CachingService.SetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache, "applychannelid",
             channelId.ToString());
         await CachingService.SetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache, "ispanelactive", "true");
+    }
+
+    /// <summary>Where the panel currently lives, or (0, 0) when none was ever sent.</summary>
+    public static async Task<(ulong channelId, ulong messageId)> GetPanelLocationAsync()
+    {
+        var rawChannel = await CachingService.GetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache,
+            "applychannelid");
+        var rawMessage = await CachingService.GetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache,
+            "applymessageid");
+
+        ulong.TryParse(rawChannel, out var channelId);
+        ulong.TryParse(rawMessage, out var messageId);
+        return (channelId, messageId);
     }
 
     public static async Task RefreshPanel()
@@ -72,9 +84,9 @@ public sealed class ApplyPanelCommands : BaseCommandModule
         var c_id = await CachingService.GetCacheValue(CustomDatabaseCacheType.ApplicationSystemCache, "applychannelid");
         if (string.IsNullOrEmpty(m_id) || m_id == "0" || string.IsNullOrEmpty(c_id) || c_id == "0") return;
 
-        var msgb = await BuildMessage();
         try
         {
+            var msgb = await BuildMessage();
             var channel = await CurrentApplication.DiscordClient.GetChannelAsync(ulong.Parse(c_id));
             var m = await channel.GetMessageAsync(ulong.Parse(m_id));
             await m.ModifyAsync(msgb);
@@ -85,71 +97,64 @@ public sealed class ApplyPanelCommands : BaseCommandModule
         }
     }
 
-
+    /// <summary>
+    ///     A position without an open phase stays visible and selectable; the listener answers the click with
+    ///     the closed notice so the applicant learns why nothing happens.
+    /// </summary>
     private static async Task<DiscordMessageBuilder> BuildMessage()
     {
-        var categories = await GetBewerbungsCategories();
-        var selectorlist = new List<DiscordStringSelectComponentOption>();
+        var positions = await TeamApplicationService.GetPositionsAsync(true);
+        var closedText = await TeamApplicationService.GetTextAsync("PanelClosedText",
+            "Bewerbungen aktuell geschlossen");
+        var opensAtText = await TeamApplicationService.GetTextAsync("PanelOpensAtText",
+            "Naechste Bewerbungsphase ab");
 
+        var options = new List<DiscordStringSelectComponentOption>();
+        foreach (var position in positions.Take(MaxSelectOptions))
+        {
+            var opening = await TeamApplicationService.ResolveOpeningAsync(position);
+            string description;
 
-        foreach (var category in categories)
-            selectorlist.Add(new DiscordStringSelectComponentOption(category.PositionName,
-                ToolSet.RemoveWhitespace(category.PositionId),
-                MessageFormatter.BoolToEmoji(category.IsApplicable) + " Diese Position ist " +
-                (category.IsApplicable ? "bewerbbar" : "nicht bewerbbar")));
+            if (opening.CanApply)
+            {
+                description = "✅ Diese Position ist bewerbbar";
+            }
+            else
+            {
+                description = $"❌ {closedText}";
+                if (opening.NextOpensAt > 0)
+                    description +=
+                        $" | {opensAtText} {ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(opening.NextOpensAt)}";
+            }
 
-        var selector = new DiscordStringSelectComponent("Wähle die gewünschte Bewerbungsposition aus", selectorlist, "applypanelselector");
+            options.Add(new DiscordStringSelectComponentOption(position.PositionName, position.PositionId,
+                description.Truncate(100)));
+        }
 
-        var dbdata =
+        var panelText =
             await CachingService.GetCacheValueAsBase64(CustomDatabaseCacheType.ApplicationSystemCache,
                 "applypaneltext");
-        var embstr = new StringBuilder();
-        var paneltext = string.IsNullOrEmpty(dbdata)
+        var panelDescription = new StringBuilder(string.IsNullOrEmpty(panelText)
             ? "⚠️ Es wurde noch kein Text für das Bewerbungspanel festgelegt. ⚠️"
-            : dbdata;
-        embstr.Append(paneltext);
+            : panelText);
 
-        var emb = new DiscordEmbedBuilder()
+        if (options.Count == 0) panelDescription.Append("\n\nEs sind aktuell keine Bewerbungspositionen verfügbar.");
+
+        var embed = new DiscordEmbedBuilder()
             .WithTitle("Bewerbung")
-            .WithDescription(embstr.ToString())
+            .WithDescription(panelDescription.ToString())
             .WithColor(DiscordColor.Gold)
-            .WithFooter("AGC Bewerbungssystem", CurrentApplication.TargetGuild.IconUrl);
+            .WithFooter("AGC Bewerbungssystem", CurrentApplication.TargetGuild?.IconUrl ?? "");
 
-        var msgb = new DiscordMessageBuilder()
-            .AddEmbed(emb);
+        var msgb = new DiscordMessageBuilder().AddEmbed(embed);
 
-        if (categories.Count == 0) emb.WithDescription(paneltext + "\n\nEs sind keine Bewerbungspositionen verfügbar.");
+        if (options.Count > 0)
+            msgb.AddComponents(new DiscordStringSelectComponent("Wähle die gewünschte Bewerbungsposition aus",
+                options, SelectorId));
 
-
-        if (selectorlist.Count > 0) msgb.AddComponents(selector);
+        msgb.AddComponents(new DiscordButtonComponent(ButtonStyle.Secondary, MyApplicationsId,
+            "Meine Bewerbungen"));
 
         return msgb;
-    }
-
-
-    private static async Task<List<Bewerbung>> GetBewerbungsCategories()
-    {
-        List<Bewerbung> bewerbungen = [];
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command =
-            con.CreateCommand("SELECT positionname, positionid, applicable FROM applicationcategories");
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-            bewerbungen.Add(new Bewerbung
-            {
-                PositionName = reader.GetString(0),
-                PositionId = reader.GetString(1),
-                IsApplicable = reader.GetBoolean(2)
-            });
-
-        return bewerbungen;
-    }
-
-
-    private class Bewerbung
-    {
-        public string PositionName { get; set; }
-        public string PositionId { get; set; }
-        public bool IsApplicable { get; set; }
     }
 }

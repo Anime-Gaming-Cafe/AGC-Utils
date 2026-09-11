@@ -1,0 +1,92 @@
+@page "/apply"
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<h1>Bewerben</h1>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+    <a class="btn btn-secondary-glass mb-3" href="/apply/status">Meine Bewerbungen</a>
+
+    @if (entries.Count == 0)
+    {
+        <div class="alert alert-warning-glass" role="alert">
+            Aktuell gibt es keine Positionen, auf die du dich bewerben kannst.
+        </div>
+    }
+
+    @foreach (var entry in entries)
+    {
+        <div class="glass-card mt-3 p-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h5 class="mb-0">@entry.Position.PositionName</h5>
+                <span class="@(entry.IsOpen ? "badge-success-glass" : "badge-danger-glass")">
+                    @(entry.IsOpen ? "Bewerbungen offen" : closedText)
+                </span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(entry.Position.Description))
+            {
+                <p class="mb-2">@entry.Position.Description</p>
+            }
+
+            @if (!entry.IsOpen && entry.NextOpensAt > 0)
+            {
+                <p class="text-muted mb-2">
+                    @opensAtText @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(entry.NextOpensAt)
+                </p>
+            }
+
+            @if (entry.IsOpen)
+            {
+                <a class="btn btn-primary-glass" href="/apply/@entry.Position.PositionId">Jetzt bewerben</a>
+            }
+        </div>
+    }
+
+    <div class="alert alert-info-glass mt-4" role="alert">
+        Bitte beachte die Bewerbungsanforderungen auf dem Server.
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private List<PositionEntry> entries = new();
+    private string closedText = "Bewerbungen aktuell geschlossen";
+    private string opensAtText = "Naechste Bewerbungsphase ab";
+
+    protected override async Task OnInitializedAsync()
+    {
+        closedText = await TeamApplicationService.GetTextAsync("PanelClosedText", closedText);
+        opensAtText = await TeamApplicationService.GetTextAsync("PanelOpensAtText", opensAtText);
+
+        foreach (var position in await TeamApplicationService.GetPositionsAsync(true))
+        {
+            var opening = await TeamApplicationService.ResolveOpeningAsync(position);
+
+            entries.Add(new PositionEntry
+            {
+                Position = position,
+                IsOpen = opening.CanApply,
+                NextOpensAt = opening.NextOpensAt
+            });
+        }
+
+        loaded = true;
+    }
+
+    private sealed class PositionEntry
+    {
+        public TeamApplicationPosition Position { get; init; } = new();
+        public bool IsOpen { get; init; }
+        public long NextOpensAt { get; init; }
+    }
+}

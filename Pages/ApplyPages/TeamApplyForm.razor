@@ -1,0 +1,424 @@
+@page "/apply/{PositionId}"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Enums.ApplicationSystem
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+
+<h1>Bewerbung: @(position?.PositionName ?? PositionId)</h1>
+
+@if (!loaded)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else if (stage == Stage.NotFound)
+{
+    <div class="alert alert-danger-glass" role="alert">Diese Position gibt es nicht.</div>
+}
+else if (stage == Stage.Closed)
+{
+    <div class="alert alert-warning-glass" role="alert">
+        <h4 class="alert-heading">@closedText</h4>
+        @if (nextOpensAt > 0)
+        {
+            <hr>
+            <p class="mb-0">@opensAtText @ToolSet.GetFormattedTimeFromUnixAndRespectTimeZone(nextOpensAt)</p>
+        }
+    </div>
+    <a class="btn btn-secondary-glass" href="/apply">Zurück zur Übersicht</a>
+}
+else if (stage == Stage.LevelGate)
+{
+    <div class="alert alert-warning-glass" role="alert">@levelGateText</div>
+    <a class="btn btn-secondary-glass" href="/apply">Zurück zur Übersicht</a>
+}
+else if (stage == Stage.AlreadyApplied)
+{
+    <div class="alert alert-info-glass" role="alert">
+        Du hast dich in dieser Bewerbungsphase bereits auf diese Position beworben.
+    </div>
+    <a class="btn btn-primary-glass" href="/apply/status">Meine Bewerbungen</a>
+}
+else if (stage == Stage.NoQuestions)
+{
+    <div class="alert alert-warning-glass" role="alert">
+        Für diese Position ist aktuell kein Fragenkatalog hinterlegt. Bitte melde dich beim Team.
+    </div>
+}
+else if (stage == Stage.Submitted)
+{
+    <div class="alert alert-success-glass" role="alert">
+        <h4 class="alert-heading">Bewerbung abgeschickt</h4>
+        <hr>
+        <p class="mb-0">
+            Wir haben dir eine Bestätigung per DM geschickt. Den Stand deiner Bewerbung siehst du jederzeit
+            unter "Meine Bewerbungen".
+        </p>
+    </div>
+    <a class="btn btn-primary-glass" href="/apply/status">Meine Bewerbungen</a>
+}
+else
+{
+    @if (opening is { Bypassed: true })
+    {
+        <div class="alert alert-warning-glass" role="alert">
+            Für diese Position ist "Bewerbungen immer erlauben" aktiv. Phase, Mindestlevel und die Regel
+            "eine Bewerbung pro Phase" werden übersprungen.
+        </div>
+    }
+
+    @if (grant != null)
+    {
+        <div class="alert alert-info-glass" role="alert">
+            Für dich wurde eine erneute Bewerbung in dieser Phase freigeschaltet.
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-danger-glass" role="alert">@statusMessage</div>
+    }
+
+    @foreach (var answer in answers)
+    {
+        <div class="glass-card mt-3 p-3">
+            <label class="form-label">
+                <strong>@answer.Question.Text</strong>
+                @if (answer.Question.Required)
+                {
+                    <span class="text-danger"> *</span>
+                }
+            </label>
+
+            @if (!string.IsNullOrWhiteSpace(answer.Question.Description))
+            {
+                <p class="text-muted">@answer.Question.Description</p>
+            }
+
+            @switch (answer.Question.Type)
+            {
+                case TeamApplicationQuestionType.ShortText:
+                    <input class="form-control glassy-input" value="@answer.Text"
+                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                    break;
+
+                case TeamApplicationQuestionType.LongText:
+                    <textarea class="form-control glassy-input" rows="8" value="@answer.Text"
+                              @onchange="e => SetText(answer, e.Value?.ToString())"></textarea>
+                    <small class="text-muted">@answer.Text.Trim().Length Zeichen@(LengthHint(answer.Question))</small>
+                    break;
+
+                case TeamApplicationQuestionType.Number:
+                    <input type="number" class="form-control glassy-input" value="@answer.Text"
+                           @onchange="e => SetText(answer, e.Value?.ToString())"/>
+                    break;
+
+                case TeamApplicationQuestionType.SingleChoice:
+                    @for (var i = 0; i < answer.Question.Options.Count; i++)
+                    {
+                        var current = answer.Question.Options[i];
+                        var inputId = $"{answer.Question.QuestionId}-{i}";
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" id="@inputId"
+                                   name="@answer.Question.QuestionId" checked="@(answer.Text == current)"
+                                   @onchange="() => SetText(answer, current)"/>
+                            <label class="form-check-label" for="@inputId">@current</label>
+                        </div>
+                    }
+                    break;
+
+                case TeamApplicationQuestionType.MultipleChoice:
+                    @for (var i = 0; i < answer.Question.Options.Count; i++)
+                    {
+                        var current = answer.Question.Options[i];
+                        var inputId = $"{answer.Question.QuestionId}-{i}";
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="@inputId"
+                                   checked="@answer.Selected.Contains(current)"
+                                   @onchange="e => ToggleOption(answer, current, e.Value is true)"/>
+                            <label class="form-check-label" for="@inputId">@current</label>
+                        </div>
+                    }
+                    @if (SelectionHint(answer.Question) is { } hint)
+                    {
+                        <small class="text-muted">@hint</small>
+                    }
+                    break;
+            }
+
+            @if (!string.IsNullOrWhiteSpace(answer.Error))
+            {
+                <div class="validation-message mt-2">@answer.Error</div>
+            }
+        </div>
+    }
+
+    <button class="btn btn-primary-glass mt-3 mb-5" disabled="@submitting" @onclick="Submit">
+        Bewerbung abschicken
+    </button>
+}
+
+@code {
+    [Parameter] public string PositionId { get; set; } = "";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private ClaimsPrincipal? _principal;
+    private ulong userId;
+
+    private enum Stage
+    {
+        NotFound,
+        Closed,
+        LevelGate,
+        AlreadyApplied,
+        NoQuestions,
+        Form,
+        Submitted
+    }
+
+    private bool loaded;
+    private bool submitting;
+    private Stage stage = Stage.NotFound;
+    private string statusMessage = "";
+
+    private TeamApplicationPosition? position;
+    private TeamApplicationPhase? phase;
+    private TeamApplicationOpening? opening;
+    private TeamApplicationReapplyGrant? grant;
+    private List<AnswerVm> answers = new();
+
+    private long nextOpensAt;
+    private string closedText = "Bewerbungen aktuell geschlossen";
+    private string opensAtText = "Naechste Bewerbungsphase ab";
+    private string levelGateText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _principal = AuthState is null ? null : (await AuthState).User;
+        userId = UserService.GetUserId(_principal) ?? 0;
+
+        closedText = await TeamApplicationService.GetTextAsync("PanelClosedText", closedText);
+        opensAtText = await TeamApplicationService.GetTextAsync("PanelOpensAtText", opensAtText);
+        levelGateText = await TeamApplicationService.GetTextAsync("LevelGateText",
+            "Bring dich doch gerne etwas mehr in den Server ein, bevor du dich bewirbst.");
+
+        await Prepare();
+        loaded = true;
+    }
+
+    private async Task Prepare()
+    {
+        position = await TeamApplicationService.GetPositionAsync(PositionId);
+        if (position is not { Active: true })
+        {
+            stage = Stage.NotFound;
+            return;
+        }
+
+        opening = await TeamApplicationService.ResolveOpeningAsync(position);
+        if (!opening.CanApply || opening.Phase == null)
+        {
+            nextOpensAt = opening.NextOpensAt;
+            stage = Stage.Closed;
+            return;
+        }
+
+        phase = opening.Phase;
+
+        if (!opening.Bypassed && await LevelUtils.GetLevel(userId) < position.MinLevel)
+        {
+            stage = Stage.LevelGate;
+            return;
+        }
+
+        var (allowed, existingGrant, _) =
+            await TeamApplicationService.CanApplyAsync(userId, PositionId, phase.PhaseId, opening.Bypassed);
+        if (!allowed)
+        {
+            stage = Stage.AlreadyApplied;
+            return;
+        }
+
+        grant = existingGrant;
+
+        var questions = await TeamApplicationService.GetQuestionsAsync(PositionId, opening.QuestionSetVersion);
+        if (questions.Count == 0)
+        {
+            stage = Stage.NoQuestions;
+            return;
+        }
+
+        answers = questions.Select(q => new AnswerVm { Question = q }).ToList();
+        stage = Stage.Form;
+    }
+
+    private static string LengthHint(TeamApplicationQuestion question)
+    {
+        if (question.MinLength > 0 && question.MaxLength > 0)
+            return $" (erlaubt: {question.MinLength} bis {question.MaxLength})";
+        if (question.MinLength > 0) return $" (mindestens {question.MinLength})";
+        if (question.MaxLength > 0) return $" (höchstens {question.MaxLength})";
+        return "";
+    }
+
+    private static string? SelectionHint(TeamApplicationQuestion question)
+    {
+        if (question.MinSelections > 0 && question.MaxSelections > 0)
+            return $"Wähle {question.MinSelections} bis {question.MaxSelections} Optionen.";
+        if (question.MinSelections > 0) return $"Wähle mindestens {question.MinSelections} Optionen.";
+        if (question.MaxSelections > 0) return $"Wähle höchstens {question.MaxSelections} Optionen.";
+        return null;
+    }
+
+    private void SetText(AnswerVm answer, string? value)
+    {
+        answer.Text = value ?? "";
+        Validate(answer);
+    }
+
+    private void ToggleOption(AnswerVm answer, string option, bool selected)
+    {
+        if (selected)
+        {
+            if (!answer.Selected.Contains(option)) answer.Selected.Add(option);
+        }
+        else
+        {
+            answer.Selected.Remove(option);
+        }
+
+        Validate(answer);
+    }
+
+    private static void Validate(AnswerVm answer)
+    {
+        answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
+    }
+
+    private async Task Submit()
+    {
+        if (submitting) return;
+        submitting = true;
+        statusMessage = "";
+
+        try
+        {
+            // Everything is re-checked here; the state the page was rendered with may be minutes old.
+            var current = await TeamApplicationService.GetPositionAsync(PositionId);
+            if (current is not { Active: true })
+            {
+                await Prepare();
+                return;
+            }
+
+            var currentOpening = await TeamApplicationService.ResolveOpeningAsync(current);
+            if (!currentOpening.CanApply || currentOpening.Phase == null ||
+                currentOpening.Phase.PhaseId != phase?.PhaseId)
+            {
+                await Prepare();
+                return;
+            }
+
+            if (!currentOpening.Bypassed && await LevelUtils.GetLevel(userId) < current.MinLevel)
+            {
+                stage = Stage.LevelGate;
+                return;
+            }
+
+            var (allowed, currentGrant, nextAttempt) = await TeamApplicationService.CanApplyAsync(userId,
+                PositionId, currentOpening.Phase.PhaseId, currentOpening.Bypassed);
+            if (!allowed)
+            {
+                stage = Stage.AlreadyApplied;
+                return;
+            }
+
+            foreach (var answer in answers) Validate(answer);
+            if (answers.Any(a => a.Error != null))
+            {
+                statusMessage = "Bitte korrigiere die markierten Antworten.";
+                return;
+            }
+
+            await Persist(current, currentOpening, currentGrant, nextAttempt);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "TeamApplications: Bewerbung konnte nicht gespeichert werden");
+            statusMessage = "Deine Bewerbung konnte nicht gespeichert werden. Bitte versuche es erneut.";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private async Task Persist(TeamApplicationPosition current, TeamApplicationOpening currentOpening,
+        TeamApplicationReapplyGrant? currentGrant, int nextAttempt)
+    {
+        var currentPhase = currentOpening.Phase!;
+
+        var guild = CurrentApplication.TargetGuild;
+        guild.Members.TryGetValue(userId, out var member);
+
+        var accountCreated = member?.CreationTimestamp.ToUnixTimeSeconds() ?? 0;
+        if (accountCreated == 0)
+            try
+            {
+                var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
+                accountCreated = user.CreationTimestamp.ToUnixTimeSeconds();
+            }
+            catch (Exception)
+            {
+                // snapshot stays empty, the detail page shows the live value next to it anyway
+            }
+
+        var application = new TeamApplication
+        {
+            UserId = userId,
+            PositionId = current.PositionId,
+            PositionName = current.PositionName,
+            PhaseId = currentPhase.PhaseId,
+            PhaseName = currentPhase.Name,
+            QuestionSetVersion = currentOpening.QuestionSetVersion,
+            Attempt = nextAttempt,
+            LevelSnapshot = await LevelUtils.GetLevel(userId),
+            XpSnapshot = await LevelUtils.GetXp(userId),
+            JoinedAtSnapshot = member?.JoinedAt.ToUnixTimeSeconds() ?? 0,
+            AccountCreatedSnapshot = accountCreated
+        };
+
+        var payload = answers.Select(a => new TeamApplicationAnswer
+        {
+            QuestionId = a.Question.QuestionId,
+            SortOrder = a.Question.SortOrder,
+            QuestionTextSnapshot = a.Question.Text,
+            QuestionType = a.Question.Type,
+            Answer = a.Question.Type == TeamApplicationQuestionType.MultipleChoice ? "" : a.Text.Trim(),
+            AnswerOptions = a.Question.Type == TeamApplicationQuestionType.MultipleChoice ? a.Selected : []
+        }).ToList();
+
+        await TeamApplicationService.SubmitAsync(application, payload);
+        if (currentGrant != null) await TeamApplicationService.MarkGrantUsedAsync(currentGrant.GrantId);
+
+        stage = Stage.Submitted;
+
+        _ = Task.Run(async () =>
+        {
+            await TeamApplicationNotificationService.SendSubmitConfirmationAsync(application);
+            await TeamApplicationNotificationService.PostNewApplicationAsync(application);
+        });
+    }
+
+    private sealed class AnswerVm
+    {
+        public TeamApplicationQuestion Question { get; init; } = new();
+        public string Text { get; set; } = "";
+        public List<string> Selected { get; set; } = [];
+        public string? Error { get; set; }
+    }
+}

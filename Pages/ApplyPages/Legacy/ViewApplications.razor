@@ -1,7 +1,13 @@
-﻿@page "/teamarea/applysystem/viewapplications"
+﻿@page "/teamarea/applysystem/legacy/applications"
 @using AGC_Management.Entities
 @using AGC_Management.Utils
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+
+<div class="alert alert-info-glass mt-3" role="alert">
+    Dies ist eine Ansicht des alten Bewerbungssystems. Sie ist schreibgeschützt: Status und "Gesehen von"
+    lassen sich hier nicht mehr ändern. Neue Bewerbungen laufen über das aktuelle System.
+</div>
+
 
 
 <div class="search-bar-centered">
@@ -43,7 +49,7 @@
             <div class="glass-card mb-3">
                 <ul class="list-group @getcssfromstatus(application.Status) list-group-flush">
                     <li class="list-group-item">
-                        <a href="teamarea/applysystem/viewapplication/@application.BewerbungsId">
+                        <a href="/teamarea/applysystem/legacy/application/@application.BewerbungsId">
                             <h5 class="mb-1">Username: @ToolSet.GetFormattedName((ulong)application.UserId)</h5>
                             <p class="mb-1">NutzerID: @application.UserId</p>
                             <p class="mb-1">Bewerbungsposition: @application.PositionName</p>

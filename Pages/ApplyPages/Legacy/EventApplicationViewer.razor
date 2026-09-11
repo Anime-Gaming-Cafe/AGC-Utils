@@ -1,9 +1,15 @@
-﻿@page "/teamarea/applysystem/vieweventapplication/{applicationid}"
+﻿@page "/teamarea/applysystem/legacy/eventapplication/{applicationid}"
 @using AGC_Management.Entities
 @using AGC_Management.Controller
 @using AGC_Management.Utils
 @inject UserService UserService
 @attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, HeadEventmanager")]
+
+<div class="alert alert-info-glass mt-3" role="alert">
+    Dies ist eine Ansicht des alten Bewerbungssystems. Sie ist schreibgeschützt: Status und "Gesehen von"
+    lassen sich hier nicht mehr ändern. Neue Bewerbungen laufen über das aktuelle System.
+</div>
+
 
 <h3 class="text-center mt-5">Bewerbungsdetails</h3>
 
@@ -41,33 +47,6 @@
                 <p>Bewerbungstext</p>
                 <textarea class="form-control glassy-input" id="applymessage" rows="25" readonly>@ToolSet.GettextfromBase64(application.Bewerbungstext)</textarea>
 
-            </div>
-        </div>
-        <div class="glass-card mb-3">
-            <div class="card-header">
-                Optionen
-            </div>
-            <div class="card-body">
-                <div class="dropdown">
-                    <button class="btn btn-success-glass dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Kennzeichnen
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <button class="dropdown-item" @onclick="async () => await setstatus(4)" href="#">Abgelehnt</button>
-                        </li>
-                        <li>
-                            <button class="dropdown-item" @onclick="async () => await setstatus(2)" href="#">Vorgemerkt</button>
-                        </li>
-                        <li>
-                            <button class="dropdown-item" @onclick="async () => await setstatus(3)" href="#">Angenommen</button>
-                        </li>
-                        <li>
-                            <button class="dropdown-item" @onclick="async () => await setstatus(1)" href="#">Kennzeichnung entfernen</button>
-                        </li>
-                    </ul>
-                </div>
-                <!-- <button type="button" data-bs-toggle="modal" data-bs-target="#flagsandwarns" class="btn btn-danger-glass">Flags und Verwarnungen anzeigen</button> -->
             </div>
         </div>
     </div>
@@ -121,38 +100,6 @@ else if (!found && loaded)
         return 0;
     }
 
-    private async Task AddCurrentUserToSeenByIfNotAlready(long userid)
-    {
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = db.CreateCommand();
-        command.CommandText = "SELECT seenby FROM bewerbungen WHERE bewerbungsid = @applicationid";
-        command.Parameters.AddWithValue("applicationid", applicationid);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (await reader.ReadAsync())
-        {
-            var seenByIsNull = reader.IsDBNull(0);
-            if (seenByIsNull)
-            {
-                await using var updateCommand = db.CreateCommand();
-                updateCommand.CommandText = "UPDATE bewerbungen SET seenby = ARRAY[@userid] WHERE bewerbungsid = @applicationid";
-                updateCommand.Parameters.AddWithValue("userid", userid);
-                updateCommand.Parameters.AddWithValue("applicationid", applicationid);
-                await updateCommand.ExecuteNonQueryAsync();
-            }
-            else
-            {
-                var seenby = reader.GetFieldValue<long[]>(0);
-                if (!seenby.Contains(userid))
-                {
-                    await using var updateCommand = db.CreateCommand();
-                    updateCommand.CommandText = "UPDATE bewerbungen SET seenby = array_append(seenby, @userid) WHERE bewerbungsid = @applicationid";
-                    updateCommand.Parameters.AddWithValue("userid", userid);
-                    updateCommand.Parameters.AddWithValue("applicationid", applicationid);
-                    await updateCommand.ExecuteNonQueryAsync();
-                }
-            }
-        }
-    }
 
     private async Task LoadApplication()
     {
@@ -178,19 +125,6 @@ else if (!found && loaded)
         }
     }
 
-    private async Task UpdateFromUnreadToRead()
-    {
-        if (application == null)
-        {
-            return;
-        }
-
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var command = db.CreateCommand();
-        command.CommandText = "UPDATE bewerbungen SET status = 1 WHERE bewerbungsid = @applicationid";
-        command.Parameters.AddWithValue("applicationid", application.BewerbungsId);
-        await command.ExecuteNonQueryAsync();
-    }
 
 
     private string GetStatusFromInt(int status)
@@ -266,17 +200,6 @@ else if (!found && loaded)
     }
 
 
-    private async Task setstatus(int status)
-    {
-        var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        using var command = db.CreateCommand();
-        command.CommandText = "UPDATE bewerbungen SET status = @status WHERE bewerbungsid = @applicationid";
-        command.Parameters.AddWithValue("status", status);
-        command.Parameters.AddWithValue("applicationid", applicationid);
-        command.ExecuteNonQuery();
-        await LoadApplication();
-        StateHasChanged();
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -285,16 +208,6 @@ else if (!found && loaded)
         await LoadApplication();
         await Task.Delay(1000);
         loaded = true;
-        var userid = UserService.GetUserId(_principal);
-        if (userid != null)
-        {
-            await AddCurrentUserToSeenByIfNotAlready((long)userid);
-        }
-
-        if (application != null && application.Status == 0)
-        {
-            await UpdateFromUnreadToRead();
-        }
     }
 
 }

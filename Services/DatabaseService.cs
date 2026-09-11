@@ -284,6 +284,78 @@ public static class DatabaseService
             {
                 "idx_extra_permission_conditions_permname",
                 "CREATE INDEX IF NOT EXISTS idx_extra_permission_conditions_permname ON extra_permission_conditions (permname)"
+            },
+            {
+                "teamapplication_position",
+                "CREATE TABLE IF NOT EXISTS teamapplication_position (position_id TEXT PRIMARY KEY, position_name TEXT, description TEXT DEFAULT '', min_level INTEGER DEFAULT 20, notify_channel_id BIGINT DEFAULT 0, active BOOLEAN DEFAULT false, always_open BOOLEAN DEFAULT false, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "teamapplication_questionset",
+                "CREATE TABLE IF NOT EXISTS teamapplication_questionset (position_id TEXT, version INTEGER, state TEXT DEFAULT 'draft', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0, PRIMARY KEY (position_id, version))"
+            },
+            {
+                "teamapplication_questions",
+                "CREATE TABLE IF NOT EXISTS teamapplication_questions (question_id TEXT PRIMARY KEY, position_id TEXT, version INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, type TEXT DEFAULT 'shorttext', text TEXT DEFAULT '', description TEXT DEFAULT '', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0, min_value BIGINT DEFAULT 0, max_value BIGINT DEFAULT 0, options JSONB DEFAULT '[]'::jsonb, min_selections INTEGER DEFAULT 0, max_selections INTEGER DEFAULT 0)"
+            },
+            {
+                "idx_teamapplication_questions_set",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_questions_set ON teamapplication_questions (position_id, version, sort_order)"
+            },
+            {
+                "teamapplication_phase",
+                "CREATE TABLE IF NOT EXISTS teamapplication_phase (phase_id TEXT PRIMARY KEY, position_id TEXT, name TEXT DEFAULT '', state TEXT DEFAULT 'draft', questionset_version INTEGER DEFAULT 0, opens_at BIGINT DEFAULT 0, closes_at BIGINT DEFAULT 0, created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_teamapplication_phase_position",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_phase_position ON teamapplication_phase (position_id, state)"
+            },
+            {
+                "teamapplication_application",
+                "CREATE TABLE IF NOT EXISTS teamapplication_application (application_id TEXT PRIMARY KEY, user_id BIGINT, position_id TEXT, phase_id TEXT, questionset_version INTEGER DEFAULT 0, attempt INTEGER DEFAULT 1, status TEXT DEFAULT 'eingereicht', submitted_at BIGINT DEFAULT 0, decided_at BIGINT DEFAULT 0, decided_by BIGINT DEFAULT 0, decision_text TEXT DEFAULT '', dm_delivered BOOLEAN, dm_error TEXT DEFAULT '', withdrawn_at BIGINT DEFAULT 0, seen_by BIGINT[] DEFAULT '{}', level_snapshot INTEGER DEFAULT 0, xp_snapshot INTEGER DEFAULT 0, joined_at_snapshot BIGINT DEFAULT 0, account_created_snapshot BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_teamapplication_application_list",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_application_list ON teamapplication_application (position_id, phase_id, status)"
+            },
+            {
+                "idx_teamapplication_application_user",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_application_user ON teamapplication_application (user_id)"
+            },
+            {
+                "teamapplication_answers",
+                "CREATE TABLE IF NOT EXISTS teamapplication_answers (application_id TEXT, question_id TEXT, sort_order INTEGER DEFAULT 0, question_text_snapshot TEXT DEFAULT '', question_type TEXT DEFAULT 'shorttext', answer TEXT DEFAULT '', answer_options JSONB DEFAULT '[]'::jsonb, PRIMARY KEY (application_id, question_id))"
+            },
+            {
+                "teamapplication_notes",
+                "CREATE TABLE IF NOT EXISTS teamapplication_notes (note_id TEXT PRIMARY KEY, application_id TEXT, author_id BIGINT, text TEXT DEFAULT '', created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_teamapplication_notes_application",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_notes_application ON teamapplication_notes (application_id)"
+            },
+            {
+                "teamapplication_permissions",
+                "CREATE TABLE IF NOT EXISTS teamapplication_permissions (permission_id TEXT PRIMARY KEY, role_id BIGINT, position_id TEXT, phase_id TEXT, permission TEXT)"
+            },
+            {
+                "idx_teamapplication_permissions_role",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_permissions_role ON teamapplication_permissions (role_id)"
+            },
+            {
+                "teamapplication_reapply_grant",
+                "CREATE TABLE IF NOT EXISTS teamapplication_reapply_grant (grant_id TEXT PRIMARY KEY, user_id BIGINT, position_id TEXT, phase_id TEXT, granted_by BIGINT DEFAULT 0, granted_at BIGINT DEFAULT 0, reason TEXT DEFAULT '', used_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_teamapplication_reapply_grant_lookup",
+                "CREATE INDEX IF NOT EXISTS idx_teamapplication_reapply_grant_lookup ON teamapplication_reapply_grant (user_id, position_id, phase_id)"
+            },
+            {
+                "teamapplication_templates",
+                "CREATE TABLE IF NOT EXISTS teamapplication_templates (template_id TEXT PRIMARY KEY, position_id TEXT, kind TEXT DEFAULT 'accept', name TEXT DEFAULT '', text TEXT DEFAULT '')"
+            },
+            {
+                "teamapplication_placeholder",
+                "CREATE TABLE IF NOT EXISTS teamapplication_placeholder (key TEXT PRIMARY KEY, text TEXT DEFAULT '')"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -685,6 +757,369 @@ public static class DatabaseService
                         "ALTER TABLE extra_permission_conditions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
                     }
                 }
+            },
+            {
+                "teamapplication_position", new Dictionary<string, string>
+                {
+                    {
+                        "position_name",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS position_name TEXT"
+                    },
+                    {
+                        "description",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''"
+                    },
+                    {
+                        "min_level",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS min_level INTEGER DEFAULT 20"
+                    },
+                    {
+                        "notify_channel_id",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS notify_channel_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "active",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "always_open",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS always_open BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_questionset", new Dictionary<string, string>
+                {
+                    {
+                        "state",
+                        "ALTER TABLE teamapplication_questionset ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'draft'"
+                    },
+                    {
+                        "created_by",
+                        "ALTER TABLE teamapplication_questionset ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE teamapplication_questionset ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_questions", new Dictionary<string, string>
+                {
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "version",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 0"
+                    },
+                    {
+                        "sort_order",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0"
+                    },
+                    {
+                        "type",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'shorttext'"
+                    },
+                    {
+                        "text",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS text TEXT DEFAULT ''"
+                    },
+                    {
+                        "description",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''"
+                    },
+                    {
+                        "required",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS required BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "min_length",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS min_length INTEGER DEFAULT 0"
+                    },
+                    {
+                        "max_length",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS max_length INTEGER DEFAULT 0"
+                    },
+                    {
+                        "min_value",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS min_value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "max_value",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS max_value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "options",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb"
+                    },
+                    {
+                        "min_selections",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS min_selections INTEGER DEFAULT 0"
+                    },
+                    {
+                        "max_selections",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS max_selections INTEGER DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_phase", new Dictionary<string, string>
+                {
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "name",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS name TEXT DEFAULT ''"
+                    },
+                    {
+                        "state",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'draft'"
+                    },
+                    {
+                        "questionset_version",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS questionset_version INTEGER DEFAULT 0"
+                    },
+                    {
+                        "opens_at",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS opens_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "closes_at",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS closes_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_by",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE teamapplication_phase ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_application", new Dictionary<string, string>
+                {
+                    {
+                        "user_id",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS user_id BIGINT"
+                    },
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "phase_id",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS phase_id TEXT"
+                    },
+                    {
+                        "questionset_version",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS questionset_version INTEGER DEFAULT 0"
+                    },
+                    {
+                        "attempt",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS attempt INTEGER DEFAULT 1"
+                    },
+                    {
+                        "status",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'eingereicht'"
+                    },
+                    {
+                        "submitted_at",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS submitted_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "decided_at",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS decided_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "decided_by",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS decided_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "decision_text",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS decision_text TEXT DEFAULT ''"
+                    },
+                    {
+                        "dm_delivered",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS dm_delivered BOOLEAN"
+                    },
+                    {
+                        "dm_error",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS dm_error TEXT DEFAULT ''"
+                    },
+                    {
+                        "withdrawn_at",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS withdrawn_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "seen_by",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS seen_by BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "level_snapshot",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS level_snapshot INTEGER DEFAULT 0"
+                    },
+                    {
+                        "xp_snapshot",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS xp_snapshot INTEGER DEFAULT 0"
+                    },
+                    {
+                        "joined_at_snapshot",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS joined_at_snapshot BIGINT DEFAULT 0"
+                    },
+                    {
+                        "account_created_snapshot",
+                        "ALTER TABLE teamapplication_application ADD COLUMN IF NOT EXISTS account_created_snapshot BIGINT DEFAULT 0"
+                    },
+                    {
+                        "slot_unique",
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_teamapplication_application_slot ON teamapplication_application (user_id, position_id, phase_id, attempt) WHERE status <> 'zurueckgezogen'"
+                    }
+                }
+            },
+            {
+                "teamapplication_answers", new Dictionary<string, string>
+                {
+                    {
+                        "sort_order",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0"
+                    },
+                    {
+                        "question_text_snapshot",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS question_text_snapshot TEXT DEFAULT ''"
+                    },
+                    {
+                        "question_type",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS question_type TEXT DEFAULT 'shorttext'"
+                    },
+                    {
+                        "answer",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS answer TEXT DEFAULT ''"
+                    },
+                    {
+                        "answer_options",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS answer_options JSONB DEFAULT '[]'::jsonb"
+                    }
+                }
+            },
+            {
+                "teamapplication_notes", new Dictionary<string, string>
+                {
+                    {
+                        "application_id",
+                        "ALTER TABLE teamapplication_notes ADD COLUMN IF NOT EXISTS application_id TEXT"
+                    },
+                    {
+                        "author_id",
+                        "ALTER TABLE teamapplication_notes ADD COLUMN IF NOT EXISTS author_id BIGINT"
+                    },
+                    {
+                        "text",
+                        "ALTER TABLE teamapplication_notes ADD COLUMN IF NOT EXISTS text TEXT DEFAULT ''"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE teamapplication_notes ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_permissions", new Dictionary<string, string>
+                {
+                    {
+                        "role_id",
+                        "ALTER TABLE teamapplication_permissions ADD COLUMN IF NOT EXISTS role_id BIGINT"
+                    },
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_permissions ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "phase_id",
+                        "ALTER TABLE teamapplication_permissions ADD COLUMN IF NOT EXISTS phase_id TEXT"
+                    },
+                    {
+                        "permission",
+                        "ALTER TABLE teamapplication_permissions ADD COLUMN IF NOT EXISTS permission TEXT"
+                    },
+                    {
+                        "rule_unique",
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_teamapplication_permissions_rule ON teamapplication_permissions (role_id, coalesce(position_id, ''), coalesce(phase_id, ''), permission)"
+                    }
+                }
+            },
+            {
+                "teamapplication_reapply_grant", new Dictionary<string, string>
+                {
+                    {
+                        "user_id",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS user_id BIGINT"
+                    },
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "phase_id",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS phase_id TEXT"
+                    },
+                    {
+                        "granted_by",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS granted_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "granted_at",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS granted_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "reason",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT ''"
+                    },
+                    {
+                        "used_at",
+                        "ALTER TABLE teamapplication_reapply_grant ADD COLUMN IF NOT EXISTS used_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "teamapplication_templates", new Dictionary<string, string>
+                {
+                    {
+                        "position_id",
+                        "ALTER TABLE teamapplication_templates ADD COLUMN IF NOT EXISTS position_id TEXT"
+                    },
+                    {
+                        "kind",
+                        "ALTER TABLE teamapplication_templates ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'accept'"
+                    },
+                    {
+                        "name",
+                        "ALTER TABLE teamapplication_templates ADD COLUMN IF NOT EXISTS name TEXT DEFAULT ''"
+                    },
+                    {
+                        "text",
+                        "ALTER TABLE teamapplication_templates ADD COLUMN IF NOT EXISTS text TEXT DEFAULT ''"
+                    }
+                }
+            },
+            {
+                "teamapplication_placeholder", new Dictionary<string, string>
+                {
+                    {
+                        "text",
+                        "ALTER TABLE teamapplication_placeholder ADD COLUMN IF NOT EXISTS text TEXT DEFAULT ''"
+                    }
+                }
             }
         };
 
@@ -731,7 +1166,24 @@ public static class DatabaseService
             ("BoosterColors", "EmbedTitle", "Booster Farben"),
             ("BoosterColors", "EmbedDescription",
                 "Hier kannst du dir deine Booster Farbe auswählen. Sie ist jederzeit anpassbar. Deine Farbe wird automatisch wieder entfernt, sobald dein Boost ausläuft."),
-            ("ExtraPermissions", "AutoRevokeOnConditionLoss", "false")
+            ("ExtraPermissions", "AutoRevokeOnConditionLoss", "false"),
+            ("TeamApplications", "LevelGateText",
+                "Bring dich doch gerne etwas mehr in den Server ein, bevor du dich bewirbst."),
+            ("TeamApplications", "PanelClosedText", "Bewerbungen aktuell geschlossen"),
+            ("TeamApplications", "PanelOpensAtText", "Naechste Bewerbungsphase ab"),
+            ("TeamApplications", "DmSubmitTitle", "Bewerbung eingegangen"),
+            ("TeamApplications", "DmSubmitText",
+                "Hey {user}, deine Bewerbung für die Position **{position}** ist bei uns eingegangen. Wir melden uns, sobald wir sie angesehen haben."),
+            ("TeamApplications", "DmAcceptTitle", "Deine Bewerbung wurde angenommen"),
+            ("TeamApplications", "DmAcceptText",
+                "Hey {user}, deine Bewerbung für die Position **{position}** wurde angenommen."),
+            ("TeamApplications", "DmRejectTitle", "Deine Bewerbung wurde abgelehnt"),
+            ("TeamApplications", "DmRejectText",
+                "Hey {user}, deine Bewerbung für die Position **{position}** wurde leider abgelehnt."),
+            ("TeamApplications", "DmGrantTitle", "Du darfst dich erneut bewerben"),
+            ("TeamApplications", "DmGrantText",
+                "Hey {user}, du darfst dich für die Position **{position}** sofort erneut bewerben."),
+            ("TeamApplications", "NotifyNewApplicationText", "Neue Bewerbung eingegangen.")
         };
 
         foreach (var (section, key, value) in defaults)
