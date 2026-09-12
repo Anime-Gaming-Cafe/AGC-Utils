@@ -1,6 +1,6 @@
 @page "/logs/moderation/banlogs"
 @using AGC_Management.Utils
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter")]
+@attribute [Authorize(Policy = DashboardPolicies.SupportUp)]
 
 <PageHeader Title="Banns" Lead="Über den Bot ausgesprochene Banns, neueste zuerst."
             BackHref="/logs" BackText="Logging"/>

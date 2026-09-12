@@ -1,4 +1,4 @@
-ï»¿@page "/benutzereinstellungen/levelsystem/adjustrankcard"
+@page "/benutzereinstellungen/levelsystem/adjustrankcard"
 @using AGC_Management.Controller
 @using System.Text.Json
 @using AGC_Management.Utils
@@ -6,7 +6,7 @@
 @using SkiaSharp
 @inject UserService UserService
 @inject ToastService ToastService
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyMember)]
 
 <PageHeader Title="Rangkarte"
             Lead="Farbe, Deckkraft, Schrift und Hintergrund deiner Rangkarte."
@@ -48,24 +48,24 @@ else
                 <div class="field">
                     <label class="field__label" for="rc-image">Hintergrundbild</label>
                     <InputFile id="rc-image" class="form-control" accept="image/png,image/jpeg,image/webp" OnChange="UploadFile"/>
-                    <span class="field__hint">Empfohlen 930 Ã— 280 Pixel, hÃ¶chstens 5 MB. PNG, JPG oder WebP.</span>
+                    <span class="field__hint">Empfohlen 930 × 280 Pixel, höchstens 5 MB. PNG, JPG oder WebP.</span>
                 </div>
 
                 <div class="form-foot">
                     <button type="button" class="btn btn-primary" @onclick="SaveSettings">Speichern und anwenden</button>
                     @if (hasCustomRankCardSettings && !pendingReset)
                     {
-                        <button type="button" class="btn btn-danger" @onclick="() => pendingReset = true">ZurÃ¼cksetzen</button>
+                        <button type="button" class="btn btn-danger" @onclick="() => pendingReset = true">Zurücksetzen</button>
                     }
                 </div>
 
                 @if (pendingReset)
                 {
-                    <ConfirmInline Title="Rangkarte zurÃ¼cksetzen?"
-                                   ConfirmText="Ja, zurÃ¼cksetzen"
+                    <ConfirmInline Title="Rangkarte zurücksetzen?"
+                                   ConfirmText="Ja, zurücksetzen"
                                    OnConfirm="ResetCard"
                                    OnCancel="() => pendingReset = false">
-                        <p>Farbe, Schrift, Deckkraft und dein hochgeladenes Hintergrundbild werden gelÃ¶scht.</p>
+                        <p>Farbe, Schrift, Deckkraft und dein hochgeladenes Hintergrundbild werden gelöscht.</p>
                     </ConfirmInline>
                 }
             </Panel>
@@ -77,7 +77,7 @@ else
                 {
                     <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
                                 Title="Vorschau konnte nicht erzeugt werden"
-                                Description="Mit diesen Einstellungen lieÃŸ sich keine Karte rendern. Gespeichert ist noch nichts."
+                                Description="Mit diesen Einstellungen ließ sich keine Karte rendern. Gespeichert ist noch nichts."
                                 ActionText="Erneut versuchen"
                                 OnAction="CopySettingsToPreview"/>
                 }
@@ -98,7 +98,7 @@ else
                 {
                     <StateBlock Kind="StateBlock.StateKind.Error" Inline="true"
                                 Title="Karte konnte nicht erzeugt werden"
-                                Description="Ein Bild fÃ¼r die Karte lieÃŸ sich nicht abrufen. Deine Einstellungen sind davon nicht betroffen."
+                                Description="Ein Bild für die Karte ließ sich nicht abrufen. Deine Einstellungen sind davon nicht betroffen."
                                 ActionText="Erneut versuchen"
                                 OnAction="RenderCurrentCard"/>
                 }
@@ -153,19 +153,19 @@ else
         var file = e.File;
         if (file == null)
         {
-            ToastService.Notify("Keine Datei ausgewÃ¤hlt.", "bad");
+            ToastService.Notify("Keine Datei ausgewählt.", "bad");
             return;
         }
 
         if (file.Size > 5242880)
         {
-            ToastService.Notify("Die Datei ist zu groÃŸ. Bitte wÃ¤hle eine Datei, die kleiner als 5MB ist.", "bad");
+            ToastService.Notify("Die Datei ist zu groß. Bitte wähle eine Datei, die kleiner als 5MB ist.", "bad");
             return;
         }
 
         if (file.ContentType != "image/png" && file.ContentType != "image/jpg" && file.ContentType != "image/jpeg" && file.ContentType != "image/webp")
         {
-            ToastService.Notify("Die Datei hat ein ungÃ¼ltiges Format!", "bad");
+            ToastService.Notify("Die Datei hat ein ungültiges Format!", "bad");
             return;
         }
 
@@ -241,7 +241,7 @@ else
                 {
                     if (isActivated)
                     {
-                        ToastService.Notify("Bild wird geprÃ¼ft.", "ok");
+                        ToastService.Notify("Bild wird geprüft.", "ok");
                         using var client = new HttpClient();
                         var apikey = BotConfig.GetConfig()["LinkLens"]["API-KEY"];
                         client.DefaultRequestHeaders.Add("api-key", apikey);
@@ -263,19 +263,19 @@ else
                                 }
                             }
 
-                            ToastService.Notify($"Das Bild wurde abgelehnt, da es folgende GrÃ¼nde hat: {rejectReasons}", "bad");
+                            ToastService.Notify($"Das Bild wurde abgelehnt, da es folgende Gründe hat: {rejectReasons}", "bad");
                             await LogRuleViolatingImageUpload(userId, rejectReasons, imageToInstall);
                             return;
                         }
 
-                        ToastService.Notify("Bild wurde moderativ geprÃ¼ft und ist in Ordnung. Bild wird gespeichert...", "ok");
+                        ToastService.Notify("Bild wurde moderativ geprüft und ist in Ordnung. Bild wird gespeichert...", "ok");
 
                         await Task.Delay(500);
                     }
                 }
                 catch (Exception ex)
                 {
-                    ToastService.Notify($"Fehler beim moderativen prÃ¼fen der Datei: {ex.Message}", "bad");
+                    ToastService.Notify($"Fehler beim moderativen prüfen der Datei: {ex.Message}", "bad");
                     return;
                 }
 
@@ -363,7 +363,7 @@ else
         }
         catch (Exception e)
         {
-            CurrentApplication.Logger.Error(e, "Rangkarte fÃ¼r das Dashboard konnte nicht erzeugt werden");
+            CurrentApplication.Logger.Error(e, "Rangkarte für das Dashboard konnte nicht erzeugt werden");
             base64String = "";
             cardFailed = true;
         }
@@ -412,7 +412,7 @@ else
             previewFailed = true;
             if (hasImageChanged)
             {
-                ToastService.Notify("Mit diesem Bild lieÃŸ sich keine Vorschau erzeugen. Die Datei ist vermutlich kein gÃ¼ltiges Bild.", "bad");
+                ToastService.Notify("Mit diesem Bild ließ sich keine Vorschau erzeugen. Die Datei ist vermutlich kein gültiges Bild.", "bad");
             }
             else
             {

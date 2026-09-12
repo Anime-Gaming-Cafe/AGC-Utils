@@ -4,7 +4,7 @@
 @using AGC_Management.ApplicationSystem
 @using DisCatSharp.Enums
 @inject ToastService ToastService
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="Bewerbungspanel"
             Lead="Die Nachricht in Discord, über die sich Mitglieder bewerben."

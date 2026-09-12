@@ -1,5 +1,5 @@
 @page "/bot"
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Botinformationen">
     <Actions>

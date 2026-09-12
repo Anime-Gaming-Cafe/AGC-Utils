@@ -8,7 +8,7 @@
 @inject UserService UserService
 @inject ToastService ToastService
 @inject UnsavedChangesTracker Tracker
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Textbausteine und Bot-Texte" BackHref="/konfiguration" BackText="Administration"/>
 

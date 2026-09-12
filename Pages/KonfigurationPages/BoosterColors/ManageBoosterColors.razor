@@ -5,7 +5,7 @@
 @implements IDisposable
 @inject ToastService ToastService
 @inject UnsavedChangesTracker Tracker
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="Booster Farben"
             Lead="Farbrollen, die Booster sich über das Panel selbst aussuchen."

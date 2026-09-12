@@ -9,7 +9,7 @@ English.
 **Product.** AGC Utils dashboard, the web side of the bot that runs the *Anime Gaming Cafe* Discord
 (`discord.gg/animegamingcafe`), served at `dashboard.animegamingcafe.de`.
 
-**Audience.** Roughly two dozen staff members (BotOwner, Administrator, HeadModerator, Moderator, Supporter,
+**Audience.** Roughly two dozen staff members (BotOwner, Administrator, Moderator, Supporter,
 HeadEventmanager, Team), plus every server member on the applicant-facing and leaderboard screens.
 
 **The job.** Nearly every screen does the same thing: *find the record that needs a decision, decide, move on.*

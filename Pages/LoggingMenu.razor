@@ -1,11 +1,11 @@
 @page "/logs"
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Logging"/>
 
 <Panel Title="Moderation">
     <ul class="nav-links">
-        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter">
+        <AuthorizeView Policy="@DashboardPolicies.SupportUp">
             <li><a href="/logs/moderation/banlogs">Banns</a></li>
         </AuthorizeView>
     </ul>
@@ -13,7 +13,7 @@
 
 <Panel Title="Levelsystem">
     <ul class="nav-links">
-        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+        <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
             <li><a href="/logs/levelsystem/xptransferlogs">XP-Transfers</a></li>
         </AuthorizeView>
     </ul>

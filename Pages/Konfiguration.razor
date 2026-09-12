@@ -1,5 +1,5 @@
 @page "/Konfiguration"
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="Administration"/>
 
@@ -8,7 +8,7 @@
         <li><a href="/konfiguration/applysystem/positions">Positionen</a></li>
         <li><a href="/konfiguration/applysystem/templates">Textbausteine und Bot-Texte</a></li>
         <li><a href="/konfiguration/applysystem/modifypanelmessage">Bewerbungspanel</a></li>
-        <AuthorizeView Roles="BotOwner, Administrator">
+        <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
             <li><a href="/konfiguration/applysystem/permissions">Rechte-Matrix</a></li>
         </AuthorizeView>
     </ul>

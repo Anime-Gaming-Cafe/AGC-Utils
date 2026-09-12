@@ -3,7 +3,7 @@
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
 @inject ToastService ToastService
-@attribute [Authorize(Roles = "BotOwner, Administrator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="Rechte-Matrix"
             Lead="Rechte im Bewerbungssystem hängen an Discord-Rollen. Bot-Owner und Administratoren haben immer alle Rechte und brauchen keinen Eintrag."

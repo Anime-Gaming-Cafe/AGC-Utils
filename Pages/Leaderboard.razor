@@ -1,7 +1,7 @@
 @page "/Leaderboard"
 @using AGC_Management.Entities.Web
 @using AGC_Management.Utils
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyMember)]
 
 <PageHeader Title="Leaderboard"
             Lead="@(LevelUtils.LeaderboardDataLoaded ? $"Stand: {LevelUtils.CacheDate}" : null)"/>

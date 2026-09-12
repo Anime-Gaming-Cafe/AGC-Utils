@@ -7,6 +7,7 @@
 @using AGC_Management.Services
 @using AGC_Management.Utils
 @inject UserService UserService
+@inject IAuthorizationService AuthorizationService
 
 <PageTitle>Start</PageTitle>
 
@@ -179,12 +180,6 @@ else
 
     private const int OwnApplicationsShown = 3;
 
-    // Mirror the page attributes, so the start page never offers something that ends on /403.
-    private static readonly string[] TeamRoles =
-        ["BotOwner", "Administrator", "HeadModerator", "Moderator", "Supporter", "HeadEventmanager", "Team"];
-
-    private static readonly string[] MemberRoles = [..TeamRoles, "User"];
-
     private bool initialized;
     private bool isAuthenticated;
     private string username = "";
@@ -233,7 +228,7 @@ else
                 var user = await CurrentApplication.DiscordClient.GetUserAsync(userId.Value);
                 username = user.GlobalName ?? user.Username;
 
-                if (MemberRoles.Any(principal.IsInRole))
+                if ((await AuthorizationService.AuthorizeAsync(principal, DashboardPolicies.AnyMember)).Succeeded)
                 {
                     forYouVisible = true;
                     ownApplications = await TeamApplicationService.GetOwnApplicationsAsync(userId.Value);
@@ -278,8 +273,8 @@ else
                     }
                 }
 
-                // The matrix alone is not enough: DebugMode grants it to everyone.
-                if (TeamRoles.Any(principal.IsInRole))
+                // The policy alone is not enough: DebugMode grants it to everyone.
+                if ((await AuthorizationService.AuthorizeAsync(principal, DashboardPolicies.AnyStaff)).Succeeded)
                 {
                     var allowed = await TeamApplicationPermissionService.GetAllowedPositionsAsync(userId.Value,
                         TeamApplicationPermission.ViewApplications);

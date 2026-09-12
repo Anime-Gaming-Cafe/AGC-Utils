@@ -1,6 +1,6 @@
 @page "/logs/levelsystem/xptransferlogs"
 @using AGC_Management.Utils
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="XP-Transfers" Lead="Manuelle Übertragungen von XP zwischen Nutzern, neueste zuerst."
             BackHref="/logs" BackText="Logging"/>

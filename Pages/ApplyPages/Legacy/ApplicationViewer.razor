@@ -1,7 +1,7 @@
 @page "/teamarea/applysystem/legacy/application/{applicationid}"
 @using AGC_Management.Entities
 @using AGC_Management.Utils
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator")]
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
 <PageHeader Title="@(application != null ? userName : "Alte Bewerbung")"
             Lead="Altsystem, nur lesend."

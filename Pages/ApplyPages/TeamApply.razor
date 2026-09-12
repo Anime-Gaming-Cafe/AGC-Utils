@@ -2,7 +2,7 @@
 @using AGC_Management.Entities.ApplicationSystem
 @using AGC_Management.Services
 @using AGC_Management.Utils
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyMember)]
 
 <PageHeader Title="Bewerben"
             Lead="Bitte beachte vor deiner Bewerbung die Anforderungen auf dem Server.">

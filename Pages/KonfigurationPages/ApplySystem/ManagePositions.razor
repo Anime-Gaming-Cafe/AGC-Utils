@@ -9,7 +9,7 @@
 @inject UserService UserService
 @inject ToastService ToastService
 @inject UnsavedChangesTracker Tracker
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Bewerbungspositionen"
             Lead="Jede Position braucht einen veröffentlichten Fragenkatalog und eine offene Phase, bevor sich jemand bewerben kann."

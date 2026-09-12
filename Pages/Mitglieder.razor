@@ -1,12 +1,12 @@
 @page "/mitglieder"
 @using AGC_Management.Utils
 @implements IDisposable
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter")]
+@attribute [Authorize(Policy = DashboardPolicies.SupportUp)]
 
 <PageHeader Title="Mitglieder"
             Lead="@(members is null ? null : $"{matchingMembers?.Length ?? 0} von {members.Length} Mitgliedern")">
     <Actions>
-        <AuthorizeView Roles="BotOwner, Administrator">
+        <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
             <button type="button" class="btn btn-secondary" disabled="@isLoading" @onclick="MitgliederNeuEinlesen"
                     title="Lädt alle Mitglieder direkt von Discord. Das belastet das Rate-Limit.">
                 <AppIcon Name="refresh"/> Von Discord neu einlesen

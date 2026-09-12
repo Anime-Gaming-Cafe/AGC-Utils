@@ -3,7 +3,7 @@
 @using AGC_Management.Enums.ApplicationSystem
 @using AGC_Management.Services
 @inject UserService UserService
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Teambereich"
             Lead="Bewerbungen sichten und entscheiden, Altbestände einsehen."/>
@@ -22,10 +22,10 @@
 
 <Panel Title="Altsystem" Lead="Nur lesend. Über dieses System kommen keine neuen Bewerbungen mehr herein.">
     <ul class="nav-links">
-        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+        <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
             <li><a href="/teamarea/applysystem/legacy/applications">Alte Bewerbungen (Team allgemein)</a></li>
         </AuthorizeView>
-        <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, HeadEventmanager">
+        <AuthorizeView Policy="@DashboardPolicies.EventManagement">
             <li><a href="/teamarea/applysystem/legacy/eventapplications">Alte Bewerbungen (Eventteam)</a></li>
         </AuthorizeView>
     </ul>

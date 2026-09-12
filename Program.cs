@@ -3,6 +3,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using AGC_Management.Controller;
+using AGC_Management.Enums.Web;
 using AGC_Management.Services;
 using AGC_Management.Utils;
 using DisCatSharp;
@@ -11,6 +12,7 @@ using Discord.OAuth2;
 using KawaiiAPI.NET;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Serilog;
@@ -176,6 +178,7 @@ internal class Program : BaseCommandModule
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddServerSideBlazor()
             .AddHubOptions(options => { options.MaximumReceiveMessageSize = 32 * 1024 * 100; });
+        builder.Services.AddScoped<AuthenticationStateProvider, DashboardRevalidatingAuthenticationStateProvider>();
         builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog());
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton<UserService>();
@@ -209,11 +212,26 @@ internal class Program : BaseCommandModule
                 x.Prompt = DiscordOptions.PromptTypes.None;
                 x.ClaimActions.MapCustomJson(ClaimTypes.NameIdentifier,
                     element => { return AuthUtils.RetrieveId(element).Result; });
-                x.ClaimActions.MapCustomJson(ClaimTypes.Role,
-                    element => { return AuthUtils.RetrieveRole(element).Result; });
                 x.ClaimActions.MapCustomJson("FullQualifiedDiscordName",
                     element => { return AuthUtils.RetrieveName(element).Result; });
             });
+
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(DashboardPolicies.AdminOnly,
+                p => p.RequireRole(AccessLevels.AtLeast(AccessLevel.Administrator)));
+            options.AddPolicy(DashboardPolicies.ModUp,
+                p => p.RequireRole(AccessLevels.AtLeast(AccessLevel.Moderator)));
+            options.AddPolicy(DashboardPolicies.SupportUp,
+                p => p.RequireRole(AccessLevels.AtLeast(AccessLevel.Supporter)));
+            options.AddPolicy(DashboardPolicies.EventManagement,
+                p => p.RequireRole([..AccessLevels.AtLeast(AccessLevel.Administrator), nameof(AccessLevel.HeadEventmanager)]));
+            options.AddPolicy(DashboardPolicies.AnyStaff,
+                p => p.RequireRole(AccessLevels.AtLeast(AccessLevel.Team)));
+            options.AddPolicy(DashboardPolicies.AnyMember,
+                p => p.RequireRole(AccessLevels.AtLeast(AccessLevel.User)));
+        });
+        builder.Services.AddTransient<IClaimsTransformation, DashboardRoleClaimsTransformation>();
 
         ILoggerFactory loggerFactory = null;
         if (loglevel == LogEventLevel.Debug)
@@ -355,7 +373,6 @@ internal class Program : BaseCommandModule
         {
             MinimumSameSitePolicy = SameSiteMode.Lax
         });
-        app.UseMiddleware<RoleRefreshMiddleware>();
         app.MapBlazorHub();
         app.MapDefaultControllerRoute();
         app.MapFallbackToPage("/_Host");

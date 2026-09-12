@@ -1,8 +1,8 @@
-﻿#region
+#region
 
 using System.Text.Json;
 using AGC_Management.Enums.Web;
-using DisCatSharp.Exceptions;
+using IniParser.Model;
 
 #endregion
 
@@ -10,82 +10,48 @@ namespace AGC_Management.Utils;
 
 public sealed class AuthUtils
 {
-    public static async Task<string> RetrieveRole(ulong userId)
+    private static readonly (string ConfigKey, AccessLevel Level)[] RoleMappings =
+    [
+        ("AdminRoleId", AccessLevel.Administrator),
+        ("ModRoleId", AccessLevel.Moderator),
+        ("SupportRoleId", AccessLevel.Supporter),
+        ("HeadEventmanagerRoleId", AccessLevel.HeadEventmanager),
+        ("StaffRoleId", AccessLevel.Team),
+        ("EventlerRoleId", AccessLevel.Team)
+    ];
+
+    public static Task<AccessLevel> ResolveAccessLevelAsync(ulong userId)
     {
         var guild = CurrentApplication.TargetGuild;
-        DiscordMember? user = null;
+        if (!guild.Members.TryGetValue(userId, out var user))
+            return Task.FromResult(AccessLevel.NichtImServer);
+
         var servercfg = BotConfig.GetConfig()["ServerConfig"];
-        var adminRole = guild.GetRole(ulong.Parse(servercfg["AdminRoleId"]));
-        DiscordRole? overrideRole = null;
-        try
-        {
-            overrideRole = guild.GetRole(ulong.Parse(servercfg["WebOverrideRoleId"]));
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
 
-        var supRole = guild.GetRole(ulong.Parse(servercfg["SupportRoleId"]));
-        var modRole = guild.GetRole(ulong.Parse(servercfg["ModRoleId"]));
-        var staffRole = guild.GetRole(ulong.Parse(servercfg["StaffRoleId"]));
-        try
-        {
-            user = CurrentApplication.TargetGuild.Members.Values.First(x => x.Id == userId);
-            if (user == null) return AccessLevel.NichtImServer.ToString();
-        }
-        catch (NotFoundException)
-        {
-            return AccessLevel.NichtImServer.ToString();
-        }
-        catch (InvalidOperationException)
-        {
-            return AccessLevel.NichtImServer.ToString();
-        }
+        if (TryGetRole(guild, servercfg, "WebOverrideRoleId", out var overrideRole) &&
+            user.Roles.Contains(overrideRole))
+            return Task.FromResult(AccessLevel.Administrator);
 
-        try
-        {
-            if (overrideRole != null && user.Roles.Contains(overrideRole)) return AccessLevel.Administrator.ToString();
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
+        if (user.Id == GlobalProperties.BotOwnerId) return Task.FromResult(AccessLevel.BotOwner);
 
-        // bot owner
-        if (user.Id == GlobalProperties.BotOwnerId) return AccessLevel.BotOwner.ToString();
+        foreach (var (key, level) in RoleMappings)
+            if (TryGetRole(guild, servercfg, key, out var role) && user.Roles.Contains(role))
+                return Task.FromResult(level);
 
-        // admin
-        if (user.Roles.Contains(adminRole)) return AccessLevel.Administrator.ToString();
-
-        try
-        {
-            ulong headmodroleid = 817732206876688387;
-            var headmodrole = guild.GetRole(headmodroleid);
-            if (user.Roles.Contains(headmodrole)) return AccessLevel.HeadModerator.ToString();
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
-
-        // mod
-        if (user.Roles.Contains(modRole)) return AccessLevel.Moderator.ToString();
-
-        // sup
-        if (user.Roles.Contains(supRole)) return AccessLevel.Supporter.ToString();
-
-        var eventmanagerRole = guild.Roles.Values.FirstOrDefault(x => x.Id.Equals(1157337266960732232));
-        if (eventmanagerRole != null && user.Roles.Contains(eventmanagerRole))
-            return AccessLevel.HeadEventmanager.ToString();
-
-        // staff
-        if (user.Roles.Contains(staffRole)) return AccessLevel.Team.ToString();
-
-        // user
-        return AccessLevel.User.ToString();
+        return Task.FromResult(AccessLevel.User);
     }
 
+    public static async Task<string> RetrieveRole(ulong userId) => (await ResolveAccessLevelAsync(userId)).ToString();
+
+    private static bool TryGetRole(DiscordGuild guild, KeyDataCollection servercfg, string key, out DiscordRole role)
+    {
+        role = null;
+        var value = servercfg[key];
+        if (string.IsNullOrEmpty(value) || !ulong.TryParse(value, out var roleId)) return false;
+
+        role = guild.GetRole(roleId);
+        return role != null;
+    }
 
     public static async Task<string> RetrieveName(JsonElement userClaims)
     {
@@ -108,151 +74,9 @@ public sealed class AuthUtils
         return (await CurrentApplication.DiscordClient.GetUserAsync(userId)).GlobalName;
     }
 
-
     public static async Task<string> RetrieveId(JsonElement userClaims)
     {
         var userId_ = userClaims.GetProperty("id").ToString();
         return userId_;
-    }
-
-    public static async Task<string> RetrieveRole(JsonElement userClaims)
-    {
-        var userId_ = userClaims.GetProperty("id").ToString();
-        var userId = ulong.Parse(userId_);
-
-
-        var guild = CurrentApplication.TargetGuild;
-        DiscordMember? user = null;
-        var servercfg = BotConfig.GetConfig()["ServerConfig"];
-        var adminRole = guild.GetRole(ulong.Parse(servercfg["AdminRoleId"]));
-        var supRole = guild.GetRole(ulong.Parse(servercfg["SupportRoleId"]));
-        DiscordRole? overrideRole = null;
-        try
-        {
-            overrideRole = guild.GetRole(ulong.Parse(servercfg["WebOverrideRoleId"]));
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
-
-        var modRole = guild.GetRole(ulong.Parse(servercfg["ModRoleId"]));
-        var staffRole = guild.GetRole(ulong.Parse(servercfg["StaffRoleId"]));
-        try
-        {
-            user = CurrentApplication.TargetGuild.Members.Values.First(x => x.Id == userId);
-            if (user == null) return AccessLevel.NichtImServer.ToString();
-        }
-        catch (NotFoundException)
-        {
-            return AccessLevel.NichtImServer.ToString();
-        }
-        catch (InvalidOperationException)
-        {
-            return AccessLevel.NichtImServer.ToString();
-        }
-
-        try
-        {
-            if (overrideRole != null && user.Roles.Contains(overrideRole)) return AccessLevel.Administrator.ToString();
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
-
-        // bot owner
-        if (user.Id == GlobalProperties.BotOwnerId) return AccessLevel.BotOwner.ToString();
-
-        // admin
-        if (user.Roles.Contains(adminRole)) return AccessLevel.Administrator.ToString();
-
-
-        try
-        {
-            ulong headmodroleid = 817732206876688387;
-            var headmodrole = guild.GetRole(headmodroleid);
-            if (user.Roles.Contains(headmodrole)) return AccessLevel.HeadModerator.ToString();
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
-
-        // mod
-        if (user.Roles.Contains(modRole)) return AccessLevel.Moderator.ToString();
-
-        // sup
-        if (user.Roles.Contains(supRole)) return AccessLevel.Supporter.ToString();
-
-        var eventmanagerRole = guild.Roles.Values.FirstOrDefault(x => x.Id.Equals(1157337266960732232));
-        if (eventmanagerRole != null && user.Roles.Contains(eventmanagerRole))
-            return AccessLevel.HeadEventmanager.ToString();
-
-        // staff
-        if (user.Roles.Contains(staffRole)) return AccessLevel.Team.ToString();
-
-        // user
-        return AccessLevel.User.ToString();
-    }
-
-
-    public static async Task<List<string>> RetrieveRoles(ulong id)
-    {
-        var userId = ulong.Parse(id.ToString());
-
-        var guild = CurrentApplication.TargetGuild;
-        DiscordMember? user = null;
-        var servercfg = BotConfig.GetConfig()["ServerConfig"];
-        var adminRole = guild.GetRole(ulong.Parse(servercfg["AdminRoleId"]));
-        var supRole = guild.GetRole(ulong.Parse(servercfg["SupportRoleId"]));
-        DiscordRole? overrideRole = null;
-
-        try
-        {
-            overrideRole = guild.GetRole(ulong.Parse(servercfg["WebOverrideRoleId"]));
-        }
-        catch (Exception)
-        {
-            // ignored
-        }
-
-        var modRole = guild.GetRole(ulong.Parse(servercfg["ModRoleId"]));
-        var staffRole = guild.GetRole(ulong.Parse(servercfg["StaffRoleId"]));
-
-        try
-        {
-            user = await guild.GetMemberAsync(userId);
-        }
-        catch (NotFoundException)
-        {
-            return [AccessLevel.NichtImServer.ToString()];
-        }
-
-        var userRoles = new List<string>();
-
-        // bot owner
-        if (user.Id == GlobalProperties.BotOwnerId) userRoles.Add(AccessLevel.BotOwner.ToString());
-
-        // override
-        if (overrideRole != null && user.Roles.Contains(overrideRole))
-            userRoles.Add(AccessLevel.Administrator.ToString());
-
-        // admin
-        if (user.Roles.Contains(adminRole)) userRoles.Add(AccessLevel.Administrator.ToString());
-
-        // mod
-        if (user.Roles.Contains(modRole)) userRoles.Add(AccessLevel.Moderator.ToString());
-
-        // sup
-        if (user.Roles.Contains(supRole)) userRoles.Add(AccessLevel.Supporter.ToString());
-
-        // staff
-        if (user.Roles.Contains(staffRole)) userRoles.Add(AccessLevel.Team.ToString());
-
-        // user
-        if (userRoles.Count == 0) userRoles.Add(AccessLevel.User.ToString());
-
-        return userRoles;
     }
 }

@@ -11,18 +11,17 @@
         <nav id="topnav" class="topnav @(open ? "is-open" : null)" aria-label="Hauptnavigation">
             <ul class="topnav__list" @onclick="Close">
                 <li><NavLink href="" Match="NavLinkMatch.All">Start</NavLink></li>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User">
+                <AuthorizeView Policy="@DashboardPolicies.AnyMember">
                     <li><NavLink href="leaderboard">Leaderboard</NavLink></li>
                 </AuthorizeView>
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team">
+                <AuthorizeView Policy="@DashboardPolicies.AnyStaff">
                     <li class="topnav__sep" aria-hidden="true"></li>
                     <li class="topnav__group">Team</li>
                     <li><NavLink href="teamarea">Teambereich</NavLink></li>
                     <li><NavLink href="bot">Botinformationen</NavLink></li>
                     <li><NavLink href="logs">Logging</NavLink></li>
                 </AuthorizeView>
-                @* Matches Konfiguration.razor's own [Authorize]. *@
-                <AuthorizeView Roles="BotOwner, Administrator, HeadModerator">
+                <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
                     <li><NavLink href="konfiguration">Administration</NavLink></li>
                 </AuthorizeView>
             </ul>
@@ -51,7 +50,7 @@
                                 <li><hr class="dropdown-divider"></li>
                             }
                             @* Personal destinations sit with the account, not in the main navigation. *@
-                            <AuthorizeView Roles="BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team, User"
+                            <AuthorizeView Policy="@DashboardPolicies.AnyMember"
                                            Context="memberContext">
                                 <li><a class="dropdown-item" href="/apply/status">Meine Bewerbungen</a></li>
                                 <li><a class="dropdown-item" href="/tickets">Meine Tickets</a></li>

@@ -6,7 +6,7 @@
 @using AGC_Management.Utils
 @implements IDisposable
 @inject UserService UserService
-@attribute [Authorize(Roles = "BotOwner, Administrator, HeadModerator, Moderator, Supporter, HeadEventmanager, Team")]
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Bewerbungen" Lead="Unentschiedene Bewerbungen stehen oben.">
     <Actions>
