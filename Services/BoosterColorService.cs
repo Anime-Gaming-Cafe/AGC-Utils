@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Collections.Concurrent;
+using System.Reflection;
 using DisCatSharp.Exceptions;
 using SkiaSharp;
 
@@ -403,6 +405,229 @@ public static class BoosterColorService
         return emojiLookup.TryGetValue(role.Id, out var emojiId)
             ? new DiscordComponentEmoji(emojiId)
             : new DiscordComponentEmoji(NearestUnicodeCircle(role.Color));
+    }
+
+    private static readonly Lazy<SKBitmap> TemplateBitmap = new(LoadTemplateBitmap);
+
+    private static readonly Lazy<float[,]> TemplateRecolorMask = new(() =>
+    {
+        var bmp = TemplateBitmap.Value;
+        var hardMask = ComputeRecolorMask(bmp);
+        return BlurMask(hardMask, bmp.Width, bmp.Height, 1);
+    });
+
+    private static readonly ConcurrentDictionary<ulong, string> LastIconFingerprint = new();
+    private static readonly (int Dx, int Dy)[] OrthogonalNeighbors = { (1, 0), (-1, 0), (0, 1), (0, -1) };
+
+    /// <summary>
+    ///     Decoded at its native resolution and sent to Discord as-is, no downscaling: role icons render sharper
+    ///     at whatever size Discord's client shows them if the source isn't tiny to begin with, and the
+    ///     connected-component mask below needs the extra pixels to correctly separate the sparkle stars from
+    ///     the gem shape anyway.
+    /// </summary>
+    private static SKBitmap LoadTemplateBitmap()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        using var stream = assembly.GetManifestResourceStream("AGC_Management.Resources.boosterstandard.png");
+        return SKBitmap.Decode(stream);
+    }
+
+    /// <summary>
+    ///     The template mixes two things that render as the exact same opaque white: the gem body/ring (should
+    ///     take the role color) and the sparkle stars (must stay white). The only way to tell them apart is that
+    ///     the stars sit as their own blobs, physically disconnected from the gem shape. The largest connected
+    ///     component of non-transparent pixels is the gem (body + ring + drop shadow, all touching); everything
+    ///     smaller is a star and is left untouched by <see cref="GenerateRoleIcon" />.
+    /// </summary>
+    private static bool[,] ComputeRecolorMask(SKBitmap template)
+    {
+        var w = template.Width;
+        var h = template.Height;
+        var componentId = new int[w, h];
+        var componentSizes = new List<int>();
+
+        bool HasContent(int x, int y)
+        {
+            return template.GetPixel(x, y).Alpha > 10;
+        }
+
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+        {
+            if (componentId[x, y] != 0 || !HasContent(x, y)) continue;
+
+            var id = componentSizes.Count + 1;
+            var count = 0;
+            var queue = new Queue<(int X, int Y)>();
+            queue.Enqueue((x, y));
+            componentId[x, y] = id;
+
+            while (queue.Count > 0)
+            {
+                var (cx, cy) = queue.Dequeue();
+                count++;
+
+                foreach (var (dx, dy) in OrthogonalNeighbors)
+                {
+                    var nx = cx + dx;
+                    var ny = cy + dy;
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                    if (componentId[nx, ny] != 0 || !HasContent(nx, ny)) continue;
+
+                    componentId[nx, ny] = id;
+                    queue.Enqueue((nx, ny));
+                }
+            }
+
+            componentSizes.Add(count);
+        }
+
+        var largestId = 0;
+        var largestSize = -1;
+        for (var i = 0; i < componentSizes.Count; i++)
+            if (componentSizes[i] > largestSize)
+            {
+                largestSize = componentSizes[i];
+                largestId = i + 1;
+            }
+
+        var mask = new bool[w, h];
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+            mask[x, y] = componentId[x, y] == largestId;
+
+        return mask;
+    }
+
+    /// <summary>
+    ///     Brings every color role's native Discord role icon in line with its current color(s). A role whose
+    ///     color fingerprint has not changed since the last sync is skipped, same idea as <see cref="EnsureEmojisAsync" />.
+    /// </summary>
+    public static async Task EnsureRoleIconsAsync(IReadOnlyCollection<DiscordRole> colorRoles)
+    {
+        foreach (var role in colorRoles)
+        {
+            var fingerprint = ColorFingerprint(role);
+            if (LastIconFingerprint.TryGetValue(role.Id, out var last) && last == fingerprint) continue;
+
+            try
+            {
+                await using var stream = GenerateRoleIcon(role.Color, role.Colors?.SecondaryColor);
+                await role.ModifyAsync(m => m.Icon = stream);
+                LastIconFingerprint[role.Id] = fingerprint;
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Error(e, "BoosterColors: failed to set role icon for role {RoleId}", role.Id);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Multiplies the role color(s) into the gem body/ring only (see <see cref="ComputeRecolorMask" />), pixel
+    ///     by pixel: white fill becomes a vivid flat color, the near-black shadow/bevel stays neutral because
+    ///     anything times black is still black, and the stars are skipped entirely and stay white. The mask is
+    ///     pre-blurred (<see cref="BlurMask" />) so the gem/star boundary fades over a couple pixels instead of a
+    ///     hard, visibly painted-on edge.
+    /// </summary>
+    private static MemoryStream GenerateRoleIcon(DiscordColor primary, DiscordColor? secondary)
+    {
+        var template = TemplateBitmap.Value;
+        var maskBlend = TemplateRecolorMask.Value;
+        var size = template.Width;
+
+        var primaryColor = new SKColor(primary.R, primary.G, primary.B);
+        var secondaryColor = secondary.HasValue
+            ? new SKColor(secondary.Value.R, secondary.Value.G, secondary.Value.B)
+            : (SKColor?)null;
+
+        using var bmp = new SKBitmap(size, size);
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var original = template.GetPixel(x, y);
+            var blend = maskBlend[x, y];
+            if (original.Alpha == 0 || blend <= 0f)
+            {
+                bmp.SetPixel(x, y, original);
+                continue;
+            }
+
+            var tint = secondaryColor.HasValue
+                ? LerpColor(primaryColor, secondaryColor.Value, size <= 1 ? 0f : x / (float)(size - 1))
+                : primaryColor;
+
+            var recoloredR = (byte)(original.Red * tint.Red / 255);
+            var recoloredG = (byte)(original.Green * tint.Green / 255);
+            var recoloredB = (byte)(original.Blue * tint.Blue / 255);
+
+            if (blend >= 1f)
+            {
+                bmp.SetPixel(x, y, new SKColor(recoloredR, recoloredG, recoloredB, original.Alpha));
+                continue;
+            }
+
+            byte Mix(byte fromOriginal, byte toRecolored)
+            {
+                return (byte)(fromOriginal + (toRecolored - fromOriginal) * blend);
+            }
+
+            bmp.SetPixel(x, y, new SKColor(
+                Mix(original.Red, recoloredR),
+                Mix(original.Green, recoloredG),
+                Mix(original.Blue, recoloredB),
+                original.Alpha));
+        }
+
+        using var image = SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        var ms = new MemoryStream();
+        data.SaveTo(ms);
+        ms.Position = 0;
+        return ms;
+    }
+
+    /// <summary>
+    ///     A single box-blur pass over the boolean mask, giving a subtle ~1px falloff at the gem/star boundary
+    ///     instead of a hard 0/1 cutoff - matching the artwork's own anti-aliasing, not a bloom/glow effect.
+    /// </summary>
+    private static float[,] BlurMask(bool[,] mask, int w, int h, int radius)
+    {
+        var current = new float[w, h];
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+            current[x, y] = mask[x, y] ? 1f : 0f;
+
+        var next = new float[w, h];
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+        {
+            float sum = 0;
+            var count = 0;
+            for (var dy = -radius; dy <= radius; dy++)
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                var nx = x + dx;
+                var ny = y + dy;
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                sum += current[nx, ny];
+                count++;
+            }
+
+            next[x, y] = sum / count;
+        }
+
+        return next;
+    }
+
+    private static SKColor LerpColor(SKColor a, SKColor b, float t)
+    {
+        byte Lerp(byte x, byte y)
+        {
+            return (byte)(x + (y - x) * t);
+        }
+
+        return new SKColor(Lerp(a.Red, b.Red), Lerp(a.Green, b.Green), Lerp(a.Blue, b.Blue));
     }
 
     private static MemoryStream GenerateCircle(DiscordColor primary, DiscordColor? secondary = null)

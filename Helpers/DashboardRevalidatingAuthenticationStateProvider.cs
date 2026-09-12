@@ -37,10 +37,10 @@ public sealed class DashboardAuthenticationStateProvider
 
     private async Task RunLoopAsync(Task<AuthenticationState> stateTask, CancellationToken cancellationToken)
     {
-        try
+        var state = await stateTask;
+        while (!cancellationToken.IsCancellationRequested)
         {
-            var state = await stateTask;
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
                 await Task.Delay(RevalidationInterval, cancellationToken);
 
@@ -52,13 +52,15 @@ public sealed class DashboardAuthenticationStateProvider
                 _authenticationStateTask = newTask;
                 NotifyAuthenticationStateChanged(newTask);
             }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Aktualisieren des Dashboard-Zugriffslevels");
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler beim Aktualisieren des Dashboard-Zugriffslevels, versuche es in {Interval} erneut",
+                    RevalidationInterval);
+            }
         }
     }
 

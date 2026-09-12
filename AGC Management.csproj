@@ -124,4 +124,9 @@
         <Folder Include="Utils\Attributes\"/>
     </ItemGroup>
 
+
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\boosterstandard.png" LogicalName="AGC_Management.Resources.boosterstandard.png"/>
+    </ItemGroup>
+
 </Project>

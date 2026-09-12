@@ -111,6 +111,7 @@ public sealed class BoosterColorPanelCommands : BaseCommandModule
 
         var colorRoles = BoosterColorService.GetColorRoles(guild);
         var emojiLookup = await BoosterColorService.EnsureEmojisAsync(colorRoles);
+        await BoosterColorService.EnsureRoleIconsAsync(colorRoles);
 
         var options = new List<DiscordStringSelectComponentOption>();
         // Discord allows max 25 options. Reserve one for the reset option.
