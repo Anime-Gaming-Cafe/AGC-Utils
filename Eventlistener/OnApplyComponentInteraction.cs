@@ -20,19 +20,11 @@ public sealed class OnApplyComponentInteraction : BaseCommandModule
             {
                 var customId = args.Interaction.Data.CustomId;
 
-                if (customId != ApplyPanelCommands.MyApplicationsId && customId != ApplyPanelCommands.SelectorId)
+                if (customId != ApplyPanelCommands.SelectorId)
                     return;
 
                 await args.Interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
                     new DiscordInteractionResponseBuilder().AsEphemeral());
-
-                if (customId == ApplyPanelCommands.MyApplicationsId)
-                {
-                    await RespondAsync(args, "Meine Bewerbungen",
-                        $"[Hier siehst du den Status deiner Bewerbungen]({ToolSet.GetDashboardUrl("apply/status")})",
-                        DiscordColor.Green);
-                    return;
-                }
 
                 var values = args.Interaction.Data.Values;
                 if (values == null || !values.Any()) return;

@@ -13,7 +13,6 @@ namespace AGC_Management.ApplicationSystem;
 public sealed class ApplyPanelCommands : BaseCommandModule
 {
     public const string SelectorId = "applypanelselector";
-    public const string MyApplicationsId = "applypanel_myapplications";
 
     /// <summary>Discord caps a string select at 25 options.</summary>
     private const int MaxSelectOptions = 25;
@@ -153,8 +152,8 @@ public sealed class ApplyPanelCommands : BaseCommandModule
                 options, SelectorId));
 
         var applyNowButton = new DiscordLinkButtonComponent(ToolSet.GetDashboardUrl("apply"), "Jetzt bewerben");
-        var myApplicationsButton = new DiscordButtonComponent(ButtonStyle.Secondary, MyApplicationsId,
-            "Meine Bewerbungen");
+        var myApplicationsButton =
+            new DiscordLinkButtonComponent(ToolSet.GetDashboardUrl("apply/status"), "Meine Bewerbungen");
         msgb.AddComponents(applyNowButton, myApplicationsButton);
 
         return msgb;
