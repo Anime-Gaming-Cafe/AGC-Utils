@@ -178,7 +178,7 @@ internal class Program : BaseCommandModule
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddServerSideBlazor()
             .AddHubOptions(options => { options.MaximumReceiveMessageSize = 32 * 1024 * 100; });
-        builder.Services.AddScoped<AuthenticationStateProvider, DashboardRevalidatingAuthenticationStateProvider>();
+        builder.Services.AddScoped<AuthenticationStateProvider, DashboardAuthenticationStateProvider>();
         builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog());
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton<UserService>();
@@ -201,6 +201,8 @@ internal class Program : BaseCommandModule
             {
                 options.LoginPath = "/login";
                 options.LogoutPath = "/logout";
+                options.ExpireTimeSpan = TimeSpan.FromHours(24);
+                options.SlidingExpiration = true;
             })
             .AddDiscord(x =>
             {

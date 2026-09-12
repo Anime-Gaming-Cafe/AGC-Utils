@@ -27,7 +27,7 @@ public class AccountController : ControllerBase
         returnUrl = Uri.UnescapeDataString(returnUrl);
 
 
-        return Challenge(new AuthenticationProperties { RedirectUri = returnUrl }, "Discord");
+        return Challenge(new AuthenticationProperties { RedirectUri = returnUrl, IsPersistent = true }, "Discord");
     }
 
     [HttpGet]
