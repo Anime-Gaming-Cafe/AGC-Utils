@@ -137,8 +137,8 @@
                         <label class="field__label" for="q-otherlong-@Question.QuestionId">Feldart</label>
                         <select id="q-otherlong-@Question.QuestionId" class="form-select"
                                 @bind="Question.OtherIsLongText" @bind:after="Changed">
-                            <option value="false">Kurzer Text</option>
-                            <option value="true">Langer Text</option>
+                            <option value="@false">Kurzer Text</option>
+                            <option value="@true">Langer Text</option>
                         </select>
                     </div>
                     <div class="field">
