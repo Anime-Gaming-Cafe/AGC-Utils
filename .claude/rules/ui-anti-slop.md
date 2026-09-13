@@ -2,6 +2,7 @@
 paths:
   - "**/*.razor"
   - "**/*.cshtml"
+  - "**/*.css"
   - "wwwroot/**"
   - "DESIGN.md"
 ---
