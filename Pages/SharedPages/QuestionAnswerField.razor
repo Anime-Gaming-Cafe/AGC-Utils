@@ -19,6 +19,27 @@
         <span class="field__hint mb-2">@Answer.Question.Description</span>
     }
 
+    @{
+        // Inline free-text field revealed once the question's "Sonstiges"-style option is picked.
+        // Declared once here since it renders identically for Dropdown/SingleChoice/MultipleChoice.
+        RenderFragment otherField = @<div class="option-answer-other">
+            @if (Answer.Question.OtherIsLongText)
+            {
+                <textarea class="form-control" rows="4" value="@Answer.OtherText"
+                          @onchange="e => SetOtherText(e.Value?.ToString())"></textarea>
+            }
+            else
+            {
+                <input class="form-control" value="@Answer.OtherText"
+                       @onchange="e => SetOtherText(e.Value?.ToString())"/>
+            }
+            @if (Answer.Question.MaxLength > 0)
+            {
+                <span class="field__hint tnum">Maximal @Answer.Question.MaxLength Zeichen</span>
+            }
+        </div>;
+    }
+
     @switch (Answer.Question.Type)
     {
         case TeamApplicationQuestionType.ShortText:
@@ -81,6 +102,10 @@
                     <option value="@option">@option</option>
                 }
             </select>
+            @if (ShowOtherField(Answer.Question.OtherOptionValue))
+            {
+                @otherField
+            }
             break;
 
         case TeamApplicationQuestionType.SingleChoice:
@@ -94,6 +119,10 @@
                            @onchange="() => SetText(current)"/>
                     <label class="form-check-label" for="@inputId">@current</label>
                 </div>
+                @if (ShowOtherField(current))
+                {
+                    @otherField
+                }
             }
             break;
 
@@ -108,6 +137,10 @@
                            @onchange="e => ToggleOption(current, e.Value is true)"/>
                     <label class="form-check-label" for="@inputId">@current</label>
                 </div>
+                @if (ShowOtherField(current))
+                {
+                    @otherField
+                }
             }
             @if (SelectionHint(Answer.Question) is { } hint)
             {
@@ -148,9 +181,21 @@
         return null;
     }
 
+    private bool ShowOtherField(string optionValue) =>
+        !string.IsNullOrEmpty(Answer.Question.OtherOptionValue) &&
+        Answer.Question.OtherOptionValue == optionValue &&
+        TeamApplicationService.IsOtherOptionPicked(Answer.Question, Answer.Text, Answer.Selected);
+
     private async Task SetText(string? value)
     {
         Answer.Text = value ?? "";
+        Validate();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetOtherText(string? value)
+    {
+        Answer.OtherText = value ?? "";
         Validate();
         await OnChanged.InvokeAsync();
     }
@@ -171,5 +216,6 @@
     }
 
     private void Validate() =>
-        Answer.Error = TeamApplicationService.ValidateAnswer(Answer.Question, Answer.Text, Answer.Selected);
+        Answer.Error = TeamApplicationService.ValidateAnswer(Answer.Question, Answer.Text, Answer.Selected,
+            Answer.OtherText);
 }

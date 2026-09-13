@@ -475,10 +475,19 @@ else
     private static string Day(long unix) =>
         unix <= 0 ? "unbekannt" : DateTimeOffset.FromUnixTimeSeconds(unix).ToLocalTime().ToString("dd.MM.yyyy");
 
-    private static string Render(TeamApplicationAnswer answer) =>
-        answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
-            ? string.Join(", ", answer.AnswerOptions)
-            : answer.Answer;
+    private static string Render(TeamApplicationAnswer answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer.OtherText))
+            return answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
+                ? string.Join(", ", answer.AnswerOptions)
+                : answer.Answer;
+
+        if (answer.QuestionType == TeamApplicationQuestionType.MultipleChoice)
+            return string.Join(", ", answer.AnswerOptions.Select(o =>
+                o == answer.OtherOptionSnapshot ? $"{o} ({answer.OtherText})" : o));
+
+        return $"{answer.Answer} ({answer.OtherText})";
+    }
 
     private static StatusPill.PillTone ModerationTone(string kind) => kind switch
     {

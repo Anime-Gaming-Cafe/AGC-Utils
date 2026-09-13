@@ -345,7 +345,8 @@ public static class TeamApplicationService
         await using var cmd = Db.CreateCommand(
             "SELECT question_id, position_id, version, sort_order, type, text, description, required, " +
             "min_length, max_length, min_value, max_value, options, min_selections, max_selections, " +
-            "condition_question_id, condition_value, number_display, number_step " +
+            "condition_question_id, condition_value, number_display, number_step, other_option_value, " +
+            "other_is_long_text " +
             "FROM teamapplication_questions WHERE position_id = @id AND version = @version ORDER BY sort_order");
         cmd.Parameters.AddWithValue("id", positionId);
         cmd.Parameters.AddWithValue("version", version);
@@ -372,7 +373,9 @@ public static class TeamApplicationService
                 ConditionQuestionId = reader.IsDBNull(15) ? "" : reader.GetString(15),
                 ConditionValue = reader.IsDBNull(16) ? "" : reader.GetString(16),
                 NumberDisplay = ParseEnum(reader.IsDBNull(17) ? null : reader.GetString(17), NumberDisplay.Text),
-                NumberStep = reader.IsDBNull(18) ? 1 : reader.GetInt32(18)
+                NumberStep = reader.IsDBNull(18) ? 1 : reader.GetInt32(18),
+                OtherOptionValue = reader.IsDBNull(19) ? "" : reader.GetString(19),
+                OtherIsLongText = !reader.IsDBNull(20) && reader.GetBoolean(20)
             });
 
         return questions;
@@ -385,16 +388,17 @@ public static class TeamApplicationService
         await using var cmd = Db.CreateCommand(
             "INSERT INTO teamapplication_questions (question_id, position_id, version, sort_order, type, text, " +
             "description, required, min_length, max_length, min_value, max_value, options, min_selections, max_selections, " +
-            "condition_question_id, condition_value, number_display, number_step) " +
+            "condition_question_id, condition_value, number_display, number_step, other_option_value, other_is_long_text) " +
             "VALUES (@qid, @pid, @version, @sort, @type, @text, @description, @required, @minlen, @maxlen, " +
-            "@minval, @maxval, @options, @minsel, @maxsel, @condqid, @condval, @numdisplay, @numstep) " +
+            "@minval, @maxval, @options, @minsel, @maxsel, @condqid, @condval, @numdisplay, @numstep, @otherval, @otherlong) " +
             "ON CONFLICT (question_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, type = EXCLUDED.type, " +
             "text = EXCLUDED.text, description = EXCLUDED.description, required = EXCLUDED.required, " +
             "min_length = EXCLUDED.min_length, max_length = EXCLUDED.max_length, min_value = EXCLUDED.min_value, " +
             "max_value = EXCLUDED.max_value, options = EXCLUDED.options, min_selections = EXCLUDED.min_selections, " +
             "max_selections = EXCLUDED.max_selections, condition_question_id = EXCLUDED.condition_question_id, " +
             "condition_value = EXCLUDED.condition_value, number_display = EXCLUDED.number_display, " +
-            "number_step = EXCLUDED.number_step");
+            "number_step = EXCLUDED.number_step, other_option_value = EXCLUDED.other_option_value, " +
+            "other_is_long_text = EXCLUDED.other_is_long_text");
         cmd.Parameters.AddWithValue("qid", question.QuestionId);
         cmd.Parameters.AddWithValue("pid", question.PositionId);
         cmd.Parameters.AddWithValue("version", question.Version);
@@ -414,6 +418,8 @@ public static class TeamApplicationService
         cmd.Parameters.AddWithValue("condval", question.ConditionValue);
         cmd.Parameters.AddWithValue("numdisplay", Store(question.NumberDisplay));
         cmd.Parameters.AddWithValue("numstep", question.NumberStep);
+        cmd.Parameters.AddWithValue("otherval", question.OtherOptionValue);
+        cmd.Parameters.AddWithValue("otherlong", question.OtherIsLongText);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -826,8 +832,8 @@ public static class TeamApplicationService
         {
             await using var cmd = Db.CreateCommand(
                 "INSERT INTO teamapplication_answers (application_id, question_id, sort_order, " +
-                "question_text_snapshot, question_type, answer, answer_options) " +
-                "VALUES (@aid, @qid, @sort, @snapshot, @type, @answer, @options)");
+                "question_text_snapshot, question_type, answer, answer_options, other_text, other_option_snapshot) " +
+                "VALUES (@aid, @qid, @sort, @snapshot, @type, @answer, @options, @othertext, @otheroption)");
             cmd.Parameters.AddWithValue("aid", application.ApplicationId);
             cmd.Parameters.AddWithValue("qid", answer.QuestionId);
             cmd.Parameters.AddWithValue("sort", answer.SortOrder);
@@ -836,6 +842,8 @@ public static class TeamApplicationService
             cmd.Parameters.AddWithValue("answer", answer.Answer);
             cmd.Parameters.AddWithValue("options", NpgsqlDbType.Jsonb,
                 JsonSerializer.Serialize(answer.AnswerOptions));
+            cmd.Parameters.AddWithValue("othertext", answer.OtherText);
+            cmd.Parameters.AddWithValue("otheroption", answer.OtherOptionSnapshot);
             await cmd.ExecuteNonQueryAsync();
         }
 
@@ -847,7 +855,8 @@ public static class TeamApplicationService
         var answers = new List<TeamApplicationAnswer>();
         await using var cmd = Db.CreateCommand(
             "SELECT application_id, question_id, sort_order, question_text_snapshot, question_type, answer, " +
-            "answer_options FROM teamapplication_answers WHERE application_id = @aid ORDER BY sort_order");
+            "answer_options, other_text, other_option_snapshot FROM teamapplication_answers " +
+            "WHERE application_id = @aid ORDER BY sort_order");
         cmd.Parameters.AddWithValue("aid", applicationId);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -860,7 +869,9 @@ public static class TeamApplicationService
                 QuestionType = ParseEnum(reader.IsDBNull(4) ? null : reader.GetString(4),
                     TeamApplicationQuestionType.ShortText),
                 Answer = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                AnswerOptions = ReadJsonArray(reader, 6)
+                AnswerOptions = ReadJsonArray(reader, 6),
+                OtherText = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                OtherOptionSnapshot = reader.IsDBNull(8) ? "" : reader.GetString(8)
             });
 
         return answers;
@@ -1146,13 +1157,30 @@ public static class TeamApplicationService
 
     #region Validation
 
+    public static bool IsOtherOptionPicked(TeamApplicationQuestion question, string answer,
+        IReadOnlyList<string> selected) =>
+        question.Type == TeamApplicationQuestionType.MultipleChoice
+            ? selected.Contains(question.OtherOptionValue)
+            : answer == question.OtherOptionValue;
+
     /// <summary>
     ///     The single validation implementation. The form calls it while typing, the submit path calls it
     ///     again for every question, so client and server can never drift apart.
     /// </summary>
     public static string? ValidateAnswer(TeamApplicationQuestion question, string answer,
-        IReadOnlyList<string> selected)
+        IReadOnlyList<string> selected, string otherText = "")
     {
+        if (!string.IsNullOrEmpty(question.OtherOptionValue) && IsOtherOptionPicked(question, answer, selected))
+        {
+            var trimmedOther = (otherText ?? "").Trim();
+            if (trimmedOther.Length == 0)
+                return "Bitte gib hierzu einen Text ein.";
+            if (question.MinLength > 0 && trimmedOther.Length < question.MinLength)
+                return $"Mindestens {question.MinLength} Zeichen, aktuell {trimmedOther.Length}.";
+            if (question.MaxLength > 0 && trimmedOther.Length > question.MaxLength)
+                return $"Höchstens {question.MaxLength} Zeichen, aktuell {trimmedOther.Length}.";
+        }
+
         switch (question.Type)
         {
             case TeamApplicationQuestionType.ShortText:

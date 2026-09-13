@@ -119,11 +119,42 @@
         @for (var optionIndex = 0; optionIndex < Question.Options.Count; optionIndex++)
         {
             var current = optionIndex;
+            var value = Question.Options[current];
+            var isOther = value.Length > 0 && value == Question.OtherOptionValue;
             <div class="option-row">
-                <input class="form-control" aria-label="@($"Option {current + 1}")"
-                       @bind="Question.Options[current]" @bind:after="Changed"/>
+                <input class="form-control" aria-label="@($"Option {current + 1}")" value="@value"
+                       @onchange="e => RenameOption(current, e)"/>
+                <label class="option-row__other-toggle">
+                    <input type="checkbox" checked="@isOther" @onchange="e => ToggleOtherOption(current, e.Value is true)"/>
+                    Freitext
+                </label>
                 <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveOption(current)">Entfernen</button>
             </div>
+            @if (isOther)
+            {
+                <div class="option-row__other">
+                    <div class="field">
+                        <label class="field__label" for="q-otherlong-@Question.QuestionId">Feldart</label>
+                        <select id="q-otherlong-@Question.QuestionId" class="form-select"
+                                @bind="Question.OtherIsLongText" @bind:after="Changed">
+                            <option value="false">Kurzer Text</option>
+                            <option value="true">Langer Text</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="q-othermin-@Question.QuestionId">Minimale Länge</label>
+                        <input id="q-othermin-@Question.QuestionId" type="number" min="0" class="form-control"
+                               @bind="Question.MinLength" @bind:after="Changed"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="q-othermax-@Question.QuestionId">Maximale Länge</label>
+                        <input id="q-othermax-@Question.QuestionId" type="number" min="0" class="form-control"
+                               @bind="Question.MaxLength" @bind:after="Changed"/>
+                        <span class="field__hint">0 heißt ohne Grenze.</span>
+                    </div>
+                    <span class="field__hint">Öffnet dieses Textfeld, sobald „@value“ ausgewählt wird.</span>
+                </div>
+            }
         }
         <button type="button" class="btn btn-ghost btn-sm" @onclick="AddOption">Option hinzufügen</button>
         @if (Question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) < 2)
@@ -165,9 +196,30 @@
         await Changed();
     }
 
+    private bool IsOtherOptionRow(int index) =>
+        !string.IsNullOrEmpty(Question.OtherOptionValue) && Question.Options[index] == Question.OtherOptionValue;
+
     private async Task RemoveOption(int index)
     {
+        if (IsOtherOptionRow(index)) Question.OtherOptionValue = "";
         Question.Options.RemoveAt(index);
+        await Changed();
+    }
+
+    private async Task RenameOption(int index, ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+
+        // Keep the "opens a text field" link pointed at this option even as its label changes -
+        // it's matched by value, not by index.
+        if (IsOtherOptionRow(index)) Question.OtherOptionValue = value;
+        Question.Options[index] = value;
+        await Changed();
+    }
+
+    private async Task ToggleOtherOption(int index, bool isOther)
+    {
+        Question.OtherOptionValue = isOther ? Question.Options[index] : "";
         await Changed();
     }
 

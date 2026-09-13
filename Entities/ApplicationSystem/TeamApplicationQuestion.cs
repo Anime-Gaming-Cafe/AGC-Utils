@@ -34,6 +34,12 @@ public class TeamApplicationQuestion
     public NumberDisplay NumberDisplay { get; set; } = NumberDisplay.Text;
     public int NumberStep { get; set; } = 1;
 
+    // Empty means no option opens a free-text field. When set, must match one entry in Options
+    // exactly - picking that option (e.g. "Sonstiges") reveals an inline text field right there.
+    // MinLength/MaxLength double as that field's length bounds.
+    public string OtherOptionValue { get; set; } = "";
+    public bool OtherIsLongText { get; set; }
+
     public bool IsChoice => Type is TeamApplicationQuestionType.SingleChoice
         or TeamApplicationQuestionType.MultipleChoice
         or TeamApplicationQuestionType.Dropdown;
@@ -44,4 +50,6 @@ public class TeamApplicationQuestion
     public bool SupportsRange => Type is TeamApplicationQuestionType.Number;
 
     public bool SupportsSelectionLimits => Type is TeamApplicationQuestionType.MultipleChoice;
+
+    public bool SupportsOtherOption => IsChoice;
 }

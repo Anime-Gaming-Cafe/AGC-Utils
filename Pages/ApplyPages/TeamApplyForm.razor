@@ -291,7 +291,9 @@ else
             QuestionTextSnapshot = a.Question.Text,
             QuestionType = a.Question.Type,
             Answer = a.Question.Type == TeamApplicationQuestionType.MultipleChoice ? "" : a.Text.Trim(),
-            AnswerOptions = a.Question.Type == TeamApplicationQuestionType.MultipleChoice ? a.Selected : []
+            AnswerOptions = a.Question.Type == TeamApplicationQuestionType.MultipleChoice ? a.Selected : [],
+            OtherText = a.OtherText.Trim(),
+            OtherOptionSnapshot = a.Question.OtherOptionValue
         }).ToList();
 
         await TeamApplicationService.SubmitAsync(application, payload);

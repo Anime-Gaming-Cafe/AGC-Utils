@@ -134,10 +134,19 @@ else
         applications = await TeamApplicationService.GetOwnApplicationsAsync(userId);
     }
 
-    private static string Render(TeamApplicationAnswer answer) =>
-        answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
-            ? string.Join(", ", answer.AnswerOptions)
-            : answer.Answer;
+    private static string Render(TeamApplicationAnswer answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer.OtherText))
+            return answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
+                ? string.Join(", ", answer.AnswerOptions)
+                : answer.Answer;
+
+        if (answer.QuestionType == TeamApplicationQuestionType.MultipleChoice)
+            return string.Join(", ", answer.AnswerOptions.Select(o =>
+                o == answer.OtherOptionSnapshot ? $"{o} ({answer.OtherText})" : o));
+
+        return $"{answer.Answer} ({answer.OtherText})";
+    }
 
     private async Task ToggleAnswers(string applicationId)
     {

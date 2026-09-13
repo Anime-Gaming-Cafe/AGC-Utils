@@ -45,7 +45,8 @@
                 continue;
             }
 
-            answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected);
+            answer.Error = TeamApplicationService.ValidateAnswer(answer.Question, answer.Text, answer.Selected,
+                answer.OtherText);
             if (answer.Error != null) allValid = false;
         }
 

@@ -291,7 +291,7 @@ public static class DatabaseService
             },
             {
                 "teamapplication_questions",
-                "CREATE TABLE IF NOT EXISTS teamapplication_questions (question_id TEXT PRIMARY KEY, position_id TEXT, version INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, type TEXT DEFAULT 'shorttext', text TEXT DEFAULT '', description TEXT DEFAULT '', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0, min_value BIGINT DEFAULT 0, max_value BIGINT DEFAULT 0, options JSONB DEFAULT '[]'::jsonb, min_selections INTEGER DEFAULT 0, max_selections INTEGER DEFAULT 0, condition_question_id TEXT DEFAULT '', condition_value TEXT DEFAULT '', number_display TEXT DEFAULT 'text', number_step INTEGER DEFAULT 1)"
+                "CREATE TABLE IF NOT EXISTS teamapplication_questions (question_id TEXT PRIMARY KEY, position_id TEXT, version INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, type TEXT DEFAULT 'shorttext', text TEXT DEFAULT '', description TEXT DEFAULT '', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0, min_value BIGINT DEFAULT 0, max_value BIGINT DEFAULT 0, options JSONB DEFAULT '[]'::jsonb, min_selections INTEGER DEFAULT 0, max_selections INTEGER DEFAULT 0, condition_question_id TEXT DEFAULT '', condition_value TEXT DEFAULT '', number_display TEXT DEFAULT 'text', number_step INTEGER DEFAULT 1, other_option_value TEXT DEFAULT '', other_is_long_text BOOLEAN DEFAULT false)"
             },
             {
                 "idx_teamapplication_questions_set",
@@ -319,7 +319,7 @@ public static class DatabaseService
             },
             {
                 "teamapplication_answers",
-                "CREATE TABLE IF NOT EXISTS teamapplication_answers (application_id TEXT, question_id TEXT, sort_order INTEGER DEFAULT 0, question_text_snapshot TEXT DEFAULT '', question_type TEXT DEFAULT 'shorttext', answer TEXT DEFAULT '', answer_options JSONB DEFAULT '[]'::jsonb, PRIMARY KEY (application_id, question_id))"
+                "CREATE TABLE IF NOT EXISTS teamapplication_answers (application_id TEXT, question_id TEXT, sort_order INTEGER DEFAULT 0, question_text_snapshot TEXT DEFAULT '', question_type TEXT DEFAULT 'shorttext', answer TEXT DEFAULT '', answer_options JSONB DEFAULT '[]'::jsonb, other_text TEXT DEFAULT '', other_option_snapshot TEXT DEFAULT '', PRIMARY KEY (application_id, question_id))"
             },
             {
                 "teamapplication_notes",
@@ -853,6 +853,14 @@ public static class DatabaseService
                     {
                         "number_step",
                         "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS number_step INTEGER DEFAULT 1"
+                    },
+                    {
+                        "other_option_value",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS other_option_value TEXT DEFAULT ''"
+                    },
+                    {
+                        "other_is_long_text",
+                        "ALTER TABLE teamapplication_questions ADD COLUMN IF NOT EXISTS other_is_long_text BOOLEAN DEFAULT false"
                     }
                 }
             },
@@ -1005,6 +1013,14 @@ public static class DatabaseService
                     {
                         "answer_options",
                         "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS answer_options JSONB DEFAULT '[]'::jsonb"
+                    },
+                    {
+                        "other_text",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS other_text TEXT DEFAULT ''"
+                    },
+                    {
+                        "other_option_snapshot",
+                        "ALTER TABLE teamapplication_answers ADD COLUMN IF NOT EXISTS other_option_snapshot TEXT DEFAULT ''"
                     }
                 }
             },

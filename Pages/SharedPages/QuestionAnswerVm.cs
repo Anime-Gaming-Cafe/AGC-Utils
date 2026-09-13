@@ -8,5 +8,6 @@ public sealed class QuestionAnswerVm
     public TeamApplicationQuestion Question { get; init; } = new();
     public string Text { get; set; } = "";
     public List<string> Selected { get; set; } = [];
+    public string OtherText { get; set; } = "";
     public string? Error { get; set; }
 }

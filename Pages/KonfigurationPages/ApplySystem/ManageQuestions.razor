@@ -263,7 +263,9 @@ else
         MinSelections = source.MinSelections,
         MaxSelections = source.MaxSelections,
         ConditionQuestionId = source.ConditionQuestionId,
-        ConditionValue = source.ConditionValue
+        ConditionValue = source.ConditionValue,
+        OtherOptionValue = source.OtherOptionValue,
+        OtherIsLongText = source.OtherIsLongText
     };
 
     // Copies every editable field except identity/sort - used by Discard to revert in place
@@ -283,6 +285,8 @@ else
         target.MaxSelections = source.MaxSelections;
         target.ConditionQuestionId = source.ConditionQuestionId;
         target.ConditionValue = source.ConditionValue;
+        target.OtherOptionValue = source.OtherOptionValue;
+        target.OtherIsLongText = source.OtherIsLongText;
     }
 
     private void RebuildSnapshot() => originalQuestions = questions.ToDictionary(q => q.QuestionId, CloneQuestion);
