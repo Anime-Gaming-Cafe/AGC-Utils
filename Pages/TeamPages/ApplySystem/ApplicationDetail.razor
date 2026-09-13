@@ -55,7 +55,7 @@ else
     @if (application.IsWithdrawn)
     {
         <div class="notice mb-3">
-            Vom Bewerber zurückgezogen am <time>@Time(application.WithdrawnAt)</time>.
+            Zurückgezogen am <time>@Time(application.WithdrawnAt)</time>.
         </div>
     }
 
@@ -618,13 +618,26 @@ else
     {
         if (application == null || !await Ensure(TeamApplicationPermission.GrantReapply)) return;
 
+        var wasOpen = application.IsOpen;
+
         var grant = await TeamApplicationService.GrantReapplyAsync(application.UserId, application.PositionId,
             application.PhaseId, userId, grantReason.Trim());
         activeGrant = grant;
         grantReason = "";
 
         await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
-        ToastService.Notify("Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
+
+        if (wasOpen)
+        {
+            // A granted reapply closes this application without a formal decision - it no longer
+            // needs one, so it shouldn't keep counting as "wartet auf Entscheidung" everywhere.
+            await TeamApplicationService.WithdrawAsync(application.ApplicationId, application.UserId);
+            application = await TeamApplicationService.GetApplicationAsync(ApplicationId);
+        }
+
+        ToastService.Notify(wasOpen
+            ? "Erneute Bewerbung freigeschaltet, alte Bewerbung als zurückgezogen markiert."
+            : "Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
     }
 
     private sealed class ModerationEntry
