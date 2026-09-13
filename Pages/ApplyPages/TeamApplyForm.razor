@@ -303,8 +303,8 @@ else
 
         _ = Task.Run(async () =>
         {
-            await TeamApplicationNotificationService.SendSubmitConfirmationAsync(application);
-            await TeamApplicationNotificationService.PostNewApplicationAsync(application);
+            var delivered = await TeamApplicationNotificationService.SendSubmitConfirmationAsync(application);
+            await TeamApplicationNotificationService.PostNewApplicationAsync(application, delivered);
         });
     }
 }

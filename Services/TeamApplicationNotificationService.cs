@@ -79,7 +79,8 @@ public static class TeamApplicationNotificationService
         }
     }
 
-    public static async Task SendSubmitConfirmationAsync(TeamApplication application)
+    /// <summary>Returns whether the confirmation DM arrived, so the team post can flag it when it didn't.</summary>
+    public static async Task<bool> SendSubmitConfirmationAsync(TeamApplication application)
     {
         var user = await TryGetUserAsync(application.UserId);
         var title = await TeamApplicationService.GetTextAsync("DmSubmitTitle", "Bewerbung eingegangen");
@@ -89,20 +90,23 @@ public static class TeamApplicationNotificationService
 
         var embed = BaseEmbed(title, $"{text}\n\n[Status deiner Bewerbungen ansehen]({StatusUrl})",
             DiscordColor.Green);
-        await TrySendDmAsync(application.UserId, embed);
+        var (delivered, _) = await TrySendDmAsync(application.UserId, embed);
+        return delivered;
     }
 
-    public static async Task PostNewApplicationAsync(TeamApplication application)
+    public static async Task PostNewApplicationAsync(TeamApplication application, bool confirmationDelivered = true)
     {
         var intro = await TeamApplicationService.GetTextAsync("NotifyNewApplicationText",
             "Neue Bewerbung eingegangen.");
 
-        var embed = BaseEmbed("Neue Bewerbung",
-                $"{intro}\n\n**Position:** {application.PositionName}\n" +
-                $"**Phase:** {application.PhaseName}\n" +
-                $"**Bewerber:** <@{application.UserId}> (`{application.UserId}`)\n\n" +
-                $"[Bewerbung ansehen]({ToolSet.GetDashboardUrl($"teamarea/applysystem/application/{application.ApplicationId}")})",
-                DiscordColor.Gold)
+        var description = $"{intro}\n\n**Position:** {application.PositionName}\n" +
+                           $"**Phase:** {application.PhaseName}\n" +
+                           $"**Bewerber:** <@{application.UserId}> (`{application.UserId}`)\n\n" +
+                           $"[Bewerbung ansehen]({ToolSet.GetDashboardUrl($"teamarea/applysystem/application/{application.ApplicationId}")})";
+        if (!confirmationDelivered)
+            description += "\n\nDie Eingangsbestätigung an den Bewerber konnte nicht zugestellt werden.";
+
+        var embed = BaseEmbed("Neue Bewerbung", description, DiscordColor.Gold)
             .WithTimestamp(DateTimeOffset.UtcNow);
 
         await PostToTeamChannelAsync(application, embed);
@@ -142,7 +146,8 @@ public static class TeamApplicationNotificationService
         await PostToTeamChannelAsync(application, failure);
     }
 
-    public static async Task SendGrantAsync(TeamApplicationReapplyGrant grant, string positionName)
+    /// <summary>Returns whether the grant DM arrived, so the caller can tell staff honestly instead of assuming.</summary>
+    public static async Task<bool> SendGrantAsync(TeamApplicationReapplyGrant grant, string positionName)
     {
         var user = await TryGetUserAsync(grant.UserId);
         var title = await TeamApplicationService.GetTextAsync("DmGrantTitle", "Du darfst dich erneut bewerben");
@@ -155,6 +160,15 @@ public static class TeamApplicationNotificationService
         if (!string.IsNullOrWhiteSpace(grant.Reason)) description += $"\n\n{grant.Reason}";
         description += $"\n\n[Jetzt erneut bewerben]({ToolSet.GetDashboardUrl($"apply/{grant.PositionId}")})";
 
-        await TrySendDmAsync(grant.UserId, BaseEmbed(title, description, DiscordColor.Green));
+        var (delivered, error) = await TrySendDmAsync(grant.UserId, BaseEmbed(title, description, DiscordColor.Green));
+        if (delivered) return true;
+
+        var failure = BaseEmbed("Freigabe nicht zustellbar",
+            $"Die \"Erneute Bewerbung erlaubt\"-DM an <@{grant.UserId}> (`{grant.UserId}`) konnte nicht " +
+            $"zugestellt werden (`{error}`). Bitte informiert die Person manuell.",
+            DiscordColor.Orange);
+        await PostToTeamChannelAsync(stub, failure);
+
+        return false;
     }
 }

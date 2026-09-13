@@ -625,7 +625,7 @@ else
         activeGrant = grant;
         grantReason = "";
 
-        await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
+        var delivered = await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
 
         if (wasOpen)
         {
@@ -635,9 +635,11 @@ else
             application = await TeamApplicationService.GetApplicationAsync(ApplicationId);
         }
 
-        ToastService.Notify(wasOpen
-            ? "Erneute Bewerbung freigeschaltet, alte Bewerbung als zurückgezogen markiert."
-            : "Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.", "ok");
+        var closedNote = wasOpen ? " Alte Bewerbung als zurückgezogen markiert." : "";
+        ToastService.Notify(delivered
+            ? $"Erneute Bewerbung freigeschaltet und dem Nutzer per DM mitgeteilt.{closedNote}"
+            : $"Erneute Bewerbung freigeschaltet, die DM kam aber nicht an - bitte den Nutzer manuell informieren.{closedNote}",
+            delivered ? "ok" : "warn");
     }
 
     private sealed class ModerationEntry
