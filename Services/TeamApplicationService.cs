@@ -305,14 +305,44 @@ public static class TeamApplicationService
 
         var published = await GetPublishedAsync(positionId);
         if (published != null)
-            foreach (var question in await GetQuestionsAsync(positionId, published.Version))
-            {
-                question.QuestionId = ToolSet.GenerateCaseID();
-                question.Version = version;
-                await UpsertQuestionAsync(question);
-            }
+            await CopyQuestionsAsync(positionId, published.Version, positionId, version);
 
         return version;
+    }
+
+    /// <summary>
+    ///     Copies a catalogue version into another set under fresh ids. Follow-ups are re-pointed at the copied
+    ///     trigger, because their condition references a question id of the source set.
+    /// </summary>
+    public static async Task<int> CopyQuestionsAsync(string sourcePositionId, int sourceVersion,
+        string targetPositionId, int targetVersion)
+    {
+        var questions = await GetQuestionsAsync(sourcePositionId, sourceVersion);
+        var newIds = questions.ToDictionary(q => q.QuestionId, _ => ToolSet.GenerateCaseID());
+
+        foreach (var question in questions)
+        {
+            question.QuestionId = newIds[question.QuestionId];
+            question.PositionId = targetPositionId;
+            question.Version = targetVersion;
+
+            if (!string.IsNullOrEmpty(question.ConditionQuestionId))
+            {
+                if (newIds.TryGetValue(question.ConditionQuestionId, out var triggerId))
+                {
+                    question.ConditionQuestionId = triggerId;
+                }
+                else
+                {
+                    question.ConditionQuestionId = "";
+                    question.ConditionValue = "";
+                }
+            }
+
+            await UpsertQuestionAsync(question);
+        }
+
+        return questions.Count;
     }
 
     public static async Task PublishDraftAsync(string positionId)

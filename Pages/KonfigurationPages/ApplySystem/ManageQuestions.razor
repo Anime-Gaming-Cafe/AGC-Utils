@@ -77,6 +77,33 @@ else
                         Description="Veröffentlichen geht erst mit mindestens einer Frage."
                         ActionText="Frage hinzufügen"
                         OnAction="AddQuestion"/>
+
+            @if (importSources.Count > 0)
+            {
+                <Panel Title="Fragen aus einer anderen Position übernehmen"
+                       Lead="Kopiert alle Fragen samt Folgefragen in diesen Entwurf. Die andere Position bleibt unverändert, und veröffentlicht wird erst, wenn du es tust.">
+                    <div class="field">
+                        <label class="field__label" for="import-source">Position</label>
+                        <select id="import-source" class="form-select" @bind="importSourceId">
+                            @foreach (var source in importSources)
+                            {
+                                <option value="@source.PositionId">@source.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-foot">
+                        <button type="button" class="btn btn-primary" disabled="@importing" @onclick="ImportQuestions">
+                            Fragen übernehmen
+                        </button>
+                        @if (SelectedImportSource is { } selected)
+                        {
+                            <a class="btn btn-ghost" href="/konfiguration/applysystem/questions/@selected.PositionId/preview/@selected.Version">
+                                Vorschau
+                            </a>
+                        }
+                    </div>
+                </Panel>
+            }
         }
 
         @for (var index = 0; index < TopLevelQuestions.Count; index++)
@@ -158,6 +185,14 @@ else
     private List<TeamApplicationQuestion> questions = new();
     private List<TeamApplicationQuestion> publishedQuestions = new();
 
+    private sealed record ImportSource(string PositionId, string PositionName, int Version, string Label);
+
+    private List<ImportSource> importSources = new();
+    private string importSourceId = "";
+    private bool importing;
+
+    private ImportSource? SelectedImportSource => importSources.FirstOrDefault(s => s.PositionId == importSourceId);
+
     // Last DB-persisted state per question, keyed by id; SaveAllQuestions/Discard work against this.
     private Dictionary<string, TeamApplicationQuestion> originalQuestions = new();
 
@@ -195,6 +230,75 @@ else
         publishedQuestions = published == null
             ? new List<TeamApplicationQuestion>()
             : await TeamApplicationService.GetQuestionsAsync(PositionId, published.Version);
+
+        importSources = draft != null && questions.Count == 0
+            ? await LoadImportSources()
+            : new List<ImportSource>();
+        if (SelectedImportSource == null) importSourceId = importSources.FirstOrDefault()?.PositionId ?? "";
+    }
+
+    // Published wins over a draft since that is what applicants see. Only positions the user may manage
+    // are offered, so an import can't expose another position's unpublished draft.
+    private async Task<List<ImportSource>> LoadImportSources()
+    {
+        var allowed = await TeamApplicationPermissionService.GetAllowedPositionsAsync(userId,
+            TeamApplicationPermission.ManageQuestions);
+        var sources = new List<ImportSource>();
+
+        foreach (var candidate in await TeamApplicationService.GetPositionsAsync())
+        {
+            if (candidate.PositionId == PositionId || !allowed.Contains(candidate.PositionId)) continue;
+
+            var sets = await TeamApplicationService.GetQuestionSetsAsync(candidate.PositionId);
+            var set = sets.FirstOrDefault(s => s.State == TeamApplicationQuestionSetState.Published)
+                      ?? sets.FirstOrDefault(s => s.State == TeamApplicationQuestionSetState.Draft);
+            if (set == null) continue;
+
+            var count = (await TeamApplicationService.GetQuestionsAsync(candidate.PositionId, set.Version)).Count;
+            if (count == 0) continue;
+
+            var state = set.State == TeamApplicationQuestionSetState.Published ? "veröffentlicht" : "Entwurf";
+            var label = $"{candidate.PositionName} · {count} {(count == 1 ? "Frage" : "Fragen")}, {state} (Version {set.Version})";
+            sources.Add(new ImportSource(candidate.PositionId, candidate.PositionName, set.Version, label));
+        }
+
+        return sources;
+    }
+
+    private async Task ImportQuestions()
+    {
+        if (importing || draft == null || SelectedImportSource is not { } source) return;
+        if (!await EnsurePermission()) return;
+
+        if (!await TeamApplicationPermissionService.HasAsync(userId, TeamApplicationPermission.ManageQuestions,
+                source.PositionId))
+        {
+            ToastService.Notify("Den Fragenkatalog dieser Position darfst du nicht übernehmen.", "bad");
+            return;
+        }
+
+        importing = true;
+        try
+        {
+            // Re-read from the DB so a second tab can't import into a draft that already has questions.
+            if ((await TeamApplicationService.GetQuestionsAsync(PositionId, draft.Version)).Count > 0)
+            {
+                ToastService.Notify("Der Entwurf hat inzwischen Fragen. Übernehmen geht nur in einen leeren Entwurf.", "bad");
+            }
+            else
+            {
+                var count = await TeamApplicationService.CopyQuestionsAsync(source.PositionId, source.Version,
+                    PositionId, draft.Version);
+                ToastService.Notify($"{count} {(count == 1 ? "Frage" : "Fragen")} aus „{source.PositionName}“ übernommen.", "ok");
+            }
+
+            await LoadAll();
+            RebuildSnapshot();
+        }
+        finally
+        {
+            importing = false;
+        }
     }
 
     private static string TypeLabel(TeamApplicationQuestionType type) => type switch
