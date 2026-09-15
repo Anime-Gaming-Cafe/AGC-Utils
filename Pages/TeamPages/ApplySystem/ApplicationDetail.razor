@@ -529,14 +529,14 @@ else
             }));
         }
 
-        var bans = await DatabaseService.SelectDataFromTable("banlogs", ["*"],
+        var bans = await DatabaseService.SelectDataFromTable("bans", ["*"],
             new Dictionary<string, object> { { "userid", (long)targetId } });
         entries.AddRange(bans.Select(row => new ModerationEntry
         {
             Kind = "Ban",
-            CaseId = "",
-            Description = row.TryGetValue("reason", out var reason) ? reason?.ToString() ?? "" : "",
-            Timestamp = row.TryGetValue("timestamp", out var ts) && long.TryParse(ts?.ToString(), out var t) ? t : 0
+            CaseId = row.TryGetValue("caseid", out var caseId) ? caseId?.ToString() ?? "" : "",
+            Description = row.TryGetValue("description", out var description) ? description?.ToString() ?? "" : "",
+            Timestamp = row.TryGetValue("datum", out var datum) && long.TryParse(datum?.ToString(), out var d) ? d : 0
         }));
 
         return entries.OrderByDescending(e => e.Timestamp).ToList();

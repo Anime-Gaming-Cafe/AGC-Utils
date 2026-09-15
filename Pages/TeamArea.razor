@@ -20,17 +20,6 @@
     </ul>
 </Panel>
 
-<Panel Title="Altsystem" Lead="Nur lesend. Über dieses System kommen keine neuen Bewerbungen mehr herein.">
-    <ul class="nav-links">
-        <AuthorizeView Policy="@DashboardPolicies.AdminOnly">
-            <li><a href="/teamarea/applysystem/legacy/applications">Alte Bewerbungen (Team allgemein)</a></li>
-        </AuthorizeView>
-        <AuthorizeView Policy="@DashboardPolicies.EventManagement">
-            <li><a href="/teamarea/applysystem/legacy/eventapplications">Alte Bewerbungen (Eventteam)</a></li>
-        </AuthorizeView>
-    </ul>
-</Panel>
-
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
