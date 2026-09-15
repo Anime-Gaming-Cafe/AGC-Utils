@@ -28,8 +28,9 @@ else
 {
     <Panel Flush="true">
         <ul class="rows">
-            @* Open positions first: they are the ones this page is for. *@
-            @foreach (var entry in entries.OrderByDescending(e => e.IsOpen).ThenBy(e => e.Position.PositionName))
+            @* Open positions first: they are the ones this page is for. Custom order within that
+               from sort_order, set on /konfiguration/applysystem/positions. *@
+            @foreach (var entry in entries.OrderByDescending(e => e.IsOpen).ThenBy(e => e.Position.SortOrder))
             {
                 <li>
                     <div class="rows__main">

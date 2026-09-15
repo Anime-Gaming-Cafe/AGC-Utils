@@ -35,10 +35,17 @@ else
                     Description="Lege die erste Position im Formular darunter an. Danach folgen Fragenkatalog und Bewerbungsphase."/>
     }
 
-    @foreach (var position in positions)
+    @for (var index = 0; index < positions.Count; index++)
     {
+        var position = positions[index];
+        var currentIndex = index;
+
         <Panel Title="@position.PositionName" Lead="@($"Bewerbungs-URL: /apply/{position.PositionId}")">
             <Actions>
+                <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == 0)"
+                        @onclick="() => MovePosition(position, -1)">Nach oben</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled="@(currentIndex == positions.Count - 1)"
+                        @onclick="() => MovePosition(position, 1)">Nach unten</button>
                 @if (position.AlwaysOpen)
                 {
                     <StatusPill Text="Testmodus" Tone="StatusPill.PillTone.Warn"/>
@@ -212,6 +219,7 @@ else
         NotifyChannelId = source.NotifyChannelId,
         Active = source.Active,
         AlwaysOpen = source.AlwaysOpen,
+        SortOrder = source.SortOrder,
         CreatedAt = source.CreatedAt
     };
 
@@ -229,6 +237,39 @@ else
     private void RebuildSnapshot() => originalPositions = positions.ToDictionary(p => p.PositionId, ClonePosition);
 
     private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task MovePosition(TeamApplicationPosition position, int offset)
+    {
+        var pos = positions.IndexOf(position);
+        var targetPos = pos + offset;
+        if (targetPos < 0 || targetPos >= positions.Count) return;
+
+        (positions[pos], positions[targetPos]) = (positions[targetPos], positions[pos]);
+        await PersistOrder();
+    }
+
+    // Reordering only ever touches sort_order in the DB - it must never carry along whatever a
+    // still-unsaved field edit currently holds, so it persists a clone of the last-saved content
+    // (not the live, possibly-dirty, object) with just the new sort order.
+    private async Task PersistOrder()
+    {
+        for (var i = 0; i < positions.Count; i++)
+        {
+            positions[i].SortOrder = i;
+
+            var persisted = originalPositions.TryGetValue(positions[i].PositionId, out var original)
+                ? ClonePosition(original)
+                : ClonePosition(positions[i]);
+            persisted.SortOrder = i;
+
+            await TeamApplicationService.UpdatePositionAsync(persisted);
+
+            if (originalPositions.TryGetValue(positions[i].PositionId, out var snapshot))
+                snapshot.SortOrder = i;
+        }
+
+        ApplyPanelCommands.QueueRefreshPanel();
+    }
 
     // The registered save delegate: every position is re-checked individually because
     // ManagePermissions can grant "Fragenkatalog verwalten" per position, not just globally.

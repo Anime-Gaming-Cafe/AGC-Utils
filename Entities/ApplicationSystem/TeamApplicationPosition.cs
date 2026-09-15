@@ -15,5 +15,6 @@ public class TeamApplicationPosition
     ///     application per phase rule.
     /// </summary>
     public bool AlwaysOpen { get; set; }
+    public int SortOrder { get; set; }
     public long CreatedAt { get; set; }
 }

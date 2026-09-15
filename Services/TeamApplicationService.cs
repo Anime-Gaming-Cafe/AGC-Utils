@@ -99,7 +99,8 @@ public static class TeamApplicationService
             var positions = new List<TeamApplicationPosition>();
             await using var cmd = Db.CreateCommand(
                 "SELECT position_id, position_name, description, applicant_hints, min_level, notify_channel_id, " +
-                "active, always_open, created_at FROM teamapplication_position ORDER BY position_name");
+                "active, always_open, sort_order, created_at FROM teamapplication_position " +
+                "ORDER BY sort_order, position_name");
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 positions.Add(new TeamApplicationPosition
@@ -112,7 +113,8 @@ public static class TeamApplicationService
                     NotifyChannelId = reader.IsDBNull(5) ? 0 : (ulong)reader.GetInt64(5),
                     Active = !reader.IsDBNull(6) && reader.GetBoolean(6),
                     AlwaysOpen = !reader.IsDBNull(7) && reader.GetBoolean(7),
-                    CreatedAt = reader.IsDBNull(8) ? 0 : reader.GetInt64(8)
+                    SortOrder = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
+                    CreatedAt = reader.IsDBNull(9) ? 0 : reader.GetInt64(9)
                 });
 
             _positionCache = positions;
@@ -137,6 +139,7 @@ public static class TeamApplicationService
             NotifyChannelId = position.NotifyChannelId,
             Active = position.Active,
             AlwaysOpen = position.AlwaysOpen,
+            SortOrder = position.SortOrder,
             CreatedAt = position.CreatedAt
         };
     }
@@ -157,16 +160,20 @@ public static class TeamApplicationService
     {
         var slug = Slugify(name);
         if (string.IsNullOrEmpty(slug) || IsReservedSlug(slug)) return null;
-        if (await GetPositionAsync(slug) != null) return null;
+
+        var existing = await GetPositionsAsync();
+        if (existing.Any(p => p.PositionId == slug)) return null;
+        var nextOrder = existing.Count == 0 ? 0 : existing.Max(p => p.SortOrder) + 1;
 
         await using var cmd = Db.CreateCommand(
-            "INSERT INTO teamapplication_position (position_id, position_name, description, min_level, notify_channel_id, active, created_at) " +
-            "VALUES (@id, @name, @description, @minlevel, @channel, false, @createdat)");
+            "INSERT INTO teamapplication_position (position_id, position_name, description, min_level, notify_channel_id, active, sort_order, created_at) " +
+            "VALUES (@id, @name, @description, @minlevel, @channel, false, @sortorder, @createdat)");
         cmd.Parameters.AddWithValue("id", slug);
         cmd.Parameters.AddWithValue("name", name.Trim());
         cmd.Parameters.AddWithValue("description", description);
         cmd.Parameters.AddWithValue("minlevel", minLevel);
         cmd.Parameters.AddWithValue("channel", (long)notifyChannelId);
+        cmd.Parameters.AddWithValue("sortorder", nextOrder);
         cmd.Parameters.AddWithValue("createdat", Now);
         await cmd.ExecuteNonQueryAsync();
 
@@ -231,7 +238,7 @@ public static class TeamApplicationService
         await using var cmd = Db.CreateCommand(
             "UPDATE teamapplication_position SET position_name = @name, description = @description, " +
             "applicant_hints = @hints, min_level = @minlevel, notify_channel_id = @channel, active = @active, " +
-            "always_open = @alwaysopen WHERE position_id = @id");
+            "always_open = @alwaysopen, sort_order = @sortorder WHERE position_id = @id");
         cmd.Parameters.AddWithValue("id", position.PositionId);
         cmd.Parameters.AddWithValue("name", position.PositionName);
         cmd.Parameters.AddWithValue("description", position.Description);
@@ -240,6 +247,7 @@ public static class TeamApplicationService
         cmd.Parameters.AddWithValue("channel", (long)position.NotifyChannelId);
         cmd.Parameters.AddWithValue("active", position.Active);
         cmd.Parameters.AddWithValue("alwaysopen", position.AlwaysOpen);
+        cmd.Parameters.AddWithValue("sortorder", position.SortOrder);
         await cmd.ExecuteNonQueryAsync();
 
         InvalidatePositionCache();
