@@ -70,6 +70,15 @@ else
                     <div class="field field--wide">
                         <label class="field__label" for="desc-@position.PositionId">Beschreibung</label>
                         <textarea id="desc-@position.PositionId" class="form-control" rows="2" @bind="position.Description" @bind:after="OnFieldChanged"></textarea>
+                        <span class="field__hint">Kurzer Teaser auf der Positionsübersicht unter /apply.</span>
+                    </div>
+                    <div class="field field--wide">
+                        <label class="field__label" for="hints-@position.PositionId">Bewerbungshinweise</label>
+                        <textarea id="hints-@position.PositionId" class="form-control" rows="4" @bind="position.ApplicantHints" @bind:after="OnFieldChanged"></textarea>
+                        <span class="field__hint">
+                            Steht über dem Fragenkatalog im Formular, bevor der Bewerber zu tippen anfängt.
+                            Links per [Linktext](https://...) einfügbar.
+                        </span>
                     </div>
                 </div>
 
@@ -198,6 +207,7 @@ else
         PositionId = source.PositionId,
         PositionName = source.PositionName,
         Description = source.Description,
+        ApplicantHints = source.ApplicantHints,
         MinLevel = source.MinLevel,
         NotifyChannelId = source.NotifyChannelId,
         Active = source.Active,
@@ -209,6 +219,7 @@ else
     {
         target.PositionName = source.PositionName;
         target.Description = source.Description;
+        target.ApplicantHints = source.ApplicantHints;
         target.MinLevel = source.MinLevel;
         target.NotifyChannelId = source.NotifyChannelId;
         target.Active = source.Active;

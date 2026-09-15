@@ -8,6 +8,7 @@
     <div class="field field--wide">
         <label class="field__label" for="q-text-@Question.QuestionId">Fragetext</label>
         <input id="q-text-@Question.QuestionId" class="form-control" @bind="Question.Text" @bind:after="Changed"/>
+        <span class="field__hint">Links per [Linktext](https://...) einfügbar.</span>
     </div>
     <div class="field">
         <label class="field__label" for="q-type-@Question.QuestionId">Typ</label>
@@ -21,6 +22,7 @@
     <div class="field">
         <label class="field__label" for="q-desc-@Question.QuestionId">Hilfetext (optional)</label>
         <input id="q-desc-@Question.QuestionId" class="form-control" @bind="Question.Description" @bind:after="Changed"/>
+        <span class="field__hint">Links per [Linktext](https://...) einfügbar.</span>
     </div>
 
     @if (Question.SupportsLength)

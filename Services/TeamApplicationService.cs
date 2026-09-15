@@ -98,8 +98,8 @@ public static class TeamApplicationService
         {
             var positions = new List<TeamApplicationPosition>();
             await using var cmd = Db.CreateCommand(
-                "SELECT position_id, position_name, description, min_level, notify_channel_id, active, " +
-                "always_open, created_at FROM teamapplication_position ORDER BY position_name");
+                "SELECT position_id, position_name, description, applicant_hints, min_level, notify_channel_id, " +
+                "active, always_open, created_at FROM teamapplication_position ORDER BY position_name");
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 positions.Add(new TeamApplicationPosition
@@ -107,11 +107,12 @@ public static class TeamApplicationService
                     PositionId = reader.GetString(0),
                     PositionName = reader.IsDBNull(1) ? reader.GetString(0) : reader.GetString(1),
                     Description = reader.IsDBNull(2) ? "" : reader.GetString(2),
-                    MinLevel = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
-                    NotifyChannelId = reader.IsDBNull(4) ? 0 : (ulong)reader.GetInt64(4),
-                    Active = !reader.IsDBNull(5) && reader.GetBoolean(5),
-                    AlwaysOpen = !reader.IsDBNull(6) && reader.GetBoolean(6),
-                    CreatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7)
+                    ApplicantHints = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    MinLevel = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                    NotifyChannelId = reader.IsDBNull(5) ? 0 : (ulong)reader.GetInt64(5),
+                    Active = !reader.IsDBNull(6) && reader.GetBoolean(6),
+                    AlwaysOpen = !reader.IsDBNull(7) && reader.GetBoolean(7),
+                    CreatedAt = reader.IsDBNull(8) ? 0 : reader.GetInt64(8)
                 });
 
             _positionCache = positions;
@@ -131,6 +132,7 @@ public static class TeamApplicationService
             PositionId = position.PositionId,
             PositionName = position.PositionName,
             Description = position.Description,
+            ApplicantHints = position.ApplicantHints,
             MinLevel = position.MinLevel,
             NotifyChannelId = position.NotifyChannelId,
             Active = position.Active,
@@ -228,11 +230,12 @@ public static class TeamApplicationService
     {
         await using var cmd = Db.CreateCommand(
             "UPDATE teamapplication_position SET position_name = @name, description = @description, " +
-            "min_level = @minlevel, notify_channel_id = @channel, active = @active, always_open = @alwaysopen " +
-            "WHERE position_id = @id");
+            "applicant_hints = @hints, min_level = @minlevel, notify_channel_id = @channel, active = @active, " +
+            "always_open = @alwaysopen WHERE position_id = @id");
         cmd.Parameters.AddWithValue("id", position.PositionId);
         cmd.Parameters.AddWithValue("name", position.PositionName);
         cmd.Parameters.AddWithValue("description", position.Description);
+        cmd.Parameters.AddWithValue("hints", position.ApplicantHints);
         cmd.Parameters.AddWithValue("minlevel", position.MinLevel);
         cmd.Parameters.AddWithValue("channel", (long)position.NotifyChannelId);
         cmd.Parameters.AddWithValue("active", position.Active);

@@ -4,8 +4,11 @@ using System.Globalization;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.RegularExpressions;
 using AGC_Management.Entities;
 using DisCatSharp.Net;
+using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using NpgsqlDataSource = Npgsql.NpgsqlDataSource;
 
@@ -64,6 +67,32 @@ public static class ToolSet
     {
         var data = Convert.FromBase64String(base64);
         return Encoding.UTF8.GetString(data);
+    }
+
+    private static readonly Regex MarkdownLinkPattern = new(@"\[([^\[\]]+)\]\((https?://[^\s()]+)\)", RegexOptions.Compiled);
+
+    /// <summary>
+    ///     Renders "[label](url)" as a real link, http/https only. Everything else in the text is HTML-encoded,
+    ///     so this is safe even though the source is admin-authored, staff-facing question text.
+    /// </summary>
+    public static MarkupString FormatWithLinks(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return new MarkupString("");
+
+        var result = new StringBuilder();
+        var lastEnd = 0;
+
+        foreach (Match match in MarkdownLinkPattern.Matches(text))
+        {
+            result.Append(HtmlEncoder.Default.Encode(text[lastEnd..match.Index]));
+            var label = HtmlEncoder.Default.Encode(match.Groups[1].Value);
+            var url = HtmlEncoder.Default.Encode(match.Groups[2].Value);
+            result.Append($"<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{label}</a>");
+            lastEnd = match.Index + match.Length;
+        }
+
+        result.Append(HtmlEncoder.Default.Encode(text[lastEnd..]));
+        return new MarkupString(result.ToString());
     }
 
     public static string GetFormattedTimeFromUnix(long unixTime)

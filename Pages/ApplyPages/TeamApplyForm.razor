@@ -78,6 +78,14 @@ else
         </div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(position?.ApplicantHints))
+    {
+        <div class="notice mt-3">
+            <p class="notice__title">Hinweise zur Bewerbung</p>
+            <p class="qa__a">@ToolSet.FormatWithLinks(position.ApplicantHints)</p>
+        </div>
+    }
+
     <Panel Class="mt-3">
         <QuestionAnswerForm @ref="questionForm" Answers="answers"/>
 

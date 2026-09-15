@@ -7,7 +7,7 @@
 
 <div class="field @(Nested ? "field--followup" : null)">
     <label class="field__label" for="@(Answer.Question.Type is TeamApplicationQuestionType.SingleChoice or TeamApplicationQuestionType.MultipleChoice ? null : Answer.Question.QuestionId)">
-        @Answer.Question.Text
+        @ToolSet.FormatWithLinks(Answer.Question.Text)
         @if (Answer.Question.Required)
         {
             <span class="field__req" aria-label="Pflichtfeld">*</span>
@@ -16,7 +16,7 @@
 
     @if (!string.IsNullOrWhiteSpace(Answer.Question.Description))
     {
-        <span class="field__hint mb-2">@Answer.Question.Description</span>
+        <span class="field__hint mb-2">@ToolSet.FormatWithLinks(Answer.Question.Description)</span>
     }
 
     @{

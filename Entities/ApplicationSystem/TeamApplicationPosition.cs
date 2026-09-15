@@ -5,6 +5,7 @@ public class TeamApplicationPosition
     public string PositionId { get; set; } = "";
     public string PositionName { get; set; } = "";
     public string Description { get; set; } = "";
+    public string ApplicantHints { get; set; } = "";
     public int MinLevel { get; set; } = 20;
     public ulong NotifyChannelId { get; set; }
     public bool Active { get; set; }
