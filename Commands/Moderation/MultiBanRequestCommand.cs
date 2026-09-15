@@ -31,7 +31,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             var failsuccessEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Fehler")
                 .WithDescription("Du musst mindestens 2 User angeben!")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
@@ -47,11 +47,11 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             if (user != null) users_to_ban.Add(user);
         }
 
-        var busers_formatted = string.Join("\n", users_to_ban.Select(buser => buser.UsernameWithDiscriminator));
+        var busers_formatted = string.Join("\n", users_to_ban.Select(buser => buser.GetFormattedUserName()));
         var caseid = ToolSet.GenerateCaseID();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: Multibanrequest")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
                              $"```{busers_formatted}```\n__Grund:__```{reason}```")
@@ -75,7 +75,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             var timeoutEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Timeout")
                 .WithDescription("Du hast zu lange gebraucht um zu antworten.")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var timeoutEmbed = timeoutEmbedBuilder.Build();
             var timeoutMessage = new DiscordMessageBuilder()
@@ -91,7 +91,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             var denyEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Anfrage abgebrochen")
                 .WithDescription("Du hast deinen Multibanrequest abgebrochen.")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var denyEmbed = denyEmbedBuilder.Build();
             var denyMessage = new DiscordMessageBuilder()
@@ -128,7 +128,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                                  $"```{busers_formatted}```\n__Grund:__```{reason}```" +
                                  $"Bitte warte, während diese Anfrage von jemandem mit Bannberechtigung bestätigt wird <a:loading_agc:1084157150747697203>")
                 .WithColor(BotConfig.GetEmbedColor())
-                .WithFooter($"{ctx.User.UsernameWithDiscriminator}");
+                .WithFooter($"{ctx.User.GetFormattedUserName()}");
 
             string staffMentionString;
             if (onlineStaffWithBanPerms.Count > 0)
@@ -154,7 +154,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             {
                 new DiscordButtonComponent(ButtonStyle.Success, $"modbanrequest_accept_{caseid}", "Annehmen"),
                 new DiscordButtonComponent(ButtonStyle.Danger, $"modbanrequest_deny_{caseid}", "Ablehnen"),
-                new DiscordButtonComponent(ButtonStyle.Primary, $"modbanrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.UsernameWithDiscriminator})")
+                new DiscordButtonComponent(ButtonStyle.Primary, $"modbanrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.GetFormattedUserName()})")
             };
             staffbuttons.ForEach(x => x.Enable());
 
@@ -194,7 +194,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     .WithTitle("Anfrage abgebrochen")
                     .WithDescription(
                         "Deine Anfrage wurde abgebrochen, da sie nicht innerhalb von 6 Stunden bestätigt wurde.")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
                 var denyEmbed = denyEmbedBuilder.Build();
                 var denyMessage = new DiscordMessageBuilder()
@@ -209,7 +209,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 var cancelEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Anfrage abgebrochen")
                     .WithDescription("Deine Anfrage wurde abgebrochen.")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
                 var cancelEmbed = cancelEmbedBuilder.Build();
                 var cancelMessage = new DiscordMessageBuilder()
@@ -224,8 +224,8 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 var denyEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Anfrage abgelehnt")
                     .WithDescription(
-                        $"Deine Anfrage wurde von ``{staffresult.Result.User.UsernameWithDiscriminator}`` abgelehnt.")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                        $"Deine Anfrage wurde von ``{staffresult.Result.User.GetFormattedUserName()}`` abgelehnt.")
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
                 var denyEmbed = denyEmbedBuilder.Build();
                 var denyMessage = new DiscordMessageBuilder()
@@ -238,12 +238,12 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             if (staffresult.Result.Id == $"modbanrequest_accept_{caseid}")
             {
                 var ReasonString =
-                    $"{reason} | Banrequest von Moderator: {ctx.User.UsernameWithDiscriminator} | Approver: {staffresult.Result.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+                    $"{reason} | Banrequest von Moderator: {ctx.User.GetFormattedUserName()} | Approver: {staffresult.Result.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
                 await staffresult.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
                 var disbtn = buttons;
                 var loadingEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Multiban wird bearbeitet")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription("Der Multiban wird bearbeitet. Bitte warten...")
                     .WithColor(DiscordColor.Yellow);
                 var loadingEmbed = loadingEmbedBuilder.Build();
@@ -274,12 +274,12 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                         await ctx.Guild.BanMemberAsync(user.Id, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                             ReasonString);
                         var dm = sent ? "✅" : "❌";
-                        b_users += $"{user.UsernameWithDiscriminator} | DM: {dm}\n";
+                        b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
                         await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
                     }
                     catch (UnauthorizedException)
                     {
-                        n_users += $"{user.UsernameWithDiscriminator}\n";
+                        n_users += $"{user.GetFormattedUserName()}\n";
                     }
                 }
 
@@ -293,7 +293,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                                $"```{b_users}```";
                     e_string += $"__Nicht gebannte User:__\n" +
                                 $"```{n_users}```\n" +
-                                $"Bestätigt von {staffresult.Result.User.UsernameWithDiscriminator}";
+                                $"Bestätigt von {staffresult.Result.User.GetFormattedUserName()}";
                     ec = DiscordColor.Yellow;
                 }
                 else
@@ -302,14 +302,14 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                                $"__Grund:__ ```{reason}```\n" +
                                $"__Gebannte User:__\n" +
                                $"```{b_users}```\n" +
-                               $"Bestätigt von {staffresult.Result.User.UsernameWithDiscriminator}";
+                               $"Bestätigt von {staffresult.Result.User.GetFormattedUserName()}";
                     ec = DiscordColor.Green;
                 }
 
                 var discordEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Multibanrequest abgeschlossen")
                     .WithDescription(e_string)
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(ec);
                 var discordEmbed = discordEmbedBuilder.Build();
                 await message.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));

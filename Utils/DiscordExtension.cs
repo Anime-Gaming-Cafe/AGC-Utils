@@ -299,4 +299,15 @@ internal static class DiscordExtension
 
         return invites;
     }
+
+    internal static string GetFormattedUserName(this DiscordUser user)
+    {
+        return user.IsMigrated ? user.Username : user.UsernameWithDiscriminator;
+    }
+
+    internal static bool isTeamMember(this DiscordMember member)
+    {
+        var teamRole = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
+        return member.Roles.Any(x => x.Id == teamRole);
+    }
 }

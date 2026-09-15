@@ -30,7 +30,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             var failsuccessEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Fehler")
                 .WithDescription("Du musst mindestens 2 User angeben!")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
@@ -46,11 +46,11 @@ public sealed class MultiWarnCommand : BaseCommandModule
             if (user != null) users_to_warn.Add(user);
         }
 
-        var busers_formatted = string.Join("\n", users_to_warn.Select(buser => buser.UsernameWithDiscriminator));
+        var busers_formatted = string.Join("\n", users_to_warn.Select(buser => buser.GetFormattedUserName()));
         var caseid = ToolSet.GenerateCaseID();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: MultiWarn")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
                              $"```{busers_formatted}```\n__Grund:__```{reason}```")
@@ -74,7 +74,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             var timeoutEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Timeout")
                 .WithDescription("Du hast zu lange gebraucht um zu antworten.")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var timeoutEmbed = timeoutEmbedBuilder.Build();
             var timeoutMessage = new DiscordMessageBuilder()
@@ -89,7 +89,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("MultiWarn abgebrochen")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der MultiWarn wurde abgebrochen.")
                 .WithColor(DiscordColor.Red);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -107,7 +107,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             disbtn.ForEach(x => x.Disable());
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("MultiWarn wird bearbeitet")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der MultiWarn wird bearbeitet. Bitte warten...")
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -184,7 +184,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 var uembed =
                     await ModerationHelper.GenerateWarnEmbed(ctx, user, ctx.User, warncount, caseid, true, reason);
                 var reasonString =
-                    $"{warncount}. Verwarnung: {reason} | By Moderator: {ctx.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+                    $"{warncount}. Verwarnung: {reason} | By Moderator: {ctx.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
                 bool sent;
                 try
                 {
@@ -230,7 +230,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                     }
 
                 var stringtoadd =
-                    $"{user.UsernameWithDiscriminator} {user.Id} | Case-ID: {caseid_} | {warncount} Warn(s) | DM: {dmsent} | Sek. Aktion: {uAction}\n\n";
+                    $"{user.GetFormattedUserName()} {user.Id} | Case-ID: {caseid_} | {warncount} Warn(s) | DM: {dmsent} | Sek. Aktion: {uAction}\n\n";
                 for_str += stringtoadd;
             }
 
@@ -242,7 +242,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
             var embedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("MultiWarn abgeschlossen")
                 .WithDescription(e_string)
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(ec);
             var sembed = embedBuilder.Build();
             var smessageBuilder = new DiscordMessageBuilder()

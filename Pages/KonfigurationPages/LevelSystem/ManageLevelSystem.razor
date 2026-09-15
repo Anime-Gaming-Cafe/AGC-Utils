@@ -4,7 +4,9 @@
 @using AGC_Management.Utils
 @using DisCatSharp.Enums
 @inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
 @attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
 
 <PageHeader Title="Levelsystem"
             Lead="XP-Vergabe, Belohnungsrollen und Ausnahmen für das Levelsystem."
@@ -22,29 +24,29 @@ else
         <div class="field-grid">
             <div class="field">
                 <div class="form-check form-switch m-0">
-                    <input class="form-check-input" type="checkbox" role="switch" id="ls-text-active" @bind="textActive"/>
+                    <input class="form-check-input" type="checkbox" role="switch" id="ls-text-active" @bind="textActive" @bind:after="OnFieldChanged"/>
                     <label class="form-check-label" for="ls-text-active">Text-XP aktiviert</label>
                 </div>
             </div>
             <div class="field">
                 <label class="field__label" for="ls-text-multi">Text-Multiplikator</label>
-                <input id="ls-text-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!textActive)" @bind="textMultiplier"/>
+                <input id="ls-text-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!textActive)" @bind="textMultiplier" @bind:after="OnFieldChanged"/>
             </div>
 
             <div class="field">
                 <div class="form-check form-switch m-0">
-                    <input class="form-check-input" type="checkbox" role="switch" id="ls-vc-active" @bind="vcActive"/>
+                    <input class="form-check-input" type="checkbox" role="switch" id="ls-vc-active" @bind="vcActive" @bind:after="OnFieldChanged"/>
                     <label class="form-check-label" for="ls-vc-active">Voice-XP aktiviert</label>
                 </div>
             </div>
             <div class="field">
                 <label class="field__label" for="ls-vc-multi">Voice-Multiplikator</label>
-                <input id="ls-vc-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!vcActive)" @bind="vcMultiplier"/>
+                <input id="ls-vc-multi" type="number" step="0.01" min="0.01" class="form-control" disabled="@(!vcActive)" @bind="vcMultiplier" @bind:after="OnFieldChanged"/>
             </div>
 
             <div class="field">
                 <label class="field__label" for="ls-channel">Levelup-Channel</label>
-                <select id="ls-channel" class="form-select" @bind="levelUpChannelId">
+                <select id="ls-channel" class="form-select" @bind="levelUpChannelId" @bind:after="OnFieldChanged">
                     <option value="0">Kein Channel</option>
                     @foreach (var channel in textChannels)
                     {
@@ -55,19 +57,15 @@ else
 
             <div class="field field--wide">
                 <label class="field__label" for="ls-message">Levelup-Nachricht</label>
-                <textarea id="ls-message" class="form-control" rows="2" @bind="levelUpMessage"></textarea>
+                <textarea id="ls-message" class="form-control" rows="2" @bind="levelUpMessage" @bind:after="OnFieldChanged"></textarea>
                 <span class="field__hint">Platzhalter: {usermention}, {username}, {level}</span>
             </div>
 
             <div class="field field--wide">
                 <label class="field__label" for="ls-reward-message">Levelup-Belohnungs-Nachricht</label>
-                <textarea id="ls-reward-message" class="form-control" rows="2" @bind="levelUpRewardMessage"></textarea>
+                <textarea id="ls-reward-message" class="form-control" rows="2" @bind="levelUpRewardMessage" @bind:after="OnFieldChanged"></textarea>
                 <span class="field__hint">Platzhalter: {usermention}, {username}, {level}, {rolemention}, {rolename}</span>
             </div>
-        </div>
-
-        <div class="form-foot">
-            <button type="button" class="btn btn-primary" @onclick="SaveGlobalSettings">Einstellungen speichern</button>
         </div>
     </Panel>
 
@@ -87,9 +85,24 @@ else
                             <p class="rows__text">@RoleName(reward.RoleId)</p>
                         </div>
                         <div class="rows__side">
-                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveRewardRole(reward)">Entfernen</button>
+                            @if (pendingDeleteReward != reward)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteReward = reward">Entfernen</button>
+                            }
                         </div>
                     </li>
+                    @if (pendingDeleteReward == reward)
+                    {
+                        <li>
+                            <ConfirmInline Title="Belohnungsrolle entfernen?"
+                                           ConfirmText="Ja, entfernen"
+                                           Busy="deleting"
+                                           OnConfirm="() => RemoveRewardRole(reward)"
+                                           OnCancel="() => pendingDeleteReward = null">
+                                <p>@RoleName(reward.RoleId) wird ab Level @reward.Level nicht mehr automatisch vergeben.</p>
+                            </ConfirmInline>
+                        </li>
+                    }
                 }
             </ul>
         }
@@ -133,9 +146,24 @@ else
                             <p class="rows__text">@(overrideRole.Multiplicator)x</p>
                         </div>
                         <div class="rows__side">
-                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveOverrideRole(overrideRole)">Entfernen</button>
+                            @if (pendingDeleteOverride != overrideRole)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteOverride = overrideRole">Entfernen</button>
+                            }
                         </div>
                     </li>
+                    @if (pendingDeleteOverride == overrideRole)
+                    {
+                        <li>
+                            <ConfirmInline Title="Multiplikator-Rolle entfernen?"
+                                           ConfirmText="Ja, entfernen"
+                                           Busy="deleting"
+                                           OnConfirm="() => RemoveOverrideRole(overrideRole)"
+                                           OnCancel="() => pendingDeleteOverride = null">
+                                <p>@RoleName(overrideRole.RoleId) erhält danach keinen XP-Multiplikator mehr.</p>
+                            </ConfirmInline>
+                        </li>
+                    }
                 }
             </ul>
         }
@@ -178,9 +206,24 @@ else
                             <p class="rows__title">@ChannelName(channelId)</p>
                         </div>
                         <div class="rows__side">
-                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveBlockedChannel(channelId)">Entfernen</button>
+                            @if (pendingDeleteBlockedChannel != channelId)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteBlockedChannel = channelId">Entfernen</button>
+                            }
                         </div>
                     </li>
+                    @if (pendingDeleteBlockedChannel == channelId)
+                    {
+                        <li>
+                            <ConfirmInline Title="Channel wieder freigeben?"
+                                           ConfirmText="Ja, freigeben"
+                                           Busy="deleting"
+                                           OnConfirm="() => RemoveBlockedChannel(channelId)"
+                                           OnCancel="() => pendingDeleteBlockedChannel = null">
+                                <p>In @ChannelName(channelId) wird danach wieder Text-XP vergeben.</p>
+                            </ConfirmInline>
+                        </li>
+                    }
                 }
             </ul>
         }
@@ -219,9 +262,24 @@ else
                             <p class="rows__title">@RoleName(roleId)</p>
                         </div>
                         <div class="rows__side">
-                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveBlockedRole(roleId)">Entfernen</button>
+                            @if (pendingDeleteBlockedRole != roleId)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteBlockedRole = roleId">Entfernen</button>
+                            }
                         </div>
                     </li>
+                    @if (pendingDeleteBlockedRole == roleId)
+                    {
+                        <li>
+                            <ConfirmInline Title="Rolle wieder freigeben?"
+                                           ConfirmText="Ja, freigeben"
+                                           Busy="deleting"
+                                           OnConfirm="() => RemoveBlockedRole(roleId)"
+                                           OnCancel="() => pendingDeleteBlockedRole = null">
+                                <p>Mitglieder mit @RoleName(roleId) erhalten danach wieder XP.</p>
+                            </ConfirmInline>
+                        </li>
+                    }
                 }
             </ul>
         }
@@ -274,13 +332,56 @@ else
     private List<ulong> blockedRoleIds = new();
     private ulong newBlockedRoleId;
 
+    private Reward? pendingDeleteReward;
+    private MultiplicatorOverrides? pendingDeleteOverride;
+    private ulong? pendingDeleteBlockedChannel;
+    private ulong? pendingDeleteBlockedRole;
+    private bool deleting;
+
+    private bool originalTextActive;
+    private float originalTextMultiplier;
+    private bool originalVcActive;
+    private float originalVcMultiplier;
+    private ulong originalLevelUpChannelId;
+    private string originalLevelUpMessage = "";
+    private string originalLevelUpRewardMessage = "";
+
     protected override async Task OnInitializedAsync()
     {
-        await LoadAll();
+        await LoadLists();
+        await LoadGlobalSettings();
+        RebuildGlobalSettingsSnapshot();
+        Tracker.Register(SaveGlobalSettings, DiscardGlobalSettings);
         loaded = true;
     }
 
-    private async Task LoadAll()
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private void RebuildGlobalSettingsSnapshot()
+    {
+        originalTextActive = textActive;
+        originalTextMultiplier = textMultiplier;
+        originalVcActive = vcActive;
+        originalVcMultiplier = vcMultiplier;
+        originalLevelUpChannelId = levelUpChannelId;
+        originalLevelUpMessage = levelUpMessage;
+        originalLevelUpRewardMessage = levelUpRewardMessage;
+    }
+
+    private void DiscardGlobalSettings()
+    {
+        textActive = originalTextActive;
+        textMultiplier = originalTextMultiplier;
+        vcActive = originalVcActive;
+        vcMultiplier = originalVcMultiplier;
+        levelUpChannelId = originalLevelUpChannelId;
+        levelUpMessage = originalLevelUpMessage;
+        levelUpRewardMessage = originalLevelUpRewardMessage;
+    }
+
+    private async Task LoadLists()
     {
         var guild = CurrentApplication.TargetGuild;
 
@@ -294,6 +395,14 @@ else
             .OrderByDescending(r => r.Position)
             .ToList();
 
+        rewardRoles = await LevelUtils.GetLevelRewards();
+        overrideRoles = await LevelUtils.GetMultiplicatorOverrides();
+        blockedChannelIds = await LevelUtils.BlockedChannels();
+        blockedRoleIds = await LevelUtils.BlockedRoles();
+    }
+
+    private async Task LoadGlobalSettings()
+    {
         textActive = await LevelUtils.IsLevelingActive(XpRewardType.Message);
         textMultiplier = await LevelUtils.GetMessageXpMultiplier();
         vcActive = await LevelUtils.IsLevelingActive(XpRewardType.Voice);
@@ -301,11 +410,6 @@ else
         levelUpChannelId = await LevelUtils.GetLevelUpChannelId();
         levelUpMessage = await LevelUtils.GetLevelUpMessage();
         levelUpRewardMessage = await LevelUtils.GetLevelUpRewardMessage();
-
-        rewardRoles = await LevelUtils.GetLevelRewards();
-        overrideRoles = await LevelUtils.GetMultiplicatorOverrides();
-        blockedChannelIds = await LevelUtils.BlockedChannels();
-        blockedRoleIds = await LevelUtils.BlockedRoles();
     }
 
     private string RoleName(ulong roleId)
@@ -329,7 +433,8 @@ else
         await LevelUtils.SetLevelUpRewardMessage(levelUpRewardMessage);
 
         ToastService.Notify("Einstellungen gespeichert.", "ok");
-        await LoadAll();
+        await LoadGlobalSettings();
+        RebuildGlobalSettingsSnapshot();
     }
 
     private async Task AddRewardRole()
@@ -363,14 +468,18 @@ else
         newRewardRoleId = 0;
         newRewardLevel = 1;
         ToastService.Notify("Belohnungsrolle wurde hinzugefügt.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task RemoveRewardRole(Reward reward)
     {
+        if (deleting) return;
+        deleting = true;
         await LevelUtils.RemoveRewardRole(reward.RoleId, reward.Level);
+        pendingDeleteReward = null;
+        deleting = false;
         ToastService.Notify("Belohnungsrolle wurde entfernt.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task AddOverrideRole()
@@ -404,14 +513,18 @@ else
         newOverrideRoleId = 0;
         newOverrideMultiplier = 1f;
         ToastService.Notify("Multiplikator-Rolle wurde hinzugefügt.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task RemoveOverrideRole(MultiplicatorOverrides overrideRole)
     {
+        if (deleting) return;
+        deleting = true;
         await LevelUtils.RemoveOverrideRole(overrideRole.RoleId);
+        pendingDeleteOverride = null;
+        deleting = false;
         ToastService.Notify("Multiplikator-Rolle wurde entfernt.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task AddBlockedChannel()
@@ -431,14 +544,18 @@ else
         await LevelUtils.AddBlacklistedChannel(newBlockedChannelId);
         newBlockedChannelId = 0;
         ToastService.Notify("Channel wurde blockiert.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task RemoveBlockedChannel(ulong channelId)
     {
+        if (deleting) return;
+        deleting = true;
         await LevelUtils.RemoveBlacklistedChannel(channelId);
+        pendingDeleteBlockedChannel = null;
+        deleting = false;
         ToastService.Notify("Channel wurde freigegeben.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task AddBlockedRole()
@@ -465,13 +582,17 @@ else
         await LevelUtils.AddBlockedRole(newBlockedRoleId);
         newBlockedRoleId = 0;
         ToastService.Notify("Rolle wurde blockiert.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 
     private async Task RemoveBlockedRole(ulong roleId)
     {
+        if (deleting) return;
+        deleting = true;
         await LevelUtils.RemoveBlockedRole(roleId);
+        pendingDeleteBlockedRole = null;
+        deleting = false;
         ToastService.Notify("Rolle wurde freigegeben.", "ok");
-        await LoadAll();
+        await LoadLists();
     }
 }

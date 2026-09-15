@@ -154,7 +154,7 @@ else
 
         cachedUsers = client.UserCache.Count.ToString();
         mode = GetMode();
-        botUser = client.CurrentUser.UsernameWithDiscriminator;
+        botUser = client.CurrentUser.GetFormattedUserName();
         libVersion = client.BotLibrary + " " + client.VersionString.Split("+")[0];
         osVersion = Environment.OSVersion.ToString();
         ramUsage = GC.GetTotalMemory(false) / 1024 / 1024 + " MB";

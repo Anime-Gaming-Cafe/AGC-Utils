@@ -53,9 +53,28 @@ else
                                 }
                             </td>
                             <td class="text-end">
-                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveRule(rule)">Entfernen</button>
+                                @if (pendingDeleteRuleId != rule.PermissionId)
+                                {
+                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDeleteRuleId = rule.PermissionId">Entfernen</button>
+                                }
                             </td>
                         </tr>
+                        @if (pendingDeleteRuleId == rule.PermissionId)
+                        {
+                            <tr>
+                                <td colspan="4">
+                                    <ConfirmInline Title="Recht wirklich entfernen?"
+                                                   ConfirmText="Ja, entfernen"
+                                                   Busy="deletingRule"
+                                                   OnConfirm="() => RemoveRule(rule)"
+                                                   OnCancel="() => pendingDeleteRuleId = null">
+                                        <p>
+                                            @RoleName(rule.RoleId) verliert das Recht „@PermissionLabel(rule.Permission)“@(rule.PositionId == null ? "" : $" für {PositionName(rule.PositionId)}").
+                                        </p>
+                                    </ConfirmInline>
+                                </td>
+                            </tr>
+                        }
                     }
                     </tbody>
                 </table>
@@ -112,6 +131,9 @@ else
     private ulong newRoleId;
     private string newPositionId = "";
     private TeamApplicationPermission newPermission = TeamApplicationPermission.ViewApplications;
+
+    private string? pendingDeleteRuleId;
+    private bool deletingRule;
 
     protected override async Task OnInitializedAsync()
     {
@@ -171,7 +193,11 @@ else
 
     private async Task RemoveRule(TeamApplicationPermissionRule rule)
     {
+        if (deletingRule) return;
+        deletingRule = true;
         await TeamApplicationPermissionService.RemoveRuleAsync(rule.PermissionId);
+        pendingDeleteRuleId = null;
+        deletingRule = false;
         await LoadAll();
         ToastService.Notify("Recht entfernt.", "ok");
     }

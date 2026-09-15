@@ -47,12 +47,12 @@ public static class ToolSet
         try
         {
             if (CurrentApplication.DiscordClient.UserCache.TryGetValue(userId, out var cached))
-                return cached.IsMigrated ? cached.Username : cached.UsernameWithDiscriminator;
+                return cached.GetFormattedUserName();
 
             if (!fetch) return userId.ToString();
 
             var user = await CurrentApplication.DiscordClient.GetUserAsync(userId);
-            return user.IsMigrated ? user.Username : user.UsernameWithDiscriminator;
+            return user.GetFormattedUserName();
         }
         catch (Exception)
         {
@@ -370,7 +370,7 @@ public static class ToolSet
         {
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Kein Grund angegeben!")
                 .WithDescription("Bitte gebe einen Grund an")
-                .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.UsernameWithDiscriminator}", ctx.User.AvatarUrl);
+                .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.GetFormattedUserName()}", ctx.User.AvatarUrl);
             var msg = new DiscordMessageBuilder().AddEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(msg);
 
@@ -382,7 +382,7 @@ public static class ToolSet
         {
             var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Kein Grund angegeben!")
                 .WithDescription("Bitte gebe einen Grund an")
-                .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.UsernameWithDiscriminator}", ctx.User.AvatarUrl);
+                .WithColor(DiscordColor.Red).WithFooter($"{ctx.User.GetFormattedUserName()}", ctx.User.AvatarUrl);
             var msg = new DiscordMessageBuilder().AddEmbed(embedBuilder.Build()).WithReply(ctx.Message.Id);
             await ctx.Channel.SendMessageAsync(msg);
             return true;

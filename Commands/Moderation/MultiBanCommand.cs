@@ -24,14 +24,14 @@ public sealed class MultiBanCommand : BaseCommandModule
         reason = reason.TrimEnd(' ');
         var users_to_ban = new List<DiscordUser>();
         var reasonString =
-            $"{reason} | Von Moderator: {ctx.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+            $"{reason} | Von Moderator: {ctx.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
         var setids = ids.ToHashSet().ToList();
         if (setids.Count < 2)
         {
             var failsuccessEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Fehler")
                 .WithDescription("Du musst mindestens 2 User angeben!")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
@@ -47,11 +47,11 @@ public sealed class MultiBanCommand : BaseCommandModule
             if (user != null) users_to_ban.Add(user);
         }
 
-        var busers_formatted = string.Join("\n", users_to_ban.Select(buser => buser.UsernameWithDiscriminator));
+        var busers_formatted = string.Join("\n", users_to_ban.Select(buser => buser.GetFormattedUserName()));
         var caseid = ToolSet.GenerateCaseID();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: Multiban")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
                              $"```{busers_formatted}```\n__Grund:__```{reason}```")
@@ -82,7 +82,7 @@ public sealed class MultiBanCommand : BaseCommandModule
         {
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Multiban wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -95,7 +95,7 @@ public sealed class MultiBanCommand : BaseCommandModule
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Multiban abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Multiban wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -110,7 +110,7 @@ public sealed class MultiBanCommand : BaseCommandModule
             disbtn.ForEach(x => x.Disable());
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Multiban wird bearbeitet")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der Multiban wird bearbeitet. Bitte warten...")
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -141,12 +141,12 @@ public sealed class MultiBanCommand : BaseCommandModule
                     await ctx.Guild.BanMemberAsync(user.Id, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                         reasonString);
                     var dm = sent ? "✅" : "❌";
-                    b_users += $"{user.UsernameWithDiscriminator} | DM: {dm}\n";
+                    b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
                     await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
                 }
                 catch (UnauthorizedException)
                 {
-                    n_users += $"{user.UsernameWithDiscriminator}\n";
+                    n_users += $"{user.GetFormattedUserName()}\n";
                 }
             }
 
@@ -174,7 +174,7 @@ public sealed class MultiBanCommand : BaseCommandModule
             var discordEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Multiban abgeschlossen")
                 .WithDescription(e_string)
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(ec);
             var discordEmbed = discordEmbedBuilder.Build();
             await message.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));

@@ -34,13 +34,11 @@ public class RequireBotOwner : CheckBaseAttribute
     }
 }
 
-public class ApplicationCommandsRequireBotOwner : CheckBaseAttribute
+public class ApplicationCommandsRequireBotOwner : ApplicationCommandCheckBaseAttribute
 {
-    public override async Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
+    public override Task<bool> ExecuteChecksAsync(BaseContext ctx)
     {
-        if (ctx.User.Id == GlobalProperties.BotOwnerId)
-            return true;
-        return false;
+        return Task.FromResult(ctx.User.Id == GlobalProperties.BotOwnerId);
     }
 }
 
@@ -88,7 +86,7 @@ public class RequireDatabase : CheckBaseAttribute
         Console.WriteLine("Database is not connected! Command disabled.");
         var embedBuilder = new DiscordEmbedBuilder().WithTitle("Fehler: Datenbank nicht verbunden!")
             .WithDescription(
-                $"Command deaktiviert. Bitte informiere den Botentwickler ``{ctx.Client.GetUserAsync(GlobalProperties.BotOwnerId).Result.UsernameWithDiscriminator}``")
+                $"Command deaktiviert. Bitte informiere den Botentwickler ``{ctx.Client.GetUserAsync(GlobalProperties.BotOwnerId).Result.GetFormattedUserName()}``")
             .WithColor(DiscordColor.Red);
         var embed = embedBuilder.Build();
         var msg_e = new DiscordMessageBuilder().AddEmbed(embed).WithReply(ctx.Message.Id);
@@ -97,17 +95,16 @@ public class RequireDatabase : CheckBaseAttribute
     }
 }
 
-public class ACRequireStaffRole : CheckBaseAttribute
+public class ACRequireStaffRole : ApplicationCommandCheckBaseAttribute
 {
     private readonly ulong RoleId = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
 
-    public override async Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
+    public override Task<bool> ExecuteChecksAsync(BaseContext ctx)
     {
-        if (GlobalProperties.DebugMode) return true;
+        if (GlobalProperties.DebugMode) return Task.FromResult(true);
+        if (ctx.Member is null) return Task.FromResult(false);
 
-        if (ctx.Member.Roles.Any(r => r.Id == RoleId))
-            return true;
-        return false;
+        return Task.FromResult(ctx.Member.Roles.Any(r => r.Id == RoleId));
     }
 }
 
@@ -147,6 +144,17 @@ public class AGCEasterEggsEnabled : CheckBaseAttribute
         }
 
         return false;
+    }
+}
+
+public class ApplicationCommandRequireDatabase : ApplicationCommandCheckBaseAttribute
+{
+    public override async Task<bool> ExecuteChecksAsync(BaseContext ctx)
+    {
+        var db = CurrentApplication.ServiceProvider.GetService<NpgsqlDataSource>();
+        await using var cmd = db.CreateCommand("SELECT 1");
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
+        return reader.HasRows;
     }
 }
 

@@ -29,14 +29,14 @@ public sealed class KickUserCommand : BaseCommandModule
         var embed = embedBuilder.Build();
         bool sent;
         var ReasonString =
-            $"{reason} | Von Moderator: {ctx.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+            $"{reason} | Von Moderator: {ctx.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
         var interactivity = ctx.Client.GetInteractivity();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: Kick")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
-                             $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
+                             $"```{user.GetFormattedUserName()}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
         List<DiscordButtonComponent> buttons =
@@ -53,7 +53,7 @@ public sealed class KickUserCommand : BaseCommandModule
         {
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Kick wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -66,7 +66,7 @@ public sealed class KickUserCommand : BaseCommandModule
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Kick abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Kick wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -79,7 +79,7 @@ public sealed class KickUserCommand : BaseCommandModule
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Kick wird bearbeitet")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der Kick wird bearbeitet. Bitte warten...")
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -108,11 +108,11 @@ public sealed class KickUserCommand : BaseCommandModule
             {
                 await user.RemoveAsync(ReasonString);
                 var dm = sent ? "✅" : "❌";
-                b_users += $"{user.UsernameWithDiscriminator} | DM: {dm}\n";
+                b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
             }
             catch (UnauthorizedException)
             {
-                n_users += $"{user.UsernameWithDiscriminator}\n";
+                n_users += $"{user.GetFormattedUserName()}\n";
             }
 
             if (n_users != "")
@@ -146,7 +146,7 @@ public sealed class KickUserCommand : BaseCommandModule
             var discordEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Kick abgeschlossen")
                 .WithDescription(e_string)
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(ec);
             var discordEmbed = discordEmbedBuilder.Build();
             await confirm.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));

@@ -87,27 +87,32 @@ public static class ModerationHelper
 
 
     public static async Task<DiscordEmbed> GenerateWarnEmbed(CommandContext ctx, DiscordUser user, DiscordUser mod,
-        int warnCount, string caseid, bool isManual, string reason)
+        int warnCount, string caseid, bool isManual, string reason, bool isPerma = false)
     {
         var unbanurl = GetUnbanURL();
         var (warnsToKick, warnsToBan) = await GetWarnKickValues();
+        var introPhrase = isPerma
+            ? "Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten"
+            : "Du hast eine Verwarnung vom Serverteam erhalten";
+        var title = isPerma ? "Du wurdest permanent verwarnt!" : "Du wurdest verwarnt!";
+
         if (warnCount >= warnsToBan)
             return new DiscordEmbedBuilder()
                 .WithDescription(
-                    $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. __Du wirst nun aus dem Server gebannt.__ Du kannst einen [Entbannungsantrag einreichen]({unbanurl}). Der Grund für die Verwarnung ist: ```{reason}```")
+                    $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. __Du wirst nun aus dem Server gebannt.__ Du kannst einen [Entbannungsantrag einreichen]({unbanurl}). Der Grund für die Verwarnung ist: ```{reason}```")
                 .WithColor(DiscordColor.Red).WithFooter("").WithFooter(isManual
                     ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
                     : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest verwarnt!")
+                .WithTitle(title)
                 .Build();
 
         if (warnCount == warnsToBan - 1)
             return new DiscordEmbedBuilder()
                 .WithDescription(
-                    $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
+                    $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
                     $"__beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gebannt wirst.__ Der Grund für die Verwarnung ist: ```{reason}```")
                 .WithColor(DiscordColor.Red)
-                .WithTitle("Du wurdest verwarnt!")
+                .WithTitle(title)
                 .Build();
 
         if (warnCount >= warnsToKick)
@@ -115,112 +120,44 @@ public static class ModerationHelper
             if (warnsToKick + 1 == warnsToBan)
                 return new DiscordEmbedBuilder()
                     .WithDescription(
-                        $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
-                        $"__beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gebannt wirst.__ __Du wirst nun aus dem Server gekickt.__ Der Grund für die Verwarnung ist: ```{reason}```")
+                        $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
+                        $"__beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gebannt wirst.__ {(isPerma ? "Du wirst nun aus dem Server gekickt." : "__Du wirst nun aus dem Server gekickt.__")} Der Grund für die Verwarnung ist: ```{reason}```")
                     .WithColor(DiscordColor.Red).WithFooter(isManual
                         ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
                         : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                    .WithTitle("Du wurdest verwarnt!")
+                    .WithTitle(title)
                     .Build();
             return new DiscordEmbedBuilder()
                 .WithDescription(
-                    $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. __Du wirst nun aus dem Server gekickt.__ Der Grund für die Verwarnung ist: ```{reason}```")
+                    $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine {(isPerma ? $"**{warnCount}. Verwarnung**," : $"**{warnCount}.")} __Du wirst nun aus dem Server gekickt.__ Der Grund für die Verwarnung ist: ```{reason}```")
                 .WithColor(DiscordColor.Red).WithFooter(isManual
                     ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
                     : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest verwarnt!")
+                .WithTitle(title)
                 .Build();
         }
 
         if (warnCount == warnsToKick - 1)
             return new DiscordEmbedBuilder()
                 .WithDescription(
-                    $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, __beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gekickt wirst.__ Der Grund für die Verwarnung ist: ```{reason}```")
+                    $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, __beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gekickt wirst.__ Der Grund für die Verwarnung ist: ```{reason}```*")
                 .WithColor(DiscordColor.Red).WithFooter(isManual
                     ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
                     : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest verwarnt!")
+                .WithTitle(title)
                 .Build();
 
         return new DiscordEmbedBuilder()
             .WithDescription(
-                $"Du hast eine Verwarnung vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. Der Grund für die Verwarnung ist: ```{reason}```*")
+                $"{introPhrase}, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. Der Grund für die Verwarnung ist: ```{reason}```*")
             .WithColor(DiscordColor.Red).WithFooter(isManual
                 ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
                 : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-            .WithTitle("Du wurdest verwarnt!")
+            .WithTitle(title)
             .Build();
     }
 
-    public static async Task<DiscordEmbed> GeneratePermaWarnEmbed(CommandContext ctx, DiscordUser user, DiscordUser mod,
-        int warnCount, string caseid,
-        bool isManual, string reason)
-    {
-        var (warnsToKick, warnsToBan) = await GetWarnKickValues();
-        var unbanurl = GetUnbanURL();
-        if (warnCount >= warnsToBan)
-            return new DiscordEmbedBuilder()
-                .WithDescription(
-                    $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. __Du wirst nun aus dem Server gebannt.__ Du kannst einen [Entbannungsantrag einreichen]({unbanurl}). Der Grund für die Verwarnung ist: ```{reason}```")
-                .WithColor(DiscordColor.Red).WithFooter("").WithFooter(isManual
-                    ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
-                    : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest permanent verwarnt!")
-                .Build();
-
-        if (warnCount == warnsToBan - 1)
-            return new DiscordEmbedBuilder()
-                .WithDescription(
-                    $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
-                    $"__beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gebannt wirst.__ Der Grund für die Verwarnung ist: ```{reason}```")
-                .WithColor(DiscordColor.Red)
-                .WithTitle("Du wurdest permanent verwarnt!")
-                .Build();
-
-        if (warnCount >= warnsToKick)
-        {
-            if (warnsToKick + 1 == warnsToBan)
-                return new DiscordEmbedBuilder()
-                    .WithDescription(
-                        $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, " +
-                        $"__beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gebannt wirst.__ Du wirst nun aus dem Server gekickt. Der Grund für die Verwarnung ist: ```{reason}```")
-                    .WithColor(DiscordColor.Red).WithFooter(isManual
-                        ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
-                        : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                    .WithTitle("Du wurdest permanent verwarnt!")
-                    .Build();
-            return new DiscordEmbedBuilder()
-                .WithDescription(
-                    $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, __Du wirst nun aus dem Server gekickt.__ Der Grund für die Verwarnung ist: ```{reason}```")
-                .WithColor(DiscordColor.Red).WithFooter(isManual
-                    ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
-                    : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest permanent verwarnt!")
-                .Build();
-        }
-
-        if (warnCount == warnsToKick - 1)
-            return new DiscordEmbedBuilder()
-                .WithDescription(
-                    $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**, __beachte bitte, dass Du bei der nächsten Verwarnung aus **{ctx.Guild.Name}** gekickt wirst.__ Der Grund für die Verwarnung ist: ```{reason}```*")
-                .WithColor(DiscordColor.Red).WithFooter(isManual
-                    ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
-                    : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-                .WithTitle("Du wurdest permanent verwarnt!")
-                .Build();
-
-        return new DiscordEmbedBuilder()
-            .WithDescription(
-                $"Du hast eine permanente Verwarnung (sie läuft nicht ab) vom Serverteam erhalten, bitte beachte, dass Verwarnungen immer Folgen mit sich ziehen. Dies ist deine **{warnCount}. Verwarnung**. Der Grund für die Verwarnung ist: ```{reason}```*")
-            .WithColor(DiscordColor.Red).WithFooter(isManual
-                ? $"Manuelle Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben."
-                : $"Automatische Verwarnung | Warnungs-ID: {caseid} <- Bei Fragen bitte ein Ticket eröffnen und diese ID angeben.")
-            .WithTitle("Du wurdest permanent verwarnt!")
-            .Build();
-    }
-
-
-    public static async Task<string?> WarnReasonSelector(CommandContext ctx)
+    public static async Task<string?> ReasonSelector(CommandContext ctx, string reasonTable, string actionTitle)
     {
         var caseId = ToolSet.GenerateCaseID();
         List<string> DBQuery =
@@ -228,12 +165,12 @@ public static class ModerationHelper
 			"*"
         ];
         var queryResult =
-            await DatabaseService.SelectDataFromTable("warnreasons", DBQuery, null);
+            await DatabaseService.SelectDataFromTable(reasonTable, DBQuery, null);
         var embedBuilder = new DiscordEmbedBuilder()
-            .WithTitle("Grund auswählen | Aktion: Verwarnen")
+            .WithTitle($"Grund auswählen | Aktion: {actionTitle}")
             .WithDescription(
                 "Wähle einen oder mehrere zutreffende Gründe aus der Liste aus. \n Dieses Menü läuft in 120 Sekunden ab!")
-            .WithFooter(ctx.User.UsernameWithDiscriminator)
+            .WithFooter(ctx.User.GetFormattedUserName())
             .WithColor(BotConfig.GetEmbedColor());
         var options = new List<DiscordStringSelectComponentOption>();
         Dictionary<string, string> ReasonMap = [];
@@ -285,71 +222,14 @@ public static class ModerationHelper
         return reason;
     }
 
-
-    public static async Task<string?> BanReasonSelector(CommandContext ctx)
+    public static Task<string?> WarnReasonSelector(CommandContext ctx)
     {
-        var caseId = ToolSet.GenerateCaseID();
-        List<string> DBQuery =
-		[
-			"*"
-        ];
-        var queryResult =
-            await DatabaseService.SelectDataFromTable("banreasons", DBQuery, null);
-        var embedBuilder = new DiscordEmbedBuilder()
-            .WithTitle("Grund auswählen | Aktion: Ban")
-            .WithDescription(
-                "Wähle einen oder mehrere zutreffende Gründe aus der Liste aus. \n Dieses Menü läuft in 120 Sekunden ab!")
-            .WithFooter(ctx.User.UsernameWithDiscriminator)
-            .WithColor(BotConfig.GetEmbedColor());
-        var options = new List<DiscordStringSelectComponentOption>();
-        Dictionary<string, string> ReasonMap = [];
-        foreach (var result in queryResult)
-        {
-            options.Add(new DiscordStringSelectComponentOption(result["reason"].ToString(),
-                result["custom_id"].ToString()));
-            ReasonMap.Add(result["custom_id"].ToString(), result["reason"].ToString());
-        }
+        return ReasonSelector(ctx, "warnreasons", "Verwarnen");
+    }
 
-        var discordEmbed = embedBuilder.Build();
-        var select = new DiscordStringSelectComponent("Gründe auswählen auswählen", options, caseId,
-            maxOptions: ReasonMap.Count, minOptions: 1);
-        var selector = new List<DiscordComponent>
-        {
-            select
-        };
-
-        List<DiscordActionRowComponent> discordActionRowComponents =
-		[
-			new DiscordActionRowComponent(selector)
-        ];
-        var message = await ctx.RespondAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed)
-            .AddComponents(discordActionRowComponents));
-        var interactivity = ctx.Client.GetInteractivity();
-        var interaction = await interactivity.WaitForSelectAsync(message, ctx.User, caseId,
-            ComponentType.StringSelect, TimeSpan.FromSeconds(120));
-        if (interaction.TimedOut)
-        {
-            await message.DeleteAsync();
-            return "";
-        }
-
-        Console.WriteLine(interaction.Result.Id);
-        var valIds = new List<string>();
-        foreach (var option in interaction.Result.Values) valIds.Add(option);
-
-        var reasonBuilder = new StringBuilder();
-        for (var i = 0; i < valIds.Count; i++)
-        {
-            reasonBuilder.Append(ReasonMap[valIds[i]]);
-
-            if (i < valIds.Count - 1) reasonBuilder.Append(" | ");
-        }
-
-        var reason = reasonBuilder.ToString();
-
-        Console.WriteLine(reason);
-        await message.DeleteAsync();
-        return reason;
+    public static Task<string?> BanReasonSelector(CommandContext ctx)
+    {
+        return ReasonSelector(ctx, "banreasons", "Ban");
     }
 
     public static string GetUnbanURL()

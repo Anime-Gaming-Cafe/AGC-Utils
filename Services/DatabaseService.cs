@@ -230,6 +230,10 @@ public static class DatabaseService
             { "level_excludedroles", "CREATE TABLE IF NOT EXISTS level_excludedroles (roleid BIGINT)" },
             { "banreasons", "CREATE TABLE IF NOT EXISTS banreasons (reason TEXT, custom_id VARCHAR)" },
             {
+                "bans",
+                "CREATE TABLE IF NOT EXISTS bans (userid BIGINT, punisherid BIGINT, datum BIGINT, description VARCHAR, caseid VARCHAR)"
+            },
+            {
                 "flags",
                 "CREATE TABLE IF NOT EXISTS flags (userid BIGINT, punisherid BIGINT, datum BIGINT, description VARCHAR, caseid VARCHAR)"
             },
@@ -613,6 +617,17 @@ public static class DatabaseService
                     { "description", "ALTER TABLE warns ADD COLUMN IF NOT EXISTS description VARCHAR" },
                     { "perma", "ALTER TABLE warns ADD COLUMN IF NOT EXISTS perma BOOLEAN" },
                     { "caseid", "ALTER TABLE warns ADD COLUMN IF NOT EXISTS caseid VARCHAR" }
+                }
+            },
+            {
+                "bans",
+                new Dictionary<string, string>
+                {
+                    { "userid", "ALTER TABLE bans ADD COLUMN IF NOT EXISTS userid BIGINT" },
+                    { "punisherid", "ALTER TABLE bans ADD COLUMN IF NOT EXISTS punisherid BIGINT" },
+                    { "datum", "ALTER TABLE bans ADD COLUMN IF NOT EXISTS datum BIGINT" },
+                    { "description", "ALTER TABLE bans ADD COLUMN IF NOT EXISTS description VARCHAR" },
+                    { "caseid", "ALTER TABLE bans ADD COLUMN IF NOT EXISTS caseid VARCHAR" }
                 }
             },
             {

@@ -33,18 +33,18 @@ public sealed class BanRequestCommand : BaseCommandModule
             .Where(member => ctx.Guild.Presences.TryGetValue(member.Id, out var p) && p.Status != UserStatus.Offline).ToList();
         var embedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Bannanfrage")
-            .WithDescription($"Ban-Anfrage für Benutzer: ``{user.UsernameWithDiscriminator}`` ``({user.Id})``\n" +
+            .WithDescription($"Ban-Anfrage für Benutzer: ``{user.GetFormattedUserName()}`` ``({user.Id})``\n" +
                              $"Banngrund:\n```\n{reason}\n```\n" +
                              $"Bitte warte, während diese Anfrage von jemandem mit Bannberechtigung bestätigt wird <a:loading_agc:1084157150747697203>")
             .WithColor(BotConfig.GetEmbedColor())
-            .WithFooter($"{ctx.User.UsernameWithDiscriminator}");
+            .WithFooter($"{ctx.User.GetFormattedUserName()}");
         var interactivity_ = ctx.Client.GetInteractivity();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: Banrequest")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
-                             $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
+                             $"```{user.GetFormattedUserName()}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
         List<DiscordButtonComponent> buttons_ =
@@ -61,7 +61,7 @@ public sealed class BanRequestCommand : BaseCommandModule
         {
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Banrequest wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -74,7 +74,7 @@ public sealed class BanRequestCommand : BaseCommandModule
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var sembed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Banrequest abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Der Banrequest wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -109,7 +109,7 @@ public sealed class BanRequestCommand : BaseCommandModule
             {
                 new DiscordButtonComponent(ButtonStyle.Success, $"banrequest_accept_{caseid}", "Annehmen"),
                 new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_deny_{caseid}", "Ablehnen"),
-                new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.UsernameWithDiscriminator})")
+                new DiscordButtonComponent(ButtonStyle.Danger, $"banrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.GetFormattedUserName()})")
             };
 
             var builder = new DiscordMessageBuilder()
@@ -167,8 +167,8 @@ public sealed class BanRequestCommand : BaseCommandModule
                     .WithTitle("Bannanfrage abgebrochen")
                     .WithDescription(
                         $"Die Bannanfrage für {user} (``{user.Id}``) wurde abgebrochen.\n\n" +
-                        $"Grund: Abgebrochen von `{ctx.User.UsernameWithDiscriminator}`")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                        $"Grund: Abgebrochen von `{ctx.User.GetFormattedUserName()}`")
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
 
                 var cancelEmbed = cancelEmbedBuilder.Build();
@@ -192,7 +192,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                 await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
                 var loadingEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Ban wird bearbeitet")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription("Der Ban wird bearbeitet. Bitte warten...")
                     .WithColor(DiscordColor.Yellow);
                 var loadingEmbed = loadingEmbedBuilder.Build();
@@ -206,7 +206,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                 string e_string;
                 bool sent;
                 var ReasonString =
-                    $"{reason} | Banrequest von Moderator: {ctx.User.UsernameWithDiscriminator} | Approver: {result.Result.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+                    $"{reason} | Banrequest von Moderator: {ctx.User.GetFormattedUserName()} | Approver: {result.Result.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
                 var ec = DiscordColor.Red;
                 DiscordMessage? umsg = null;
                 try
@@ -225,18 +225,18 @@ public sealed class BanRequestCommand : BaseCommandModule
                     await ctx.Guild.BanMemberAsync(user.Id, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                         ReasonString);
                     var dm = sent ? "✅" : "❌";
-                    b_users += $"{user.UsernameWithDiscriminator} | DM: {dm}\n";
+                    b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
                     await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
                 }
                 catch (UnauthorizedException)
                 {
-                    n_users += $"{user.UsernameWithDiscriminator}\n";
+                    n_users += $"{user.GetFormattedUserName()}\n";
                 }
 
                 if (n_users != "")
                 {
                     e_string = $"Der Ban war nicht erfolgreich!\n" +
-                               $"Bestätigt von ``{result.Result.User.UsernameWithDiscriminator}``\n\n" +
+                               $"Bestätigt von ``{result.Result.User.GetFormattedUserName()}``\n\n" +
                                $"__Grund:__ ```{reason}```\n";
                     e_string += $"__Nicht gebannte User:__\n" +
                                 $"```{n_users}```";
@@ -254,7 +254,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                 else
                 {
                     e_string = $"Der Ban wurde erfolgreich abgeschlossen.\n" +
-                               $"Bestätigt von ``{result.Result.User.UsernameWithDiscriminator}``\n\n" +
+                               $"Bestätigt von ``{result.Result.User.GetFormattedUserName()}``\n\n" +
                                $"__Grund:__ ```{reason}```\n" +
                                $"__Gebannte User:__\n" +
                                $"```{b_users}```";
@@ -264,7 +264,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                 var discordEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Ban abgeschlossen")
                     .WithDescription(e_string)
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(ec);
                 var discordEmbed = discordEmbedBuilder.Build();
                 await confirm.ModifyAsync(new DiscordMessageBuilder().AddEmbed(discordEmbed));
@@ -276,9 +276,9 @@ public sealed class BanRequestCommand : BaseCommandModule
                 var declineEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Bannanfrage abgebrochen")
                     .WithDescription(
-                        $"Die Bannanfrage für {user.UsernameWithDiscriminator} (``{user.Id}``) wurde abgebrochen.\n\n" +
-                        $"Grund: Ban wurde abgelehnt von `{result.Result.User.UsernameWithDiscriminator}`")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                        $"Die Bannanfrage für {user.GetFormattedUserName()} (``{user.Id}``) wurde abgebrochen.\n\n" +
+                        $"Grund: Ban wurde abgelehnt von `{result.Result.User.GetFormattedUserName()}`")
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
 
                 var declineEmbed = declineEmbedBuilder.Build();

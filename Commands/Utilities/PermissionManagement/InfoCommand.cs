@@ -63,7 +63,7 @@ public partial class Perms
         if (shown < total) footer += $" · {shown}/{total} angezeigt";
 
         var embed = new DiscordEmbedBuilder()
-            .WithTitle($"Extra Permissions von {user.UsernameWithDiscriminator}")
+            .WithTitle($"Extra Permissions von {user.GetFormattedUserName()}")
             .WithDescription(description)
             .WithThumbnail(user.AvatarUrl)
             .WithColor(BotConfig.GetEmbedColor())

@@ -93,7 +93,7 @@ public class UserReportMessage : ApplicationCommandsModule
         var embed = new DiscordEmbedBuilder()
             .WithTitle("Nachricht gemeldet")
             .WithDescription(
-                $"**Gemeldeter User: {reportedUser.Mention} ({reportedUser.UsernameWithDiscriminator}) **```{reportedUser.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{(result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value}```")
+                $"**Gemeldeter User: {reportedUser.Mention} ({reportedUser.GetFormattedUserName()}) **```{reportedUser.Id}```\n**Gemeldete Nachricht:**```{messagecontent}```\n**Gemeldet von:**\n{ctx.User.Mention} / {ctx.User.Id}\n\n**Zusätzliche Infos:**\n```{(result.Result.Interaction.Data.ModalComponents.OfType<DiscordLabelComponent>().First().Component as DiscordTextInputComponent)?.Value}```")
             .WithColor(DiscordColor.Red)
             .WithFooter($"Gemeldet in #{channel.Name}")
             .Build();

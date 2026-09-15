@@ -18,7 +18,7 @@ public static class ErrorReporting
                                $"__Stacktrace:__\n" +
                                $"```{exception.StackTrace}```\n" +
                                $"__User:__\n" +
-                               $"``{user.UsernameWithDiscriminator}`` - ``{user.Id}``\n");
+                               $"``{user.GetFormattedUserName()}`` - ``{user.Id}``\n");
         embed2.WithColor(DiscordColor.Red);
         try
         {

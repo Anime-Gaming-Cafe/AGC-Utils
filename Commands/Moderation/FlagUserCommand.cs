@@ -71,9 +71,9 @@ public sealed class FlagUserCommand : BaseCommandModule
         var embed = new DiscordEmbedBuilder()
             .WithTitle("Nutzer geflaggt")
             .WithDescription(
-                $"Der Nutzer {user.UsernameWithDiscriminator} `{user.Id}` wurde geflaggt!\n Grund: ```{reason}{urls}```Der User hat nun __{flagcount} Flag(s)__. \nID des Flags: ``{caseid}``")
+                $"Der Nutzer {user.GetFormattedUserName()} `{user.Id}` wurde geflaggt!\n Grund: ```{reason}{urls}```Der User hat nun __{flagcount} Flag(s)__. \nID des Flags: ``{caseid}``")
             .WithColor(BotConfig.GetEmbedColor())
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl).Build();
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl).Build();
         await ctx.RespondAsync(embed);
     }
 }

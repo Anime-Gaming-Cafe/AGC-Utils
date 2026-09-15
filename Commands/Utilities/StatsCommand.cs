@@ -62,7 +62,7 @@ public class StatsCommand : BaseCommandModule
         istring += $"CPU Cores: **{cpu}**\n";
 
         var botowner = ctx.Client.CurrentApplication.Owner;
-        istring += $"Bot Owner: **{botowner.UsernameWithDiscriminator}** ``{botowner.Id}``\n";
+        istring += $"Bot Owner: **{botowner.GetFormattedUserName()}** ``{botowner.Id}``\n";
 
         embed.WithDescription(istring);
 

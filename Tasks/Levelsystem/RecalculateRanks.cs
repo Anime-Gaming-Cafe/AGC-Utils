@@ -22,16 +22,23 @@ public static class RecalculateRanks
         await Task.Delay(TimeSpan.FromSeconds(5));
         while (true)
         {
-            var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-            await using var cmd = con.CreateCommand("SELECT lastrecalc FROM levelingsettings");
-            await using var reader = await cmd.ExecuteReaderAsync();
-            await reader.ReadAsync();
-            var lastrecalc = reader.GetInt64(0);
-            await reader.CloseAsync();
-            var currenttimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var difference = currenttimestamp - lastrecalc;
+            try
+            {
+                var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+                await using var cmd = con.CreateCommand("SELECT lastrecalc FROM levelingsettings");
+                await using var reader = await cmd.ExecuteReaderAsync();
+                await reader.ReadAsync();
+                var lastrecalc = reader.GetInt64(0);
+                await reader.CloseAsync();
+                var currenttimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var difference = currenttimestamp - lastrecalc;
 
-            if (difference >= 43200) await LevelUtils.RecalculateAllUserLevels();
+                if (difference >= 43200) await LevelUtils.RecalculateAllUserLevels();
+            }
+            catch (Exception e)
+            {
+                await ErrorReporting.SendErrorToDev(CurrentApplication.DiscordClient, null, e);
+            }
 
             await Task.Delay(TimeSpan.FromHours(2));
         }

@@ -87,16 +87,16 @@ public sealed class ImageUtils
 
         var avatarstream = await response2.Content.ReadAsByteArrayAsync();
 
-        var avatar = SKBitmap.Decode(avatarstream);
+        using var avatar = SKBitmap.Decode(avatarstream);
 
 
-        var avatarPaint = new SKPaint
+        using var avatarPaint = new SKPaint
         {
             IsAntialias = true
         };
         var avatarSampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
 
-        var backgroundPaint = new SKPaint
+        using var backgroundPaint = new SKPaint
         {
             IsAntialias = true
         };
@@ -112,13 +112,13 @@ public sealed class ImageUtils
             if (!hasCustomSettings)
             {
                 using var bg_stream = new MemoryStream(Convert.FromBase64String(await GetFallbackBackground()));
-                var backgroundBitmap = SKBitmap.Decode(bg_stream);
+                using var backgroundBitmap = SKBitmap.Decode(bg_stream);
                 canvas.DrawBitmap(backgroundBitmap, new SKRect(0, 0, cardWidth, cardHeight), backgroundPaint);
             }
             else
             {
                 using var bg_stream = new MemoryStream(Convert.FromBase64String(c_bgdata));
-                var backgroundBitmap = SKBitmap.Decode(bg_stream);
+                using var backgroundBitmap = SKBitmap.Decode(bg_stream);
                 canvas.DrawBitmap(backgroundBitmap, new SKRect(0, 0, cardWidth, cardHeight), backgroundPaint);
             }
         }
@@ -127,7 +127,7 @@ public sealed class ImageUtils
             // ignored
         }
 
-        var darkenPaint = new SKPaint
+        using var darkenPaint = new SKPaint
         {
             Color = new SKColor(0, 0, 0, (byte)boxalpha),
             IsAntialias = true
@@ -167,7 +167,7 @@ public sealed class ImageUtils
             canvas.DrawBitmap(guildicon, guildiconrect, avatarSampling, avatarPaint);
             canvas.Restore();
 
-            var borderPaint = new SKPaint
+            using var borderPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 Color = barcolor,
@@ -179,7 +179,7 @@ public sealed class ImageUtils
         }
 
 
-        var textPaint = new SKPaint
+        using var textPaint = new SKPaint
         {
             Color = SKColors.White,
             IsAntialias = true
@@ -195,7 +195,7 @@ public sealed class ImageUtils
         canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, SKTextAlign.Left, rankLevelFont, textPaint);
         canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, SKTextAlign.Left, totalxpFont, textPaint);
 
-        var progressBarBackgroundPaint = new SKPaint
+        using var progressBarBackgroundPaint = new SKPaint
         {
             Color = SKColors.LightGray.WithAlpha(140),
             Style = SKPaintStyle.Fill
@@ -204,7 +204,7 @@ public sealed class ImageUtils
         var progressBarBackgroundRect = new SKRect(300, 200, cardWidth - 30, 160);
         canvas.DrawRoundRect(new SKRoundRect(progressBarBackgroundRect, 10, 10), progressBarBackgroundPaint);
 
-        var progressBarPaint = new SKPaint
+        using var progressBarPaint = new SKPaint
         {
             Color = barcolor,
             Style = SKPaintStyle.Fill
@@ -217,7 +217,7 @@ public sealed class ImageUtils
 
         var xpText =
             $"{Converter.FormatWithCommas(currentxpforthislevel)}/{xptoCompleteCurrentLevel} XP ({Math.Round(progress * 100, 2)}%)";
-        var xpPaint = new SKPaint
+        using var xpPaint = new SKPaint
         {
             Color = SKColors.White,
             IsAntialias = true
@@ -295,16 +295,16 @@ public sealed class ImageUtils
 
         var avatarstream = await response2.Content.ReadAsByteArrayAsync();
 
-        var avatar = SKBitmap.Decode(avatarstream);
+        using var avatar = SKBitmap.Decode(avatarstream);
 
 
-        var avatarPaint = new SKPaint
+        using var avatarPaint = new SKPaint
         {
             IsAntialias = true
         };
         var avatarSampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
 
-        var backgroundPaint = new SKPaint
+        using var backgroundPaint = new SKPaint
         {
             IsAntialias = true
         };
@@ -315,10 +315,10 @@ public sealed class ImageUtils
         var barcolor = default_barcolor;
 
         using var bg_stream = new MemoryStream(Convert.FromBase64String(bgdata));
-        var backgroundBitmap = SKBitmap.Decode(bg_stream);
+        using var backgroundBitmap = SKBitmap.Decode(bg_stream);
         canvas.DrawBitmap(backgroundBitmap, new SKRect(0, 0, cardWidth, cardHeight), backgroundPaint);
 
-        var darkenPaint = new SKPaint
+        using var darkenPaint = new SKPaint
         {
             Color = new SKColor(0, 0, 0, (byte)boxalpha),
             IsAntialias = true
@@ -358,7 +358,7 @@ public sealed class ImageUtils
             canvas.DrawBitmap(guildicon, guildiconrect, avatarSampling, avatarPaint);
             canvas.Restore();
 
-            var borderPaint = new SKPaint
+            using var borderPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 Color = SKColor.Parse(hexcolor),
@@ -370,7 +370,7 @@ public sealed class ImageUtils
         }
 
 
-        var textPaint = new SKPaint
+        using var textPaint = new SKPaint
         {
             Color = SKColors.White,
             IsAntialias = true
@@ -386,7 +386,7 @@ public sealed class ImageUtils
         canvas.DrawText($"Rang: #{rank}   Level: {level}", 300, 110, SKTextAlign.Left, rankLevelFont, textPaint);
         canvas.DrawText($"Gesamt XP: {totalXP}", 300, 230, SKTextAlign.Left, totalxpFont, textPaint);
 
-        var progressBarBackgroundPaint = new SKPaint
+        using var progressBarBackgroundPaint = new SKPaint
         {
             Color = SKColors.LightGray.WithAlpha(140),
             Style = SKPaintStyle.Fill
@@ -395,7 +395,7 @@ public sealed class ImageUtils
         var progressBarBackgroundRect = new SKRect(300, 200, cardWidth - 30, 160);
         canvas.DrawRoundRect(new SKRoundRect(progressBarBackgroundRect, 10, 10), progressBarBackgroundPaint);
 
-        var progressBarPaint = new SKPaint
+        using var progressBarPaint = new SKPaint
         {
             Color = barcolor,
             Style = SKPaintStyle.Fill
@@ -408,7 +408,7 @@ public sealed class ImageUtils
 
         var xpText =
             $"{Converter.FormatWithCommas(currentxpforthislevel)}/{xptoCompleteCurrentLevel} XP ({Math.Round(progress * 100, 2)}%)";
-        var xpPaint = new SKPaint
+        using var xpPaint = new SKPaint
         {
             Color = SKColors.White,
             IsAntialias = true

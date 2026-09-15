@@ -31,10 +31,10 @@ public sealed class PermaWarnCommand : BaseCommandModule
         var interactivity = ctx.Client.GetInteractivity();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: Permanente Verwarnung")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
-                             $"```{user.UsernameWithDiscriminator}```\n__Grund:__```{reason}```")
+                             $"```{user.GetFormattedUserName()}```\n__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed__ = confirmEmbedBuilder.Build();
         List<DiscordButtonComponent> buttons =
@@ -51,7 +51,7 @@ public sealed class PermaWarnCommand : BaseCommandModule
         {
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Permanente Verwarnung wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -64,7 +64,7 @@ public sealed class PermaWarnCommand : BaseCommandModule
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
                 .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
-                    .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                    .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Permanente Verwarnung wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
                     .WithColor(DiscordColor.Red).Build());
@@ -103,7 +103,7 @@ public sealed class PermaWarnCommand : BaseCommandModule
 
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Permanente Verwarnung wird bearbeitet")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Die Permanente Verwarnung wird bearbeitet. Bitte warten...")
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -142,9 +142,10 @@ public sealed class PermaWarnCommand : BaseCommandModule
 
             await DatabaseService.InsertDataIntoTable("warns", data);
             var uembed =
-                await ModerationHelper.GeneratePermaWarnEmbed(ctx, user, ctx.User, warncount, caseid, true, reason);
+                await ModerationHelper.GenerateWarnEmbed(ctx, user, ctx.User, warncount, caseid, true, reason,
+                    true);
             var reasonString =
-                $"{warncount}. Permanente Verwarnung: {reason} | By Moderator: {ctx.User.UsernameWithDiscriminator} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
+                $"{warncount}. Permanente Verwarnung: {reason} | By Moderator: {ctx.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
             bool sent;
             try
             {
@@ -193,9 +194,9 @@ public sealed class PermaWarnCommand : BaseCommandModule
             var sembed = new DiscordEmbedBuilder()
                 .WithTitle("Nutzer permaverwarnt")
                 .WithDescription(
-                    $"Der Nutzer {user.UsernameWithDiscriminator} `{user.Id}` wurde permanent verwarnt!\n Grund: ```{reason + urls}```Der User hat nun __{warncount} Verwarnung(en)__. \nUser benachrichtigt: {dmsent} \nSekundäre ausgeführte Aktion: **{uAction}** \nID des Warns: ``{caseid}``")
+                    $"Der Nutzer {user.GetFormattedUserName()} `{user.Id}` wurde permanent verwarnt!\n Grund: ```{reason + urls}```Der User hat nun __{warncount} Verwarnung(en)__. \nUser benachrichtigt: {dmsent} \nSekundäre ausgeführte Aktion: **{uAction}** \nID des Warns: ``{caseid}``")
                 .WithColor(BotConfig.GetEmbedColor())
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .Build();
             var embedwithoutbuttons = new DiscordMessageBuilder()
                 .AddEmbed(sembed);

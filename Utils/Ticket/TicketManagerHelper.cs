@@ -142,7 +142,7 @@ public class TicketManagerHelper
         var ticket_channel = tchannel;
         var prev_tickets = await GetTicketCountFromThisUser((long)ctx.User.Id);
         var eb = new DiscordEmbedBuilder()
-            .WithAuthor(member.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithAuthor(member.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithColor(DiscordColor.Blurple)
             .WithFooter(
                 $"Nutzer-ID: {member.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
@@ -171,7 +171,7 @@ public class TicketManagerHelper
                 var ticket_channel = tchannel;
                 var prev_tickets = await GetTicketCountFromThisUser((long)interaction.User.Id);
                 var eb = new DiscordEmbedBuilder()
-                    .WithAuthor(interaction.User.UsernameWithDiscriminator, interaction.User.AvatarUrl)
+                    .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
                     .WithColor(DiscordColor.Blurple)
                     .WithFooter(
                         $"Nutzer-ID: {interaction.User.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
@@ -197,7 +197,7 @@ public class TicketManagerHelper
                 var prev_tickets = await GetTicketCountFromThisUser((long)interaction.User.Id);
 
                 var eb = new DiscordEmbedBuilder()
-                    .WithAuthor(interaction.User.UsernameWithDiscriminator, interaction.User.AvatarUrl)
+                    .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
                     .WithColor(DiscordColor.Blurple)
                     .WithFooter(
                         $"Nutzer-ID: {interaction.User.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
@@ -237,7 +237,7 @@ public class TicketManagerHelper
     public static async Task SendStaffNotice(CommandContext ctx, DiscordChannel ticket_channel, DiscordMember user)
     {
         var eb = new DiscordEmbedBuilder()
-            .WithAuthor(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithAuthor(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
             .WithDescription(
                 $"Hey {user.Mention}. Ein Ticket wurde von {ctx.User.Mention} mit dir erstellt. Bitte warte ab, bis sich das Teammitglied bei dir meldet.");
@@ -250,7 +250,7 @@ public class TicketManagerHelper
         if (ticketType == TicketType.Report)
         {
             var eb = new DiscordEmbedBuilder()
-                .WithAuthor(interaction.User.UsernameWithDiscriminator, interaction.User.AvatarUrl)
+                .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
                 .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
                 .WithDescription(
                     $"Hey! Danke fürs öffnen eines Report-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit.\n" +
@@ -262,7 +262,7 @@ public class TicketManagerHelper
         else if (ticketType == TicketType.Support)
         {
             var eb = new DiscordEmbedBuilder()
-                .WithAuthor(interaction.User.UsernameWithDiscriminator, interaction.User.AvatarUrl)
+                .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
                 .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
                 .WithDescription(
                     $"Hey! Danke fürs öffnen eines Support-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit. {GenerateAdditionalNotes()}");
@@ -294,13 +294,25 @@ public class TicketManagerHelper
         var ebct = new DiscordEmbedBuilder()
             .WithTitle("Ticket wird gelöscht")
             .WithDescription(
-                $"Löschen eingeleitet von {interaction.User.Mention} {interaction.User.UsernameWithDiscriminator} ``{interaction.User.Id}`` \nTicket wird in __5__ Sekunden gelöscht.")
+                $"Löschen eingeleitet von {interaction.User.Mention} {interaction.User.GetFormattedUserName()} ``{interaction.User.Id}`` \nTicket wird in __5__ Sekunden gelöscht.")
             .WithColor(BotConfig.GetEmbedColor())
             .WithFooter("AGC-Support-System").Build();
         var mb = new DiscordMessageBuilder();
         mb.AddEmbed(ebct);
         var ms = await interaction.Channel.SendMessageAsync("Transcript wird generiert...");
-        var transcriptURL = await GenerateTranscript(interaction.Channel);
+        string transcriptURL;
+        try
+        {
+            transcriptURL = await GenerateTranscript(interaction.Channel);
+        }
+        catch (Exception e)
+        {
+            await ErrorReporting.SendErrorToDev(CurrentApplication.DiscordClient, interaction.User, e);
+            await ms.ModifyAsync(
+                "Transcript konnte nicht generiert werden. Das Ticket wurde nicht gelöscht, bitte versuche es erneut oder wende dich an den Botentwickler.");
+            return;
+        }
+
         await InsertTransscriptIntoDB(interaction.Channel, TranscriptType.Team, transcriptURL);
         await ms.ModifyAsync("Transcript wurde generiert....");
 
@@ -341,7 +353,7 @@ public class TicketManagerHelper
             Color = DiscordColor.Green
         };
         claimembed.WithFooter(
-            $"{interaction.User.UsernameWithDiscriminator} wird sich um dein Anliegen kümmern | {ticket_id}");
+            $"{interaction.User.GetFormattedUserName()} wird sich um dein Anliegen kümmern | {ticket_id}");
 
         await using var cmd2 =
             con.CreateCommand($"UPDATE ticketcache SET claimed = True WHERE ticket_id = '{ticket_id}'");
@@ -532,7 +544,7 @@ public class TicketManagerHelper
         cmd.Parameters.AddWithValue("@caseid", caseid);
         await cmd.ExecuteNonQueryAsync();
         await interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(
-            $"Transcript wurde in die Datenbank eingetragen bei {user.UsernameWithDiscriminator} ``{user.Id}`` eingetragen!"));
+            $"Transcript wurde in die Datenbank eingetragen bei {user.GetFormattedUserName()} ``{user.Id}`` eingetragen!"));
     }
 
     public static async Task RenderSnippetSelector(DiscordInteraction interaction)
@@ -597,7 +609,7 @@ public class TicketManagerHelper
         var users = await GetTicketUsers(interaction);
         var options = new List<DiscordStringSelectComponentOption>();
         foreach (var user in users)
-            options.Add(new DiscordStringSelectComponentOption(user.UsernameWithDiscriminator + " ( " + user.Id + " )",
+            options.Add(new DiscordStringSelectComponentOption(user.GetFormattedUserName() + " ( " + user.Id + " )",
                 user.Id.ToString()));
 
         var selector = new DiscordStringSelectComponent("Wähle einen User", options, maxOptions: 1,
@@ -833,7 +845,6 @@ public class TicketManagerHelper
             };
             await interaction.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(afteraddembed));
             var transcriptURL = "";
-            var tr = await GenerateTranscript(interaction.Channel);
             try
             {
                 transcriptURL = await GenerateTranscript(ticket_channel);
@@ -1059,24 +1070,36 @@ public class TicketManagerHelper
         var BotToken = BotConfig.GetConfig()["MainConfig"]["Discord_API_Token"];
         var tick = await GetTicketIdFromChannel(ticket_channel);
         var id = GenerateTicketID(5);
+        var outputFileName = $"{tick}-{id}.html";
 
         var baseDir = AppContext.BaseDirectory;
+        var outputPath = Path.Combine(baseDir, "data", "tickets", "transcripts", outputFileName);
         var psi = new ProcessStartInfo
         {
             FileName = Path.Combine(baseDir, "tools", "exporter", "DiscordChatExporter.Cli"),
             Arguments =
-                $"export -t \"{BotToken}\" -c {ticket_channel.Id} --media --reuse-media --media-dir data/tickets/transcripts/Assets -o data/tickets/transcripts/{tick}-{id}.html",
+                $"export -c {ticket_channel.Id} --media --reuse-media --media-dir data/tickets/transcripts/Assets -o data/tickets/transcripts/{outputFileName}",
             WorkingDirectory = baseDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        psi.EnvironmentVariables["DISCORD_TOKEN"] = BotToken;
         var process = new Process { StartInfo = psi };
         process.Start();
 
+        var stdErrTask = process.StandardError.ReadToEndAsync();
+        var stdOutTask = process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
-        var baselink = $"https://ticketsystem.animegamingcafe.de/transcripts/" + $"{tick}-{id}.html";
+        var stdErr = await stdErrTask;
+        await stdOutTask;
 
-        _ = TicketSearchTools.LoadSingleTicketIntoCache($"{tick}-{id}.html");
+        if (process.ExitCode != 0 || !File.Exists(outputPath))
+            throw new InvalidOperationException(
+                $"Transcript-Export für Ticket {tick} ist fehlgeschlagen (Exit-Code {process.ExitCode}): {stdErr}");
+
+        var baselink = $"https://ticketsystem.animegamingcafe.de/transcripts/{outputFileName}";
+
+        _ = TicketSearchTools.LoadSingleTicketIntoCache(outputFileName);
 
         return baselink;
     }

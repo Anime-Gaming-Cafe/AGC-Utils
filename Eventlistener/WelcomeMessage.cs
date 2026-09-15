@@ -69,7 +69,7 @@ public class WelcomeMessage : BaseCommandModule
                 if (imageurl != null) embed.WithImageUrl(imageurl);
 
                 var channel = await client.GetChannelAsync(channelid);
-                if (args.Member.UsernameWithDiscriminator.Contains("chatnoir"))
+                if (args.Member.GetFormattedUserName().Contains("chatnoir"))
                     await BanBlacklistedUsers(args.Member.Id, args.Guild,
                         "Blacklisted User | Mitbeteiligter am Epsilon Stealer");
 

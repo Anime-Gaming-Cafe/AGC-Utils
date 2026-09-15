@@ -25,7 +25,7 @@ public sealed class RemoveVorstellungsCooldownCommand : BaseCommandModule
 
 		var ue = new DiscordEmbedBuilder()
 			.WithTitle("Cooldown Entfernt").WithDescription(
-				$"{user.UsernameWithDiscriminator} kann nun wieder eine Vorstellung posten.")
+				$"{user.GetFormattedUserName()} kann nun wieder eine Vorstellung posten.")
 			.WithColor(BotConfig.GetEmbedColor()).Build();
 		await ctx.RespondAsync(ue);
 	}

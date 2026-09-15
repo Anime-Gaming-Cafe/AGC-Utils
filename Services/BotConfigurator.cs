@@ -10,13 +10,20 @@ namespace AGC_Management;
 
 public static class BotConfig
 {
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
+    private static IniData _cachedConfig;
+    private static DateTime _cacheExpires = DateTime.MinValue;
+
     public static IniData GetConfig()
     {
-        IniData ConfigIni;
+        if (_cachedConfig != null && DateTime.UtcNow < _cacheExpires)
+            return _cachedConfig;
+
         FileIniDataParser parser = new();
         try
         {
-            ConfigIni = parser.ReadFile("config.ini");
+            _cachedConfig = parser.ReadFile("config.ini");
+            _cacheExpires = DateTime.UtcNow + CacheTtl;
         }
         catch
         {
@@ -24,10 +31,9 @@ public static class BotConfig
             Console.WriteLine("Drücke eine beliebige Taste um das Programm zu beenden.");
             Console.WriteLine(Directory.GetCurrentDirectory());
             throw new ApplicationException();
-            return null;
         }
 
-        return ConfigIni;
+        return _cachedConfig;
     }
 
 
@@ -38,6 +44,9 @@ public static class BotConfig
         ConfigIni = parser.ReadFile("config.ini");
         ConfigIni[key][value] = data;
         parser.WriteFile("config.ini", ConfigIni);
+
+        _cachedConfig = ConfigIni;
+        _cacheExpires = DateTime.UtcNow + CacheTtl;
     }
 
 

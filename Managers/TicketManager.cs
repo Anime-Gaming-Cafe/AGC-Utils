@@ -46,7 +46,7 @@ public class TicketManager
 
         ticket_channel = await context.Guild.CreateChannelAsync($"support-{ticket_number}", ChannelType.Text,
             Ticket_category,
-            $"Ticket erstellt von {context.User.UsernameWithDiscriminator} zu {discordMember.UsernameWithDiscriminator}");
+            $"Ticket erstellt von {context.User.GetFormattedUserName()} zu {discordMember.GetFormattedUserName()}");
 
         await using var cmd2 =
             con.CreateCommand(
@@ -107,7 +107,7 @@ public class TicketManager
                 await cmd.ExecuteNonQueryAsync();
 
                 ticket_channel = await interaction.Guild.CreateChannelAsync($"report-{ticket_number}", ChannelType.Text,
-                    Ticket_category, $"Ticket erstellt von {interaction.User.UsernameWithDiscriminator}");
+                    Ticket_category, $"Ticket erstellt von {interaction.User.GetFormattedUserName()}");
 
                 await using var cmd2 =
                     con.CreateCommand(
@@ -128,7 +128,7 @@ public class TicketManager
 
                 ticket_channel = await interaction.Guild.CreateChannelAsync($"support-{ticket_number}",
                     ChannelType.Text,
-                    Ticket_category, $"Ticket erstellt von {interaction.User.UsernameWithDiscriminator}");
+                    Ticket_category, $"Ticket erstellt von {interaction.User.GetFormattedUserName()}");
 
                 await using var cmd2 =
                     con.CreateCommand(
@@ -227,7 +227,7 @@ public class TicketManager
         {
             Title = "Ticket geschlossen",
             Description =
-                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {ctx.User.UsernameWithDiscriminator} ``{ctx.User.Id}``",
+                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {ctx.User.GetFormattedUserName()} ``{ctx.User.Id}``",
             Color = DiscordColor.Green
         };
         var tname = ticket_channel.Name;
@@ -321,7 +321,7 @@ public class TicketManager
         {
             Title = "Ticket geschlossen",
             Description =
-                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {botu.UsernameWithDiscriminator} " +
+                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {botu.GetFormattedUserName()} " +
                 $"``{botu.Id}`` " +
                 $"\nLetzter Ticketuser nicht mehr auf dem Server",
             Color = DiscordColor.Green
@@ -427,7 +427,7 @@ public class TicketManager
         {
             Title = "Ticket geschlossen",
             Description =
-                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {interaction.User.UsernameWithDiscriminator} ``{interaction.User.Id}``",
+                $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von {interaction.User.GetFormattedUserName()} ``{interaction.User.Id}``",
             Color = DiscordColor.Green
         }.Build();
         var tname = ticket_channel.Name;

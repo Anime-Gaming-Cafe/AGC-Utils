@@ -58,7 +58,7 @@ public sealed class AuthUtils
         var userId_ = userClaims.GetProperty("id").ToString();
         var userId = ulong.Parse(userId_);
 
-        return (await CurrentApplication.DiscordClient.GetUserAsync(userId)).UsernameWithDiscriminator;
+        return (await CurrentApplication.DiscordClient.GetUserAsync(userId)).GetFormattedUserName();
     }
 
     public static async Task<string> RetrieveDisplayName(ulong userId)

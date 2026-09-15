@@ -66,7 +66,7 @@ internal class DateKickUtils
         var embed = new DiscordEmbedBuilder();
         embed.WithTitle("User durch Datekick gekickt!");
         embed.WithDescription(
-            $"``{member.UsernameWithDiscriminator}`` ({member.Id}) wurde durch das DateKick-System entfernt" +
+            $"``{member.GetFormattedUserName()}`` ({member.Id}) wurde durch das DateKick-System entfernt" +
             $", da der Account jünger als ``{MinDays} Tage alt`` ist. \n" +
             $"Account erstellt: {member.CreationTimestamp.Timestamp()}");
         embed.WithFooter($"DateKick-System | {guild.Name}");

@@ -353,7 +353,7 @@ public class DiscordBotService : IHostedService
                 };
                 web.WithDescription($"Das Embed hat zu viele Zeichen.\n" +
                                     $"**Stelle sicher dass die Hauptsektion nicht mehr als 4096 Zeichen hat!**");
-                web.WithFooter($"Fehler ausgelöst von {e.Context.User.UsernameWithDiscriminator}");
+                web.WithFooter($"Fehler ausgelöst von {e.Context.User.GetFormattedUserName()}");
                 await e.Context.RespondAsync(embed: web, content: e.Context.User.Mention);
                 return;
             }
@@ -367,7 +367,7 @@ public class DiscordBotService : IHostedService
             };
             eb.WithDescription($"Fehlerhafte Argumente.\n" +
                                $"**Stelle sicher dass alle Argumente richtig angegeben sind!**");
-            eb.WithFooter($"Fehler ausgelöst von {e.Context.User.UsernameWithDiscriminator}");
+            eb.WithFooter($"Fehler ausgelöst von {e.Context.User.GetFormattedUserName()}");
             await e.Context.RespondAsync(embed: eb, content: e.Context.User.Mention);
             return;
         }
@@ -393,7 +393,7 @@ public class DiscordBotService : IHostedService
         };
         embed.WithDescription($"Es ist ein Fehler aufgetreten.\n" +
                               $"**Fehler: {e.Exception.Message}**");
-        embed.WithFooter($"Fehler ausgelöst von {e.Context.User.UsernameWithDiscriminator}");
+        embed.WithFooter($"Fehler ausgelöst von {e.Context.User.GetFormattedUserName()}");
         await e.Context.RespondAsync(embed: embed, content: e.Context.User.Mention);
     }
 }

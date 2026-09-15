@@ -30,7 +30,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             var failsuccessEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Fehler")
                 .WithDescription("Du musst mindestens 2 User angeben!")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var failsuccessEmbed = failsuccessEmbedBuilder.Build();
             var failSuccessMessage = new DiscordMessageBuilder()
@@ -66,11 +66,11 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             }
         }
 
-        var busers_formatted = string.Join("\n", users_to_flag.Select(buser => buser.UsernameWithDiscriminator));
+        var busers_formatted = string.Join("\n", users_to_flag.Select(buser => buser.GetFormattedUserName()));
         var caseid = ToolSet.GenerateCaseID();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Überprüfe deine Eingabe | Aktion: MultiFlag")
-            .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+            .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
                              $"```{busers_formatted}```\n__Grund:__```{reason + urls}```")
@@ -94,7 +94,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             var timeoutEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Timeout")
                 .WithDescription("Du hast zu lange gebraucht um zu antworten.")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(DiscordColor.Red);
             var timeoutEmbed = timeoutEmbedBuilder.Build();
             var timeoutMessage = new DiscordMessageBuilder()
@@ -109,7 +109,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("MultiFlag abgebrochen")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der MultiFlag wurde abgebrochen.")
                 .WithColor(DiscordColor.Red);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -127,7 +127,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             disbtn.ForEach(x => x.Disable());
             var loadingEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Multiflag wird bearbeitet")
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithDescription("Der Multiflag wird bearbeitet. Bitte warten...")
                 .WithColor(DiscordColor.Yellow);
             var loadingEmbed = loadingEmbedBuilder.Build();
@@ -172,7 +172,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
                 foreach (var lresult in results) flaglist.Add(lresult);
                 var flagcount = flaglist.Count;
                 var stringtoadd =
-                    $"{user.UsernameWithDiscriminator} {user.Id} | Case-ID: {caseid_} | {flagcount} Flag(s)\n\n";
+                    $"{user.GetFormattedUserName()} {user.Id} | Case-ID: {caseid_} | {flagcount} Flag(s)\n\n";
                 for_str += stringtoadd;
             }
 
@@ -184,7 +184,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
             var embedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Multiflag abgeschlossen")
                 .WithDescription(e_string)
-                .WithFooter(ctx.User.UsernameWithDiscriminator, ctx.User.AvatarUrl)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                 .WithColor(ec);
             var sembed = embedBuilder.Build();
             var smessageBuilder = new DiscordMessageBuilder()

@@ -231,23 +231,18 @@ public sealed class UserInfoCommand : BaseCommandModule
                 permawarnResults.Add(FlagStr);
             }
 
-            var mcicon = "";
-            if (ctx.Guild.Id == 750365461945778209)
-                if (member.Roles.Any(x => x.Id == 1121443507425517718))
-                    mcicon = "<:minecrafticon:1036687323036926076>";
-
             var boost_string = member.PremiumSince.HasValue
                 ? $"Boostet seit: {member.PremiumSince.Value.Timestamp()}\n"
                 : "";
             var servernick = member.Nickname != null ? $" \n*Aka. **{member.Nickname}***" : "";
             var userinfostring =
-                $"**Das Mitglied**" + $"\n{member.UsernameWithDiscriminator} ``{member.Id}``{servernick}\n" +
+                $"**Das Mitglied**" + $"\n{member.GetFormattedUserName()} ``{member.Id}``{servernick}\n" +
                 $"{boost_string}\n";
             userinfostring += "**Erstellung, Beitritt und mehr**\n";
             userinfostring += $"**Erstellt:** {member.CreationTimestamp.Timestamp()}\n";
             userinfostring += $"**Beitritt:** {member.JoinedAt.Timestamp()}\n";
             userinfostring +=
-                $"**Infobadges:**  {booster_icon} {teamler_ico} {bot_indicator}{vc_icon} {timeout_icon} {mcicon} {bs_icon}\n\n";
+                $"**Infobadges:**  {booster_icon} {teamler_ico} {bot_indicator}{vc_icon} {timeout_icon} {bs_icon}\n\n";
             userinfostring += "**Der Online-Status und die Plattform**\n";
             userinfostring += $"{status_indicator} | {platform}\n\n";
             userinfostring += "**Kommunikations-Timeout**\n";
@@ -281,7 +276,7 @@ public sealed class UserInfoCommand : BaseCommandModule
                 $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied");
             embedbuilder.WithColor(bs_status ? DiscordColor.Red : BotConfig.GetEmbedColor());
             embedbuilder.WithThumbnail(member.AvatarUrl);
-            embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
+            embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.GetFormattedUserName()}",
                 ctx.User.AvatarUrl);
             var description = $"Ich konnte folgende Informationen über {userindicator} finden.\n\n" + userinfostring;
             await EmbedPaginator.SendPaginatedEmbed(
@@ -290,7 +285,7 @@ public sealed class UserInfoCommand : BaseCommandModule
                 description,
                 embedbuilder.Color.HasValue ? embedbuilder.Color.Value : BotConfig.GetEmbedColor(),
                 embedbuilder.Thumbnail?.Url,
-                $"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
+                $"Bericht angefordert von {ctx.User.GetFormattedUserName()}",
                 ctx.User.AvatarUrl
             );
         }
@@ -421,7 +416,7 @@ public sealed class UserInfoCommand : BaseCommandModule
 
 
             var userinfostring =
-                $"**Der User**\n{user.UsernameWithDiscriminator} ``{user.Id}``\n\n";
+                $"**Der User**\n{user.GetFormattedUserName()} ``{user.Id}``\n\n";
             userinfostring += "**Erstellung, Beitritt und mehr**\n";
             userinfostring += $"**Erstellt:** {user.CreationTimestamp.Timestamp()}\n";
             userinfostring += "**Beitritt:** *User nicht auf dem Server*\n";
@@ -456,7 +451,7 @@ public sealed class UserInfoCommand : BaseCommandModule
                 $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied");
             embedbuilder.WithColor(bs_status ? DiscordColor.Red : BotConfig.GetEmbedColor());
             embedbuilder.WithThumbnail(user.AvatarUrl);
-            embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
+            embedbuilder.WithFooter($"Bericht angefordert von {ctx.User.GetFormattedUserName()}",
                 ctx.User.AvatarUrl);
             var description = "Ich konnte folgende Informationen über den User finden.\n\n" + userinfostring;
             await EmbedPaginator.SendPaginatedEmbed(
@@ -465,7 +460,7 @@ public sealed class UserInfoCommand : BaseCommandModule
                 description,
                 embedbuilder.Color.HasValue ? embedbuilder.Color.Value : BotConfig.GetEmbedColor(),
                 embedbuilder.Thumbnail?.Url,
-                $"Bericht angefordert von {ctx.User.UsernameWithDiscriminator}",
+                $"Bericht angefordert von {ctx.User.GetFormattedUserName()}",
                 ctx.User.AvatarUrl
             );
         }
