@@ -1,0 +1,68 @@
+@page "/statistiken/tickets"
+@using AGC_Management.Services
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Tickets" Lead="Letzte 12 Wochen." BackHref="/statistiken" BackText="Statistiken"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Ticketdaten werden geladen"
+                Description="Ticket-Aufkommen und Bearbeitungsdauer werden abgefragt."/>
+}
+else
+{
+    <WeeklyBarChart Title="Tickets eröffnet pro Woche, letzte 12 Wochen" Points="ticketCounts" ValueLabel="Tickets"/>
+
+    <Panel Title="Bearbeitungsdauer nach Typ" Lead="Nur geschlossene Tickets, letzte 12 Wochen." Flush="@(resolutionStats.Count > 0)">
+        @if (resolutionStats.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Daten"
+                        Description="Im gewählten Zeitraum wurden keine Tickets geschlossen."/>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Typ</th>
+                        <th>Geschlossen</th>
+                        <th>Ø Dauer</th>
+                        <th>Median-Dauer</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var stat in resolutionStats)
+                    {
+                        <tr>
+                            <td>@FormatTicketType(stat.TicketType)</td>
+                            <td class="tnum">@stat.ClosedCount.ToString("N0")</td>
+                            <td class="tnum">@FormatHours(stat.AvgHours)</td>
+                            <td class="tnum">@FormatHours(stat.MedianHours)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<WeeklyCount> ticketCounts = [];
+    private List<TicketTypeStats> resolutionStats = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        ticketCounts = await AnalyticsService.GetWeeklyTicketsOpened();
+        resolutionStats = await AnalyticsService.GetTicketResolutionStats();
+        loaded = true;
+    }
+
+    private static string FormatTicketType(string ticketType) =>
+        string.IsNullOrEmpty(ticketType) ? ticketType : char.ToUpper(ticketType[0]) + ticketType[1..];
+
+    private static string FormatHours(double hours) => $"{hours:N1} h";
+}

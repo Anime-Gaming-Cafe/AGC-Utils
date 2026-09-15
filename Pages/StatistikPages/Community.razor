@@ -1,0 +1,64 @@
+@page "/statistiken/community"
+@using AGC_Management.Services
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Community-Aktivität" Lead="Letzte 12 Wochen." BackHref="/statistiken" BackText="Statistiken"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Aktivitätsdaten werden geladen"
+                Description="Nachrichten, Voice-Aktivität und Top-Channels werden abgefragt."/>
+}
+else
+{
+    <WeeklyBarChart Title="Nachrichten pro Woche, letzte 12 Wochen" Points="messageCounts" ValueLabel="Nachrichten"/>
+
+    <WeeklyBarChart Title="Voice-Aktivität (Messpunkte) pro Woche, letzte 12 Wochen" Points="voiceCounts"
+                    ValueLabel="Messpunkte"/>
+
+    <Panel Title="Top-Channels nach Nachrichten" Lead="Letzte 12 Wochen." Flush="@(topChannels.Count > 0)">
+        @if (topChannels.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Daten"
+                        Description="Im gewählten Zeitraum wurden keine Nachrichten erfasst."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var channel in topChannels)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@ChannelName(channel.ChannelId)</p>
+                        </div>
+                        <div class="rows__side">
+                            <span class="tnum">@channel.Count.ToString("N0")</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<WeeklyCount> messageCounts = [];
+    private List<WeeklyCount> voiceCounts = [];
+    private List<ChannelCount> topChannels = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        messageCounts = await AnalyticsService.GetWeeklyMessageCounts();
+        voiceCounts = await AnalyticsService.GetWeeklyVoicePresenceCounts();
+        topChannels = await AnalyticsService.GetTopChannelsByMessages();
+        loaded = true;
+    }
+
+    private string ChannelName(ulong channelId)
+    {
+        var channel = CurrentApplication.TargetGuild.GetChannel(channelId);
+        return channel is null ? $"Channel gelöscht ({channelId})" : "#" + channel.Name;
+    }
+}

@@ -1452,3 +1452,23 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
     .unsaved-bar.is-shaking { animation: none; }
 }
+
+/* 26. Weekly bar chart */
+
+.weekly-chart__scroll {
+    overflow-x: auto;
+}
+
+.weekly-chart__bar {
+    fill: var(--fg-muted);
+}
+
+.weekly-chart__value {
+    fill: var(--fg);
+    font-size: var(--f-xs);
+}
+
+.weekly-chart__label {
+    fill: var(--fg-subtle);
+    font-size: var(--f-xs);
+}

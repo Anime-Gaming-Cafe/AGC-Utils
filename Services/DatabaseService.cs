@@ -177,6 +177,14 @@ public static class DatabaseService
                 "idx_metrics_messages_userid",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_messages_userid ON metrics_messages (userid)"
             },
+            {
+                "idx_metrics_messages_timestamp",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_messages_timestamp ON metrics_messages (timestamp)"
+            },
+            {
+                "idx_metrics_voice_timestamp",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_voice_timestamp ON metrics_voice (timestamp)"
+            },
 
             {
                 "pollsystem",

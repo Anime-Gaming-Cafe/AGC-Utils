@@ -1,0 +1,48 @@
+@using AGC_Management.Services
+
+<Panel Title="@Title">
+    @if (Points.Count == 0 || Points.All(p => p.Count == 0))
+    {
+        <StateBlock Inline="true" Kind="StateBlock.StateKind.Empty" Title="Keine Daten"
+                    Description="Im gewählten Zeitraum wurden keine Ereignisse erfasst."/>
+    }
+    else
+    {
+        var max = Math.Max(1, Points.Max(p => p.Count));
+        <div class="weekly-chart__scroll">
+            <svg width="@(Points.Count * BarSlotWidth)" height="180" class="weekly-chart" role="img" aria-label="@Title">
+                @foreach (var (point, index) in Points.Select((p, i) => (p, i)))
+                {
+                    var barHeight = point.Count == 0 ? 0 : Math.Max(2, point.Count / (double)max * 120);
+                    var barTop = 140 - barHeight;
+                    var x = index * BarSlotWidth + BarGap;
+                    var barWidth = BarSlotWidth - BarGap * 2;
+                    <g>
+                        <title>@FormatWeek(point.WeekStart): @point.Count.ToString("N0") @ValueLabel</title>
+                        @if (point.Count > 0)
+                        {
+                            <rect x="@x" y="@barTop" width="@barWidth" height="@barHeight" rx="2" class="weekly-chart__bar"/>
+                            <g class="weekly-chart__value tnum" text-anchor="middle" transform="translate(@(x + barWidth / 2.0),@(barTop - 6))">
+                                <text>@point.Count.ToString("N0")</text>
+                            </g>
+                        }
+                        <g class="weekly-chart__label" text-anchor="middle" transform="translate(@(x + barWidth / 2.0),158)">
+                            <text>@FormatWeek(point.WeekStart)</text>
+                        </g>
+                    </g>
+                }
+            </svg>
+        </div>
+    }
+</Panel>
+
+@code {
+    private const int BarSlotWidth = 48;
+    private const int BarGap = 4;
+
+    [Parameter] [EditorRequired] public string Title { get; set; } = "";
+    [Parameter] [EditorRequired] public IReadOnlyList<WeeklyCount> Points { get; set; } = [];
+    [Parameter] public string ValueLabel { get; set; } = "";
+
+    private static string FormatWeek(DateOnly weekStart) => weekStart.ToString("dd.MM.");
+}

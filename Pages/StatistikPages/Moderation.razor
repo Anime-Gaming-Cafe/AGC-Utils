@@ -1,0 +1,83 @@
+@page "/statistiken/moderation"
+@using AGC_Management.Services
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Moderation" Lead="Letzte 12 Wochen." BackHref="/statistiken" BackText="Statistiken"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Falldaten werden geladen"
+                Description="Verwarnungen, Flags, Bans und die Verteilung nach Moderator werden abgefragt."/>
+}
+else
+{
+    <WeeklyBarChart Title="Cases pro Woche, letzte 12 Wochen" Points="caseCounts" ValueLabel="Cases"/>
+
+    <Panel Title="Fälle nach Typ" Lead="Letzte 12 Wochen.">
+        <dl class="facts">
+            <dt>Verwarnungen</dt>
+            <dd class="tnum">@totals.WarnCount.ToString("N0")</dd>
+            <dt>Flags</dt>
+            <dd class="tnum">@totals.FlagCount.ToString("N0")</dd>
+            <dt>Bans</dt>
+            <dd class="tnum">@totals.BanCount.ToString("N0")</dd>
+        </dl>
+    </Panel>
+
+    <Panel Title="Fälle nach Moderator" Lead="Letzte 12 Wochen." Flush="@(moderatorCounts.Count > 0)">
+        @if (moderatorCounts.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Daten"
+                        Description="Im gewählten Zeitraum wurden keine Fälle angelegt."/>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Moderator</th>
+                        <th>Verwarnungen</th>
+                        <th>Flags</th>
+                        <th>Bans</th>
+                        <th>Summe</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var moderator in moderatorCounts)
+                    {
+                        <tr>
+                            <td>@moderatorNames.GetValueOrDefault(moderator.PunisherId, moderator.PunisherId.ToString())</td>
+                            <td class="tnum">@moderator.WarnCount.ToString("N0")</td>
+                            <td class="tnum">@moderator.FlagCount.ToString("N0")</td>
+                            <td class="tnum">@moderator.BanCount.ToString("N0")</td>
+                            <td class="tnum">@((moderator.WarnCount + moderator.FlagCount + moderator.BanCount).ToString("N0"))</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<WeeklyCount> caseCounts = [];
+    private CaseTypeTotals totals;
+    private List<ModeratorCaseCount> moderatorCounts = [];
+    private Dictionary<ulong, string> moderatorNames = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        caseCounts = await AnalyticsService.GetWeeklyCaseCounts();
+        totals = await AnalyticsService.GetCaseTypeTotals();
+        moderatorCounts = await AnalyticsService.GetCaseCountsByModerator();
+
+        foreach (var moderator in moderatorCounts)
+            moderatorNames[moderator.PunisherId] = await ToolSet.ResolveUserNameAsync(moderator.PunisherId, true);
+
+        loaded = true;
+    }
+}

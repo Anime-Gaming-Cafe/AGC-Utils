@@ -1,0 +1,22 @@
+@page "/statistiken"
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Statistiken"/>
+
+<Panel Title="Community">
+    <ul class="nav-links">
+        <li><a href="/statistiken/community">Aktivität</a></li>
+    </ul>
+</Panel>
+
+<Panel Title="Moderation">
+    <ul class="nav-links">
+        <li><a href="/statistiken/moderation">Fallzahlen</a></li>
+    </ul>
+</Panel>
+
+<Panel Title="Tickets">
+    <ul class="nav-links">
+        <li><a href="/statistiken/tickets">Bearbeitung</a></li>
+    </ul>
+</Panel>
