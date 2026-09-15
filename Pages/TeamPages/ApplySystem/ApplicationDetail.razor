@@ -298,7 +298,7 @@ else
 
             @if (perms.MarkInternal && application.IsOpen)
             {
-                <Panel Title="Interne Markierung" Lead="Der Bewerber wird darüber nicht benachrichtigt.">
+                <Panel Title="Interne Markierung" Lead="Gelesen und Rückfrage offen bleiben intern, Vormerken zeigt dem Bewerber „In engerer Auswahl“ an.">
                     <div class="row-actions">
                         <button type="button" class="btn btn-secondary btn-sm"
                                 disabled="@(application.Status == TeamApplicationStatus.Gelesen)"
@@ -557,7 +557,11 @@ else
 
         await TeamApplicationService.SetStatusAsync(ApplicationId, status);
         application.Status = status;
-        ToastService.Notify("Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.", "ok");
+
+        var message = status == TeamApplicationStatus.Vorgemerkt
+            ? "Markierung gesetzt. Der Bewerber sieht jetzt „In engerer Auswahl“."
+            : "Markierung gesetzt. Der Bewerber wurde nicht benachrichtigt.";
+        ToastService.Notify(message, "ok");
     }
 
     private async Task AddNote()
