@@ -1,6 +1,7 @@
 @using AGC_Management.Enums.ApplicationSystem
 @* How an application status reads for the applicant. Internal markings stay invisible:
-   Gelesen, Vorgemerkt and WartetAufRueckfrage all read as "In Bearbeitung". *@
+   Gelesen and WartetAufRueckfrage both read as "In Bearbeitung". Vorgemerkt gets its own
+   label, since being shortlisted is worth telling the applicant. *@
 
 <StatusPill Text="@Label(Status)" Tone="@Tone(Status)"/>
 
@@ -10,6 +11,7 @@
     public static string Label(TeamApplicationStatus status) => status switch
     {
         TeamApplicationStatus.Eingereicht => "Eingegangen",
+        TeamApplicationStatus.Vorgemerkt => "In engerer Auswahl",
         TeamApplicationStatus.Angenommen => "Angenommen",
         TeamApplicationStatus.Abgelehnt => "Abgelehnt",
         TeamApplicationStatus.Zurueckgezogen => "Zurückgezogen",
