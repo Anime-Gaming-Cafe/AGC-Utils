@@ -29,6 +29,7 @@ public class TeamApplication
     public long AccountCreatedSnapshot { get; set; }
 
     public string PositionName { get; set; } = "";
+    public string RoleName { get; set; } = "";
     public string PhaseName { get; set; } = "";
 
     public bool IsDecided => Status is TeamApplicationStatus.Angenommen or TeamApplicationStatus.Abgelehnt;

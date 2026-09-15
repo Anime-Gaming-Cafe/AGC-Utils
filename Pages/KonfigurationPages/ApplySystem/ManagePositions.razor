@@ -60,6 +60,11 @@ else
                         <input id="name-@position.PositionId" class="form-control" @bind="position.PositionName" @bind:after="OnFieldChanged"/>
                     </div>
                     <div class="field">
+                        <label class="field__label" for="role-@position.PositionId">Rollenname</label>
+                        <input id="role-@position.PositionId" class="form-control" placeholder="@position.PositionName" @bind="position.RoleName" @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">Wie ein Mitglied in dieser Rolle heißt, z. B. „Moderator“. Leer lassen, dann wird der Anzeigename verwendet.</span>
+                    </div>
+                    <div class="field">
                         <label class="field__label" for="lvl-@position.PositionId">Mindestlevel</label>
                         <input id="lvl-@position.PositionId" type="number" min="0" class="form-control" @bind="position.MinLevel" @bind:after="OnFieldChanged"/>
                         <span class="field__hint">Bewerber sehen diese Zahl nie.</span>
@@ -213,6 +218,7 @@ else
     {
         PositionId = source.PositionId,
         PositionName = source.PositionName,
+        RoleName = source.RoleName,
         Description = source.Description,
         ApplicantHints = source.ApplicantHints,
         MinLevel = source.MinLevel,
@@ -226,6 +232,7 @@ else
     private static void CopyEditableFields(TeamApplicationPosition target, TeamApplicationPosition source)
     {
         target.PositionName = source.PositionName;
+        target.RoleName = source.RoleName;
         target.Description = source.Description;
         target.ApplicantHints = source.ApplicantHints;
         target.MinLevel = source.MinLevel;

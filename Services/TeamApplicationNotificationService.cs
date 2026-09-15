@@ -147,13 +147,15 @@ public static class TeamApplicationNotificationService
     }
 
     /// <summary>Returns whether the grant DM arrived, so the caller can tell staff honestly instead of assuming.</summary>
-    public static async Task<bool> SendGrantAsync(TeamApplicationReapplyGrant grant, string positionName)
+    public static async Task<bool> SendGrantAsync(TeamApplicationReapplyGrant grant, string positionName,
+        string roleName)
     {
         var user = await TryGetUserAsync(grant.UserId);
         var title = await TeamApplicationService.GetTextAsync("DmGrantTitle", "Du darfst dich erneut bewerben");
         var body = await TeamApplicationService.GetTextAsync("DmGrantText", "");
 
-        var stub = new TeamApplication { PositionId = grant.PositionId, PositionName = positionName };
+        var stub = new TeamApplication
+            { PositionId = grant.PositionId, PositionName = positionName, RoleName = roleName };
         var text = await TeamApplicationTemplateResolver.ResolveAsync(body, stub, user?.Username);
 
         var description = text;

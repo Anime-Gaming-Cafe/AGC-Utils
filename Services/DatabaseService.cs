@@ -290,7 +290,7 @@ public static class DatabaseService
             },
             {
                 "teamapplication_position",
-                "CREATE TABLE IF NOT EXISTS teamapplication_position (position_id TEXT PRIMARY KEY, position_name TEXT, description TEXT DEFAULT '', applicant_hints TEXT DEFAULT '', min_level INTEGER DEFAULT 20, notify_channel_id BIGINT DEFAULT 0, active BOOLEAN DEFAULT false, always_open BOOLEAN DEFAULT false, sort_order INTEGER DEFAULT 0, created_at BIGINT DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS teamapplication_position (position_id TEXT PRIMARY KEY, position_name TEXT, role_name TEXT DEFAULT '', description TEXT DEFAULT '', applicant_hints TEXT DEFAULT '', min_level INTEGER DEFAULT 20, notify_channel_id BIGINT DEFAULT 0, active BOOLEAN DEFAULT false, always_open BOOLEAN DEFAULT false, sort_order INTEGER DEFAULT 0, created_at BIGINT DEFAULT 0)"
             },
             {
                 "teamapplication_questionset",
@@ -784,6 +784,10 @@ public static class DatabaseService
                     {
                         "created_at",
                         "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "role_name",
+                        "ALTER TABLE teamapplication_position ADD COLUMN IF NOT EXISTS role_name TEXT DEFAULT ''"
                     }
                 }
             },

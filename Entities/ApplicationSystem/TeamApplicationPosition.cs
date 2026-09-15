@@ -4,6 +4,8 @@ public class TeamApplicationPosition
 {
     public string PositionId { get; set; } = "";
     public string PositionName { get; set; } = "";
+    public string RoleName { get; set; } = "";
+    public string DisplayRoleName => string.IsNullOrWhiteSpace(RoleName) ? PositionName : RoleName;
     public string Description { get; set; } = "";
     public string ApplicantHints { get; set; } = "";
     public int MinLevel { get; set; } = 20;

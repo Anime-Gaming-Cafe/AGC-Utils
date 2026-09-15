@@ -99,7 +99,7 @@ public static class TeamApplicationService
             var positions = new List<TeamApplicationPosition>();
             await using var cmd = Db.CreateCommand(
                 "SELECT position_id, position_name, description, applicant_hints, min_level, notify_channel_id, " +
-                "active, always_open, sort_order, created_at FROM teamapplication_position " +
+                "active, always_open, sort_order, created_at, role_name FROM teamapplication_position " +
                 "ORDER BY sort_order, position_name");
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
@@ -107,6 +107,7 @@ public static class TeamApplicationService
                 {
                     PositionId = reader.GetString(0),
                     PositionName = reader.IsDBNull(1) ? reader.GetString(0) : reader.GetString(1),
+                    RoleName = reader.IsDBNull(10) ? "" : reader.GetString(10),
                     Description = reader.IsDBNull(2) ? "" : reader.GetString(2),
                     ApplicantHints = reader.IsDBNull(3) ? "" : reader.GetString(3),
                     MinLevel = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
@@ -133,6 +134,7 @@ public static class TeamApplicationService
         {
             PositionId = position.PositionId,
             PositionName = position.PositionName,
+            RoleName = position.RoleName,
             Description = position.Description,
             ApplicantHints = position.ApplicantHints,
             MinLevel = position.MinLevel,
@@ -236,11 +238,12 @@ public static class TeamApplicationService
     public static async Task UpdatePositionAsync(TeamApplicationPosition position)
     {
         await using var cmd = Db.CreateCommand(
-            "UPDATE teamapplication_position SET position_name = @name, description = @description, " +
+            "UPDATE teamapplication_position SET position_name = @name, role_name = @rolename, description = @description, " +
             "applicant_hints = @hints, min_level = @minlevel, notify_channel_id = @channel, active = @active, " +
             "always_open = @alwaysopen, sort_order = @sortorder WHERE position_id = @id");
         cmd.Parameters.AddWithValue("id", position.PositionId);
         cmd.Parameters.AddWithValue("name", position.PositionName);
+        cmd.Parameters.AddWithValue("rolename", position.RoleName?.Trim() ?? "");
         cmd.Parameters.AddWithValue("description", position.Description);
         cmd.Parameters.AddWithValue("hints", position.ApplicantHints);
         cmd.Parameters.AddWithValue("minlevel", position.MinLevel);
@@ -720,14 +723,22 @@ public static class TeamApplicationService
     private static async Task DecorateAsync(IEnumerable<TeamApplication> applications)
     {
         var list = applications as IList<TeamApplication> ?? applications.ToList();
-        var positions = (await GetPositionsAsync()).ToDictionary(p => p.PositionId, p => p.PositionName);
+        var positions = (await GetPositionsAsync()).ToDictionary(p => p.PositionId);
         var phases = (await GetPhasesAsync()).ToDictionary(p => p.PhaseId, p => p.Name);
 
         foreach (var application in list)
         {
-            application.PositionName = positions.TryGetValue(application.PositionId, out var name)
-                ? name
-                : application.PositionId;
+            if (positions.TryGetValue(application.PositionId, out var position))
+            {
+                application.PositionName = position.PositionName;
+                application.RoleName = position.DisplayRoleName;
+            }
+            else
+            {
+                application.PositionName = application.PositionId;
+                application.RoleName = application.PositionId;
+            }
+
             application.PhaseName = phases.TryGetValue(application.PhaseId, out var phase)
                 ? phase
                 : application.PhaseId;

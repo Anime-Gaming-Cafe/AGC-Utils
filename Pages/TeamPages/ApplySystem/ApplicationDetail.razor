@@ -636,7 +636,8 @@ else
         activeGrant = grant;
         grantReason = "";
 
-        var delivered = await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName);
+        var delivered = await TeamApplicationNotificationService.SendGrantAsync(grant, application.PositionName,
+            application.RoleName);
 
         if (wasOpen)
         {

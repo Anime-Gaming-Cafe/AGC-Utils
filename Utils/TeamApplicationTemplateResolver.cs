@@ -14,7 +14,7 @@ namespace AGC_Management.Utils;
 public static class TeamApplicationTemplateResolver
 {
     public static readonly string[] BuiltIn =
-        ["{user}", "{position}", "{phase}", "{decider}", "{decision}", "{datum}"];
+        ["{user}", "{position}", "{rolle}", "{phase}", "{decider}", "{decision}", "{datum}"];
 
     public static async Task<string> ResolveAsync(string text, TeamApplication? application = null,
         string? userName = null, string? deciderName = null)
@@ -26,6 +26,7 @@ public static class TeamApplicationTemplateResolver
 
         text = text.Replace("{user}", userName ?? "");
         text = text.Replace("{position}", application?.PositionName ?? "");
+        text = text.Replace("{rolle}", application?.RoleName ?? "");
         text = text.Replace("{phase}", application?.PhaseName ?? "");
         text = text.Replace("{decider}", deciderName ?? "");
         text = text.Replace("{decision}", DescribeDecision(application));
