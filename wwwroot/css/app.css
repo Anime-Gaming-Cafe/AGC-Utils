@@ -236,6 +236,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 }
 
 .panel__actions {
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-2);
@@ -363,6 +364,9 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     --bs-btn-active-bg: var(--surface-raised);
     --bs-btn-active-border-color: transparent;
     --bs-btn-active-color: var(--fg);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: transparent;
+    --bs-btn-disabled-color: var(--fg-subtle);
 }
 
 .row-actions {
