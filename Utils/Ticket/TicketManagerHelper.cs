@@ -221,17 +221,13 @@ public class TicketManagerHelper
     {
         List<string> notes = [];
 
-        // Check if it's between 10 pm and 8 am
         var currentHour = DateTime.Now.Hour;
         if (currentHour >= 22 || currentHour <= 8) notes.Add("Aufgrund der Uhrzeit kann es zu Verzögerungen kommen.");
 
-        // Check if it's Christmas
         if (DateTime.Now.Month == 12) notes.Add("Aufgrund der Weihnachtszeit kann es zu Verzögerungen kommen.");
 
-        // Combine the notes
         var additionalNotes = string.Join("\n", notes);
 
-        // Add a general note
         if (!string.IsNullOrEmpty(additionalNotes))
             additionalNotes = $"\nNOTE: {additionalNotes} Danke für deine Geduld.";
 
@@ -373,7 +369,6 @@ public class TicketManagerHelper
             con.CreateCommand(
                 $"UPDATE ticketcache SET ticket_users = array_append(ticket_users, '{(long)user.Id}') WHERE ticket_id = '{ticket_id}'");
         await cmd2.ExecuteNonQueryAsync();
-        // add perms
         var channel = ticket_channel;
         var member = await ctx.Guild.GetMemberAsync(user.Id);
         await channel.AddOverwriteAsync(member,
@@ -434,7 +429,6 @@ public class TicketManagerHelper
             con.CreateCommand(
                 $"UPDATE ticketcache SET ticket_users = array_append(ticket_users, '{(long)user.Id}') WHERE ticket_id = '{ticket_id}'");
         await cmd2.ExecuteNonQueryAsync();
-        // add perms
         var channel = ticket_channel;
         var member = await interaction.Guild.GetMemberAsync(user.Id);
         await channel.AddOverwriteAsync(member,
@@ -471,7 +465,6 @@ public class TicketManagerHelper
 
     public static async Task GenerateTranscriptAndFlag(DiscordInteraction interaction)
     {
-        // user selector
         var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
         if (!teamler)
         {
@@ -602,7 +595,6 @@ public class TicketManagerHelper
     public static async Task UserInfo(DiscordInteraction interaction)
     {
         var users = await GetTicketUsers(interaction);
-        // generate stringselector
         var options = new List<DiscordStringSelectComponentOption>();
         foreach (var user in users)
             options.Add(new DiscordStringSelectComponentOption(user.UsernameWithDiscriminator + " ( " + user.Id + " )",
@@ -612,25 +604,20 @@ public class TicketManagerHelper
             minOptions: 1, customId: "userinfo_selector");
         var irb = new DiscordInteractionResponseBuilder()
             .WithContent("Wähle ein User aus dessen infos du sehen willst.").AddComponents(selector).AsEphemeral();
-        // Update original
         await interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage, irb);
     }
 
     public static async Task UserInfo_Callback(ComponentInteractionCreateEventArgs args)
     {
-        // get user
         var user = args.Interaction.Data.Values[0];
         var member = await args.Guild.GetMemberAsync(ulong.Parse(user));
-        // gather infos
         var joined_at = member.JoinedAt.Timestamp();
         var created_at = member.CreationTimestamp.Timestamp();
         var toprole_color = member.Color;
         var toprole = member.Roles?.FirstOrDefault();
         var rolemention = toprole?.Mention ?? "Keine Rolle";
-        // get prev ticketcount
         var prev_tickets = await GetTicketCountFromThisUser((long)member.Id) - 1;
         var voicestate = member.VoiceState;
-        // generate embed
         var eb = new DiscordEmbedBuilder()
             .WithTitle("Userinfo")
             .WithDescription($"Userinfo für {member.Mention} ``{member.Id}``")
@@ -649,7 +636,6 @@ public class TicketManagerHelper
 
     public static async Task<List<DiscordUser>> GetTicketUsers(DiscordInteraction interaction)
     {
-        // get them to list
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var query = $"SELECT ticket_users FROM ticketcache where tchannel_id = '{(long)interaction.Channel.Id}'";
         await using var cmd = con.CreateCommand(query);
@@ -779,7 +765,6 @@ public class TicketManagerHelper
         await cmd2.ExecuteNonQueryAsync();
         var channel = ticket_channel;
         var member = await client.GetUserAsync(user.Id);
-        //await channel.AddOverwriteAsync(member);
         if (noautomatic)
         {
             var afteraddembed = new DiscordEmbedBuilder
@@ -1110,7 +1095,6 @@ public class TicketManagerHelper
 
         if (transcriptType == TranscriptType.User)
         {
-            // insert
             await using var cmd2 =
                 con.CreateCommand(
                     $"UPDATE ticketstore SET user_transscript_url = '{transcript_url}' WHERE ticket_id = '{ticket_id}'");
@@ -1118,7 +1102,6 @@ public class TicketManagerHelper
         }
         else if (transcriptType == TranscriptType.Team)
         {
-            // insert
             await using var cmd2 =
                 con.CreateCommand(
                     $"UPDATE ticketstore SET team_transscript_url = '{transcript_url}' WHERE ticket_id = '{ticket_id}'");

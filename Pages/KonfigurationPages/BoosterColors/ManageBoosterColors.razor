@@ -298,7 +298,6 @@ else
 
         var guild = CurrentApplication.TargetGuild;
 
-        // Step 1: create the role.
         DiscordRole role;
         try
         {
@@ -313,7 +312,7 @@ else
             return;
         }
 
-        // Step 1b: optionally apply a gradient (two color blend). Requires the guild to support enhanced role colors.
+        // Gradient requires the guild to support enhanced role colors.
         var colorWarning = "";
         if (newRoleGradient)
         {
@@ -329,7 +328,7 @@ else
             }
         }
 
-        // Step 2: position it between the boundaries (separate so a hierarchy issue does not look like a create failure).
+        // Positioning is separate so a hierarchy issue does not look like a create failure.
         var positionWarning = "";
         var boundaries = BoosterColorService.GetBoundaries(guild);
         if (boundaries != null)

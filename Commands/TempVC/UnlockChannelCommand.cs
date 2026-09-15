@@ -11,7 +11,6 @@ public sealed class UnlockChannelCommand : TempVoiceHelper
 {
     [Command("unlock")]
     [RequireDatabase]
-    //[RequireVoiceChannel]
     public async Task VoiceUnlock(CommandContext ctx)
     {
         var dbChannels = await GetChannelIDFromDB(ctx);

@@ -274,7 +274,6 @@ public class TempVoiceHelper : BaseCommandModule
         }
         catch
         {
-            // Handle exception
         }
 
         return channelownerid;
@@ -307,7 +306,6 @@ public class TempVoiceHelper : BaseCommandModule
         }
         catch
         {
-            // Handle exception
         }
 
         return channelownerid;
@@ -342,7 +340,6 @@ public class TempVoiceHelper : BaseCommandModule
         }
         catch
         {
-            // Handle exception
         }
 
         return channelownerid;
@@ -375,7 +372,6 @@ public class TempVoiceHelper : BaseCommandModule
         }
         catch
         {
-            // Handle exception
         }
 
         return channelownerid;
@@ -1813,7 +1809,6 @@ public class TempVoiceHelper : BaseCommandModule
                     {
                     }
 
-                    //overwrites = overwrites.Merge(user, Permissions.None, Permissions.None, Permissions.UseVoice | Permissions.AccessChannels);
                     overwrites = overwrites.Merge(user, Permissions.None, Permissions.UseVoice,
                         Permissions.AccessChannels);
                     if (userChannel.Users.Contains(user)) await user.DisconnectFromVoiceAsync();

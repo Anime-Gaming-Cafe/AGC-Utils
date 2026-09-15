@@ -268,10 +268,8 @@ internal class Program : BaseCommandModule
 
         var app = builder.Build();
 
-        // Keep global service provider reference
         CurrentApplication.ServiceProvider = app.Services;
 
-        // Map Cloud Native health checks
         app.MapHealthChecks("/health/live"); // liveness (process up)
         app.MapHealthChecks("/health/ready"); 
 
@@ -396,13 +394,10 @@ internal class Program : BaseCommandModule
 
 public static class GlobalProperties
 {
-    // Server Staffrole ID
     public static ulong StaffRoleId { get; } = ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]);
 
-    // Debug Mode
     public static bool DebugMode { get; } = ParseBoolean(BotConfig.GetConfig()["MainConfig"]["DebugMode"]);
 
-    // Bot Owner ID
     public static ulong BotOwnerId { get; } = ulong.Parse(BotConfig.GetConfig()["MainConfig"]["BotOwnerId"]);
 
     public static DiscordGuild AGCGuild { get; set; }

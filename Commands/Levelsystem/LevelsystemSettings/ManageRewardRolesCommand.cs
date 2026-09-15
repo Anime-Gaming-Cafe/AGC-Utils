@@ -21,7 +21,6 @@ public partial class LevelSystemSettings
         [Option("level", "Das Level ab dem die Rolle vergeben werden soll")]
         int level)
     {
-        // check if role is managed by integration
         if (role.IsManaged)
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -32,7 +31,6 @@ public partial class LevelSystemSettings
             return;
         }
 
-        // check if role or level is used
         if (aktion == ModifyRoleChannelAction.Add && await LevelUtils.IsRewardRole(role.Id))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,

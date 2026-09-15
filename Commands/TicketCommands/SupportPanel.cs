@@ -72,7 +72,6 @@ public class SupportPanelListener : SupportPanel
                 await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
             }
 
-            // handle ticket opening
             if (e.Interaction.Data.CustomId == "ticket_open_report")
                 await TicketManager.OpenTicket(e.Interaction, TicketType.Report, client, TicketCreator.User);
             else if (e.Interaction.Data.CustomId == "ticket_open_support")

@@ -17,7 +17,6 @@ public static class DatabaseService
     }
 
 
-    // Read DBContent
     public static NpgsqlDataReader ExecuteQuery(string sql)
     {
         try
@@ -367,7 +366,6 @@ public static class DatabaseService
 
             await using var cmdCreate = conn.CreateCommand(createTableCommand);
             await cmdCreate.ExecuteNonQueryAsync();
-            //CurrentApplication.Logger.Debug($"Table {tableName} initialized or updated.");
             progressBar.Increment();
             await Task.Delay(10);
         }

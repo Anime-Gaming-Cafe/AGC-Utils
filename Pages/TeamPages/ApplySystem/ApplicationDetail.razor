@@ -62,19 +62,13 @@ else
     <div class="detail-grid">
         <div>
             <Panel Title="Antworten">
-                @if (answers.Count == 0)
+                @if (answerVms.Count == 0)
                 {
                     <p class="meta">Zu dieser Bewerbung sind keine Antworten gespeichert.</p>
                 }
                 else
                 {
-                    <dl class="qa">
-                        @foreach (var answer in answers)
-                        {
-                            <dt class="qa__q">@answer.QuestionTextSnapshot</dt>
-                            <dd class="qa__a">@Render(answer)</dd>
-                        }
-                    </dl>
+                    <QuestionAnswerForm Answers="answerVms" ReadOnly="true"/>
                 }
             </Panel>
 
@@ -366,6 +360,7 @@ else
     private TeamApplication? application;
     private TeamApplicationPermissionSet perms = new();
     private List<TeamApplicationAnswer> answers = new();
+    private List<QuestionAnswerVm> answerVms = new();
     private List<TeamApplicationNote> notes = new();
     private List<TeamApplicationTemplate> templates = new();
     private TeamApplicationReapplyGrant? activeGrant;
@@ -446,6 +441,9 @@ else
         if (application == null) return;
 
         answers = await TeamApplicationService.GetAnswersAsync(ApplicationId);
+        var questions = await TeamApplicationService.GetQuestionsAsync(application.PositionId, application.QuestionSetVersion);
+        answerVms = BuildAnswerVms(answers, questions);
+
         if (perms.Notes) notes = await TeamApplicationService.GetNotesAsync(ApplicationId);
         if (perms.Decide) templates = await TeamApplicationService.GetTemplatesAsync(application.PositionId);
         if (perms.GrantReapply)
@@ -475,19 +473,32 @@ else
     private static string Day(long unix) =>
         unix <= 0 ? "unbekannt" : DateTimeOffset.FromUnixTimeSeconds(unix).ToLocalTime().ToString("dd.MM.yyyy");
 
-    private static string Render(TeamApplicationAnswer answer)
+    // Rebuilds the exact widgets the applicant filled in: matches each stored answer back to its
+    // question from the frozen (published, never-edited) question set version the application was
+    // submitted against, so options/type/conditions are guaranteed identical to what they saw.
+    private static List<QuestionAnswerVm> BuildAnswerVms(List<TeamApplicationAnswer> answers,
+        List<TeamApplicationQuestion> questions) =>
+        answers.OrderBy(a => a.SortOrder).Select(a => new QuestionAnswerVm
+        {
+            Question = questions.FirstOrDefault(q => q.QuestionId == a.QuestionId) ?? FallbackQuestion(a),
+            Text = a.QuestionType == TeamApplicationQuestionType.MultipleChoice ? "" : a.Answer,
+            Selected = new List<string>(a.AnswerOptions),
+            OtherText = a.OtherText
+        }).ToList();
+
+    // Only hit if the question row itself is gone - published sets are never edited, so this is a
+    // defensive fallback, not the normal path. Renders as plain text via the snapshot instead of
+    // breaking the page.
+    private static TeamApplicationQuestion FallbackQuestion(TeamApplicationAnswer answer) => new()
     {
-        if (string.IsNullOrWhiteSpace(answer.OtherText))
-            return answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
-                ? string.Join(", ", answer.AnswerOptions)
-                : answer.Answer;
-
-        if (answer.QuestionType == TeamApplicationQuestionType.MultipleChoice)
-            return string.Join(", ", answer.AnswerOptions.Select(o =>
-                o == answer.OtherOptionSnapshot ? $"{o} ({answer.OtherText})" : o));
-
-        return $"{answer.Answer} ({answer.OtherText})";
-    }
+        QuestionId = answer.QuestionId,
+        Text = answer.QuestionTextSnapshot,
+        Type = answer.QuestionType,
+        Required = false,
+        Options = answer.QuestionType == TeamApplicationQuestionType.MultipleChoice
+            ? answer.AnswerOptions
+            : string.IsNullOrEmpty(answer.Answer) ? [] : [answer.Answer]
+    };
 
     private static StatusPill.PillTone ModerationTone(string kind) => kind switch
     {

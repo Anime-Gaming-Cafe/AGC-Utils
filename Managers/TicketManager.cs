@@ -149,7 +149,6 @@ public class TicketManager
                 Description = $"Dein Ticket wurde erfolgreich erstellt! -> <#{ticket_channel.Id}>",
                 Color = DiscordColor.Green
             };
-            // inset header later
             await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder().AddEmbed(teb)
                 .AddComponents(button));
             await TicketManagerHelper.SendUserNotice(interaction, ticket_channel, ticketType);
@@ -158,7 +157,6 @@ public class TicketManager
 
     public static async Task CloseTicket(CommandContext ctx, DiscordChannel ticket_channel)
     {
-        // fetch first message of this channel
         await NotificationManager.ClearMode(ticket_channel.Id);
         var channelmessages = await ctx.Channel.GetMessagesAsync();
         var message = channelmessages.LastOrDefault();
@@ -252,7 +250,6 @@ public class TicketManager
 
     public static async Task CloseTicket(DiscordChannel ticket_channel, DiscordClient client)
     {
-        // fetch first message of this channel
         await NotificationManager.ClearMode(ticket_channel.Id);
         var channelmessages = await ticket_channel.GetMessagesAsync();
         var message = channelmessages.LastOrDefault();
@@ -342,7 +339,6 @@ public class TicketManager
         {
             var member = await client.GetUserAsync((ulong)user);
             await TicketManagerHelper.RemoveUserFromTicket(ticket_channel, member, client);
-            //await TicketManagerHelper.SendTranscriptsToUser(member, transcriptURL, RemoveType.Closed, tname);
         }
     }
 

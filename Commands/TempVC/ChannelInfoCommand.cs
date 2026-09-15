@@ -114,7 +114,6 @@ public sealed class ChannelInfoCommand : TempVoiceHelper
                     $"**• Channel Gesperrt** = {lockedemote}\n" +
                     $"**• Channelowner hat Session** = {sessionemote}")
                 .WithColor(BotConfig.GetEmbedColor()).WithTitle("Voice Channel Informationen")
-                //.WithThumbnail("https://cdn3.emoji.gg/emojis/2378-discord-voice-channel.png")
                 .WithFooter($"{ctx.User.UsernameWithDiscriminator}");
             var caseid = ToolSet.GenerateCaseID();
             List<DiscordButtonComponent> buttons = new(2)

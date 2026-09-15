@@ -52,7 +52,6 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                 };
                 var dbtimestampdata =
                     await DatabaseService.SelectDataFromTable("tempvoice", Query, WhereCondiditons);
-                // look if it is NULL
                 foreach (var data in dbtimestampdata)
                     try
                     {
@@ -141,7 +140,6 @@ public sealed class ChannelStatusCommands : TempVoiceHelper
                 };
                 var dbtimestampdata =
                     await DatabaseService.SelectDataFromTable("tempvoice", Query, WhereCondiditons);
-                // look if it is NULL
                 foreach (var data in dbtimestampdata)
                     try
                     {

@@ -25,12 +25,12 @@
         RenderFragment otherField = @<div class="option-answer-other">
             @if (Answer.Question.OtherIsLongText)
             {
-                <textarea class="form-control" rows="4" value="@Answer.OtherText"
+                <textarea class="form-control" rows="4" value="@Answer.OtherText" disabled="@ReadOnly"
                           @onchange="e => SetOtherText(e.Value?.ToString())"></textarea>
             }
             else
             {
-                <input class="form-control" value="@Answer.OtherText"
+                <input class="form-control" value="@Answer.OtherText" disabled="@ReadOnly"
                        @onchange="e => SetOtherText(e.Value?.ToString())"/>
             }
             @if (Answer.Question.MaxLength > 0)
@@ -43,12 +43,12 @@
     @switch (Answer.Question.Type)
     {
         case TeamApplicationQuestionType.ShortText:
-            <input id="@Answer.Question.QuestionId" class="form-control" value="@Answer.Text"
+            <input id="@Answer.Question.QuestionId" class="form-control" value="@Answer.Text" disabled="@ReadOnly"
                    @onchange="e => SetText(e.Value?.ToString())"/>
             break;
 
         case TeamApplicationQuestionType.LongText:
-            <textarea id="@Answer.Question.QuestionId" class="form-control" rows="7" value="@Answer.Text"
+            <textarea id="@Answer.Question.QuestionId" class="form-control" rows="7" value="@Answer.Text" disabled="@ReadOnly"
                       @onchange="e => SetText(e.Value?.ToString())"></textarea>
             @if (Answer.Question.MaxLength > 0)
             {
@@ -63,7 +63,7 @@
                     <div class="range-field">
                         <input type="range" id="@Answer.Question.QuestionId" class="form-range"
                                min="@Answer.Question.MinValue" max="@Answer.Question.MaxValue" step="@Answer.Question.NumberStep"
-                               value="@RangeValue(Answer)"
+                               value="@RangeValue(Answer)" disabled="@ReadOnly"
                                oninput="this.nextElementSibling.textContent=this.value"
                                @onchange="e => SetText(e.Value?.ToString())"/>
                         <output class="tnum">@RangeValue(Answer)</output>
@@ -71,7 +71,7 @@
                     break;
 
                 case NumberDisplay.Dropdown:
-                    <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
+                    <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text" disabled="@ReadOnly"
                             @onchange="e => SetText(e.Value?.ToString())">
                         <option value="" disabled hidden>Bitte wählen</option>
                         @foreach (var value in NumberRangeValues(Answer.Question))
@@ -82,19 +82,19 @@
                     break;
 
                 default:
-                    <input id="@Answer.Question.QuestionId" type="number" class="form-control" value="@Answer.Text"
+                    <input id="@Answer.Question.QuestionId" type="number" class="form-control" value="@Answer.Text" disabled="@ReadOnly"
                            @onchange="e => SetText(e.Value?.ToString())"/>
                     break;
             }
             break;
 
         case TeamApplicationQuestionType.Date:
-            <input id="@Answer.Question.QuestionId" type="date" class="form-control" value="@Answer.Text"
+            <input id="@Answer.Question.QuestionId" type="date" class="form-control" value="@Answer.Text" disabled="@ReadOnly"
                    @onchange="e => SetText(e.Value?.ToString())"/>
             break;
 
         case TeamApplicationQuestionType.Dropdown:
-            <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text"
+            <select id="@Answer.Question.QuestionId" class="form-select" value="@Answer.Text" disabled="@ReadOnly"
                     @onchange="e => SetText(e.Value?.ToString())">
                 <option value="" disabled hidden>Bitte wählen</option>
                 @foreach (var option in Answer.Question.Options)
@@ -115,7 +115,7 @@
                 var inputId = $"{Answer.Question.QuestionId}-{i}";
                 <div class="form-check">
                     <input class="form-check-input" type="radio" id="@inputId"
-                           name="@Answer.Question.QuestionId" checked="@(Answer.Text == current)"
+                           name="@Answer.Question.QuestionId" checked="@(Answer.Text == current)" disabled="@ReadOnly"
                            @onchange="() => SetText(current)"/>
                     <label class="form-check-label" for="@inputId">@current</label>
                 </div>
@@ -133,7 +133,7 @@
                 var inputId = $"{Answer.Question.QuestionId}-{i}";
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="@inputId"
-                           checked="@Answer.Selected.Contains(current)"
+                           checked="@Answer.Selected.Contains(current)" disabled="@ReadOnly"
                            @onchange="e => ToggleOption(current, e.Value is true)"/>
                     <label class="form-check-label" for="@inputId">@current</label>
                 </div>
@@ -158,6 +158,7 @@
 @code {
     [Parameter] [EditorRequired] public QuestionAnswerVm Answer { get; set; } = null!;
     [Parameter] public bool Nested { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private static string RangeValue(QuestionAnswerVm answer) =>

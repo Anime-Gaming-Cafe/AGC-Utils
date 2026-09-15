@@ -18,7 +18,7 @@ public sealed class MessageListener : ApplicationCommandsModule
 
         _ = Task.Run(async () =>
         {
-            if (CurrentApplication.TargetGuild == null) // check init
+            if (CurrentApplication.TargetGuild == null)
                 return;
             if (args.Guild == null) return;
 

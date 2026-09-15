@@ -22,7 +22,6 @@ public static class RecalculateRanks
         await Task.Delay(TimeSpan.FromSeconds(5));
         while (true)
         {
-            // get timestamp from last recalculation
             var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
             await using var cmd = con.CreateCommand("SELECT lastrecalc FROM levelingsettings");
             await using var reader = await cmd.ExecuteReaderAsync();

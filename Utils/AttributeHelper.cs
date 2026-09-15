@@ -17,7 +17,6 @@ public class RequireStaffRole : CheckBaseAttribute
     {
         if (GlobalProperties.DebugMode) return true;
 
-        // Check if user has staff role
         if (ctx.Member.Roles.Any(r => r.Id == RoleId))
             return true;
         return false;
@@ -81,7 +80,6 @@ public class RequireDatabase : CheckBaseAttribute
 {
     public override async Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
     {
-        // Check if database is connected
         var db = CurrentApplication.ServiceProvider.GetService<NpgsqlDataSource>();
         await using var cmd = db.CreateCommand("SELECT 1");
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
@@ -107,7 +105,6 @@ public class ACRequireStaffRole : CheckBaseAttribute
     {
         if (GlobalProperties.DebugMode) return true;
 
-        // Check if user has staff role
         if (ctx.Member.Roles.Any(r => r.Id == RoleId))
             return true;
         return false;
@@ -139,7 +136,6 @@ public class AGCEasterEggsEnabled : CheckBaseAttribute
 {
     public override async Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
     {
-        // Check if AGC Setting is Enabled
         try
         {
             if (bool.TrueString == BotConfig.GetConfig()["ServerConfig"]["EasterEggsEnabled"] &&

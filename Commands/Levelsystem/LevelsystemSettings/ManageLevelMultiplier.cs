@@ -26,7 +26,6 @@ public partial class LevelSystemSettings
         else
             _multiplier = 0;
 
-        // set multiplier (if disabled, type_active = false)
         await LevelUtils.SetMultiplier(levelType, _multiplier);
 
 

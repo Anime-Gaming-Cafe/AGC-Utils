@@ -21,7 +21,6 @@ public partial class LevelSystemSettings
         DiscordRole role, [Option("multiplier", "Der Multiplier")] OverrideMultiplicatorItem multiplier)
     {
         var _multiplier = float.Parse(multiplier.ToString().Replace("x", "").Replace("X", "").Replace(" ", ""));
-        // check if role is managed by integration
         if (role.IsManaged)
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -32,7 +31,6 @@ public partial class LevelSystemSettings
             return;
         }
 
-        // check if role or level is used
         if (aktion == ModifyRoleChannelAction.Add && await LevelUtils.IsOverrideRole(role.Id))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,

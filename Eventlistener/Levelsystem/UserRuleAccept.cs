@@ -18,7 +18,7 @@ public class UserRuleAccept : BaseCommandModule
 
         _ = Task.Run(async () =>
         {
-            if (CurrentApplication.TargetGuild == null) // check init
+            if (CurrentApplication.TargetGuild == null)
                 return;
 
             if (args.Guild != CurrentApplication.TargetGuild) return;

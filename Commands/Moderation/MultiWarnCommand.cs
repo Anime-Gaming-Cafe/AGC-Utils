@@ -12,8 +12,6 @@ namespace AGC_Management.Commands.Moderation;
 
 public sealed class MultiWarnCommand : BaseCommandModule
 {
-    // multiwarn, also wie multiflag und warn zusammen
-
     [Command("multiwarn")]
     [Description("Warnt mehrere Nutzer")]
     [RequireDatabase]

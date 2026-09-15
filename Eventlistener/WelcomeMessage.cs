@@ -74,7 +74,6 @@ public class WelcomeMessage : BaseCommandModule
                         "Blacklisted User | Mitbeteiligter am Epsilon Stealer");
 
                 await Task.Delay(TimeSpan.FromSeconds(5));
-                // look if member is still in guild
                 var guild = await client.GetGuildAsync(serverid);
                 try
                 {

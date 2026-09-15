@@ -19,7 +19,7 @@ public static class CheckVCLevellingTask
         await Task.Delay(TimeSpan.FromSeconds(5));
         while (true)
         {
-            if (CurrentApplication.TargetGuild == null) // check init
+            if (CurrentApplication.TargetGuild == null)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 continue;
@@ -27,7 +27,6 @@ public static class CheckVCLevellingTask
 
             try
             {
-                // get all users and their voice channel to a dictionary
                 var users = new Dictionary<ulong, ulong>();
                 var guild = CurrentApplication.TargetGuild;
                 foreach (var channel in guild.Channels.Values)
@@ -66,9 +65,7 @@ public static class CheckVCLevellingTask
                                 users.Add(member.Id, channel.Id);
                             }
 
-                // get all memberids from the dictionary
                 var memberIds = users.Keys.ToList();
-                // get all members from the memberids
                 var members = new List<DiscordMember>();
                 foreach (var memberId in memberIds)
                 {
@@ -85,7 +82,6 @@ public static class CheckVCLevellingTask
                     if (member != null) members.Add(member);
                 }
 
-                // give xp to all members
                 foreach (var member in members)
                     await LevelUtils.GiveXP(member, LevelUtils.GetBaseXp(XpRewardType.Voice), XpRewardType.Voice);
 

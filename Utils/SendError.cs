@@ -22,7 +22,6 @@ public static class ErrorReporting
         embed2.WithColor(DiscordColor.Red);
         try
         {
-            //await botOwner.SendMessageAsync(embed2);
         }
         catch (Exception)
         {
@@ -58,7 +57,6 @@ public static class ErrorReporting
         embed2.WithColor(DiscordColor.Red);
         try
         {
-            //await botOwner.SendMessageAsync(embed2);
         }
         catch (Exception)
         {

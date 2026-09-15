@@ -61,11 +61,8 @@ public class TempVCEventHandler : TempVoiceHelper
                                     }
                                     catch (NullReferenceException)
                                     {
-                                        //await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
                                     }
 
-
-                                    //await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
                                 }
 
                     if ((e.After?.Channel != null && e.Before?.Channel == null) ||
@@ -151,7 +148,6 @@ public class TempVCEventHandler : TempVoiceHelper
                                     }
                                     catch (NullReferenceException)
                                     {
-                                        //await DatabaseService.DeleteDataFromTable("tempvoice", DeletewhereConditions);
                                     }
                                 }
 
@@ -250,13 +246,11 @@ public class TempVCEventHandler : TempVoiceHelper
 									await voice.ModifyPositionInCategoryAsync(e.After.Channel.Position + 1);
 									await voice.ModifyAsync(async x => { x.PermissionOverwrites = overwrites2; });
 
-									// write sessionskip false to db
 									var conn = CurrentApplication.ServiceProvider
 										.GetRequiredService<NpgsqlDataSource>();
 									await using var cmd = conn.CreateCommand(
 										"UPDATE tempvoicesession SET sessionskip = @sessionskip WHERE userid = @userid");
 									cmd.Parameters.AddWithValue("sessionskip", false);
-									// execute command
 									await cmd.ExecuteNonQueryAsync();
 									return;
 								}

@@ -28,7 +28,6 @@ public partial class LevelSystemSettings
         {
             if (CurrentApplication.TargetGuild.Id == 750365461945778209)
             {
-                // check if user has event top role 1066374671131480105 ctx
                 var role = ctx.Guild.GetRole(ulong.Parse("1066374671131480105"));
                 if (ctx.Member.Roles.Contains(role))
                 {

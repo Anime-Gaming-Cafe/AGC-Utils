@@ -9,13 +9,13 @@
     {
         @if (QuestionConditionalLogic.IsVisible(answer, Answers))
         {
-            <QuestionAnswerField Answer="answer" OnChanged="StateHasChanged"/>
+            <QuestionAnswerField Answer="answer" ReadOnly="ReadOnly" OnChanged="StateHasChanged"/>
 
             @foreach (var followUp in FollowUpsOf(answer))
             {
                 @if (QuestionConditionalLogic.IsVisible(followUp, Answers))
                 {
-                    <QuestionAnswerField Answer="followUp" Nested="true" OnChanged="StateHasChanged"/>
+                    <QuestionAnswerField Answer="followUp" Nested="true" ReadOnly="ReadOnly" OnChanged="StateHasChanged"/>
                 }
             }
         }
@@ -24,6 +24,7 @@
 
 @code {
     [Parameter] [EditorRequired] public List<QuestionAnswerVm> Answers { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
 
     private IEnumerable<QuestionAnswerVm> TopLevelAnswers =>
         Answers.Where(a => string.IsNullOrEmpty(a.Question.ConditionQuestionId));

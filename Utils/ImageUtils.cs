@@ -175,7 +175,7 @@ public sealed class ImageUtils
                 IsAntialias = true
             };
 
-            canvas.DrawRoundRect(guildiconrect, 15, 15, borderPaint); // Zeichnet eine Umrandung
+            canvas.DrawRoundRect(guildiconrect, 15, 15, borderPaint);
         }
 
 
@@ -259,23 +259,6 @@ public sealed class ImageUtils
     }
 
 
-    /// <summary>
-    ///     Generates a rank card for web preview.
-    /// </summary>
-    /// <param name="user">The Discord user for whom the rank card is generated.</param>
-    /// <param name="currentxpforthislevel">The current experience points accumulated for this level.</param>
-    /// <param name="level">The current level of the user.</param>
-    /// <param name="rank">The rank of the user.</param>
-    /// <param name="progression">The progress towards the next level.</param>
-    /// <param name="totalxp">The total experience points earned by the user.</param>
-    /// <param name="xpforthisleveltocomplete">The experience points required to complete this level.</param>
-    /// <param name="boxalpha">The alpha value for the box.</param>
-    /// <param name="font">The font used in the rank card.</param>
-    /// <param name="bgdata">The background data used in the rank card.</param>
-    /// <param name="hexcolor">The hex color used in the rank card.</param>
-    /// <returns>
-    ///     A Task with the generated rank card in SKData format.
-    /// </returns>
     public static async Task<SKData> GenerateRankCardForWebPreview(DiscordUser user, int currentxpforthislevel,
         int level, int rank,
         float progression, int totalxp,
@@ -286,7 +269,6 @@ public sealed class ImageUtils
 
         if (string.IsNullOrWhiteSpace(bgdata))
         {
-            // check current settings for background if it's empty use fallback
             if (await HasCustomRankCardSettings(user.Id))
             {
                 var customSettings = await GetCustomRankCardSettings(user.Id);
@@ -384,7 +366,7 @@ public sealed class ImageUtils
                 IsAntialias = true
             };
 
-            canvas.DrawRoundRect(guildiconrect, 15, 15, borderPaint); // Zeichnet eine Umrandung
+            canvas.DrawRoundRect(guildiconrect, 15, 15, borderPaint);
         }
 
 

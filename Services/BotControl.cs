@@ -74,17 +74,8 @@ public class BotControl : BaseCommandModule
         }
     }
 
-    /// <summary>
-    ///     The eval variables.
-    /// </summary>
     public class EvalVariables
     {
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="EvalVariables" /> class.
-        /// </summary>
-        /// <param name="msg">The message.</param>
-        /// <param name="client">The client.</param>
-        /// <param name="ctx">The command context.</param>
         public EvalVariables(DiscordMessage msg, DiscordClient client, CommandContext ctx)
         {
             Client = client;
@@ -97,34 +88,16 @@ public class BotControl : BaseCommandModule
             Context = ctx;
         }
 
-        /// <summary>
-        ///     Gets or sets the message.
-        /// </summary>
         public DiscordMessage Message { get; set; }
 
-        /// <summary>
-        ///     Gets or sets the channel.
-        /// </summary>
         public DiscordChannel Channel { get; set; }
 
-        /// <summary>
-        ///     Gets or sets the guild.
-        /// </summary>
         public DiscordGuild Guild { get; set; }
 
-        /// <summary>
-        ///     Gets or sets the user.
-        /// </summary>
         public DiscordUser User { get; set; }
 
-        /// <summary>
-        ///     Gets or sets the member.
-        /// </summary>
         public DiscordMember Member { get; set; }
 
-        /// <summary>
-        ///     Gets or sets the context.
-        /// </summary>
         public CommandContext Context { get; set; }
 
         public DiscordClient Client { get; set; }

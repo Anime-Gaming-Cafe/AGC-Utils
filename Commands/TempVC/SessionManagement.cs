@@ -55,7 +55,6 @@ public sealed class SessionManagement : TempVoiceHelper
 
                 if (hasSession)
                 {
-                    // if session is there delete it
                     Dictionary<string, (object value, string comparisonOperator)> whereConditions = new()
                     {
                         { "userid", ((long)ctx.User.Id, "=") }

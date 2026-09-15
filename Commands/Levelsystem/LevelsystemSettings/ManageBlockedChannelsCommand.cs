@@ -19,7 +19,6 @@ public partial class LevelSystemSettings
         [Option("channel", "Der Channel der hinzugefügt oder entfernt werden soll")]
         DiscordChannel channel)
     {
-        // check if role or level is used
         if (aktion == ModifyRoleChannelAction.Add && await LevelUtils.IsBlacklistedChannel(channel.Id))
         {
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,

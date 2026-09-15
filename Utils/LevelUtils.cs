@@ -126,11 +126,6 @@ public static class LevelUtils
         await Task.CompletedTask;
     }
 
-    /// <summary>
-    ///     Calculates the experience points required to reach a given level.
-    /// </summary>
-    /// <param name="lvl">The level to calculate the experience points for.</param>
-    /// <returns>The experience points required to reach the given level.</returns>
     public static int XpForLevel(int lvl)
     {
         if (lvl <= 0) return 0;
@@ -153,13 +148,8 @@ public static class LevelUtils
         return xpForNextLevel - xp;
     }
 
-    /// <summary>
-    ///     Updates the level roles for a member.
-    /// </summary>
-    /// <param name="member">The DiscordMember whose level roles need to be updated.</param>
     public static async Task UpdateLevelRoles(DiscordMember? member)
     {
-        // Check if member is null
         if (member == null) return;
 
         if (member.IsBot) return;
@@ -272,8 +262,6 @@ public static class LevelUtils
         var db = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         if (multiplicator == 0)
         {
-            // var {type}_active 
-            // eg. vc_active or text_active
             var cmd = db.CreateCommand(
                 $"UPDATE levelingsettings SET {GetLeveltypeString(rewardType)}_active = @active WHERE guildid = @guildid");
             cmd.Parameters.AddWithValue("@active", false);
@@ -282,7 +270,6 @@ public static class LevelUtils
             return;
         }
 
-        // set multi and type_active
         var cmd2 = db.CreateCommand(
             $"UPDATE levelingsettings SET {GetLeveltypeString(rewardType)}_multi = @multi, {GetLeveltypeString(rewardType)}_active = @active WHERE guildid = @guildid");
         cmd2.Parameters.AddWithValue("@multi", multiplicator);
@@ -476,11 +463,6 @@ public static class LevelUtils
     }
 
 
-    /// <summary>
-    ///     Transfers XP from a source user to a destination user.
-    /// </summary>
-    /// <param name="sourceUserId">The ID of the source user.</param>
-    /// <param name="destinationUserId">The ID of the destination user.</param>
     public static async Task TransferXp(ulong sourceUserId, ulong destinationUserId)
     {
         var sourceRank = await GetRank(sourceUserId);
@@ -509,18 +491,12 @@ public static class LevelUtils
     {
         await RecalculateUserLevel(userId);
 
-        // if user is not in guild, return
         if (CurrentApplication.TargetGuild.Members.Values.FirstOrDefault(x => x.Id == userId) == null) return;
 
         await UpdateLevelRoles(await CurrentApplication.TargetGuild.GetMemberAsync(userId));
     }
 
 
-    /// <summary>
-    ///     Calculates the minimum and maximum experience points (XP) required for a given level.
-    /// </summary>
-    /// <param name="lvl">The level.</param>
-    /// <returns>A dictionary containing the minimum and maximum XP values.</returns>
     public static Dictionary<int, int> MinAndMaxXpForThisLevel(int lvl)
     {
         var min = 0;
@@ -539,11 +515,6 @@ public static class LevelUtils
     }
 
 
-    /// <summary>
-    ///     Calculates the level based on the total experience points.
-    /// </summary>
-    /// <param name="totalXp">The total experience points.</param>
-    /// <returns>The level corresponding to the total experience points.</returns>
     public static int LevelAtXp(int totalXp)
     {
         var level = 0;
@@ -559,11 +530,6 @@ public static class LevelUtils
         return level;
     }
 
-    /// <summary>
-    ///     Calculates the amount of experience points needed to reach the next level.
-    /// </summary>
-    /// <param name="xp">The current amount of experience points.</param>
-    /// <returns>The amount of experience points needed to reach the next level.</returns>
     public static int XpUntilNextLevel(int xp)
     {
         var currentLevel = LevelAtXp(xp);
@@ -571,11 +537,6 @@ public static class LevelUtils
         return xpForNextLevel - xp;
     }
 
-    /// <summary>
-    ///     Method to retrieve the ranking of a user based on their XP in the leveling data table.
-    /// </summary>
-    /// <param name="userid">The unique identifier of the user.</param>
-    /// <returns>The rank of the user. Returns 0 if the user is not found.</returns>
     public static async Task<int> GetUserRankAsync(ulong userid)
     {
         var rank = 0;
@@ -602,10 +563,6 @@ public static class LevelUtils
         return rank[userId].Xp;
     }
 
-    /// <summary>
-    ///     Recalculates the user level based on their experience points (xp) and updates the database.
-    /// </summary>
-    /// <param name="userId">The ID of the user.</param>
     public static async Task RecalculateUserLevel(ulong userId)
     {
         var rank = await GetRank(userId);
@@ -658,11 +615,6 @@ public static class LevelUtils
         }
     }
 
-    /// <summary>
-    ///     Retrieves the rank data for a specified user.
-    /// </summary>
-    /// <param name="userId">The ID of the user.</param>
-    /// <returns>A dictionary containing the rank data, where the key is the user ID and the value is the RankData object.</returns>
     public static async Task<Dictionary<ulong, RankData>> GetRank(ulong userId)
     {
         var rank = new Dictionary<ulong, RankData>();
@@ -711,7 +663,6 @@ public static class LevelUtils
     }
 
 
-    // leaderboard data for the leaderboard command
     public static async Task<List<LeaderboardData>> FetchLeaderboardData()
     {
         var leaderboardData = new List<LeaderboardData>();
@@ -1136,7 +1087,6 @@ public static class LevelUtils
 
     private static async Task SendLevelUpMessageAndReward(DiscordUser user, int level)
     {
-        // Fetch all necessary data at once
         var levelUpMessage = await GetLevelUpMessage();
         var pingEnabled = await UserHasPingEnabled(user.Id);
         var isReward = await IsLevelRewarded(level);
@@ -1144,7 +1094,6 @@ public static class LevelUtils
         var reward = await GetRewardForaLevel(level);
         var member = await user.ConvertToMember(CurrentApplication.TargetGuild);
 
-        // Use StringBuilder for string concatenation
         var messageBuilder = new StringBuilder();
 
         if (isReward)
@@ -1212,7 +1161,6 @@ public static class LevelUtils
     }
 
 
-    // restore all roles for a user that match the level or below
     public static async Task RestoreRoles(DiscordMember user)
     {
         var rank = await GetRank(user.Id);

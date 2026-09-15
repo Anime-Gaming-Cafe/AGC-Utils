@@ -236,13 +236,9 @@ public sealed class UserInfoCommand : BaseCommandModule
                 if (member.Roles.Any(x => x.Id == 1121443507425517718))
                     mcicon = "<:minecrafticon:1036687323036926076>";
 
-            // if timeout
-
-            // if booster_seit
             var boost_string = member.PremiumSince.HasValue
                 ? $"Boostet seit: {member.PremiumSince.Value.Timestamp()}\n"
                 : "";
-            // discord native format
             var servernick = member.Nickname != null ? $" \n*Aka. **{member.Nickname}***" : "";
             var userinfostring =
                 $"**Das Mitglied**" + $"\n{member.UsernameWithDiscriminator} ``{member.Id}``{servernick}\n" +
@@ -507,7 +503,6 @@ public sealed class UserInfoCommand : BaseCommandModule
 
         foreach (var memberId in uniqueUserIds)
         {
-            //await Task.Delay(1000);
             var us = await ctx.Client.TryGetUserAsync(memberId, false);
             if (us == null) continue;
             await UserInfo(ctx, us);

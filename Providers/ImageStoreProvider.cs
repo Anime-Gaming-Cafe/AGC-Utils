@@ -41,8 +41,7 @@ public static class ImageStoreProvider
         var domain = GetImageStoreDomain();
         if (!Directory.Exists(path)) Directory.CreateDirectory(path);
         var fullPath = Path.Combine(path, fileName);
-        
-        // determine if foldername is flag_images or warn_images
+
         var foldername = storeType switch
         {
             ImageStoreType.Flag => "flag",

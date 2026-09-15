@@ -85,7 +85,6 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             return;
         }
 
-        // handle if you cancel request
         if (result.Result.Id == $"multibanrequest_deny_{caseid}")
         {
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
@@ -102,7 +101,6 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             return;
         }
 
-        // handle if you accept 
         if (result.Result.Id == $"multibanrequest_accept_{caseid}")
         {
             await result.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
@@ -158,7 +156,6 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 new DiscordButtonComponent(ButtonStyle.Danger, $"modbanrequest_deny_{caseid}", "Ablehnen"),
                 new DiscordButtonComponent(ButtonStyle.Primary, $"modbanrequest_cancel_{caseid}", $"Abbrechen (nur {ctx.User.UsernameWithDiscriminator})")
             };
-            // enable buttons
             staffbuttons.ForEach(x => x.Enable());
 
             var builder = new DiscordMessageBuilder()
