@@ -20,7 +20,7 @@
        BotConfig.GetEmbedColor(), so the dashboard carries the same colour as the
        bot's Discord embeds. The value here is the fallback only. */
     --accent-rgb: 47 132 162;
-    --accent: rgb(var(--accent-rgb));
+    --accent: color-mix(in srgb, rgb(var(--accent-rgb)) 88%, white);
     --accent-hover: color-mix(in srgb, var(--accent) 86%, white);
     --accent-strong: color-mix(in srgb, var(--accent) 62%, white);
     --accent-tint: rgb(var(--accent-rgb) / 0.14);
