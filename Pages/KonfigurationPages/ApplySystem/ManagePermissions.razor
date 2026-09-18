@@ -87,23 +87,11 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="r-role">Rolle</label>
-                <select id="r-role" class="form-select" @bind="newRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in roles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="r-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newRoleId"/>
             </div>
             <div class="field">
                 <label class="field__label" for="r-position">Position</label>
-                <select id="r-position" class="form-select" @bind="newPositionId">
-                    <option value="">Alle Positionen</option>
-                    @foreach (var position in positions)
-                    {
-                        <option value="@position.PositionId">@position.PositionName</option>
-                    }
-                </select>
+                <SearchableSelect TKey="string" Id="r-position" Items="PositionItems" NoneLabel="Alle Positionen" NoneValue="@string.Empty" Placeholder="Position suchen..." @bind-SelectedId="newPositionId"/>
             </div>
             <div class="field">
                 <label class="field__label" for="r-permission">Recht</label>
@@ -127,6 +115,9 @@ else
     private List<TeamApplicationPermissionRule> rules = new();
     private List<TeamApplicationPosition> positions = new();
     private List<DiscordRole> roles = new();
+
+    private List<(ulong Id, string Label)> RoleItems => roles.Select(r => (r.Id, r.Name)).ToList();
+    private List<(string Id, string Label)> PositionItems => positions.Select(p => (p.PositionId, p.PositionName)).ToList();
 
     private ulong newRoleId;
     private string newPositionId = "";

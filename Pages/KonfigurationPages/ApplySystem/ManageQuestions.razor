@@ -84,12 +84,7 @@ else
                        Lead="Kopiert alle Fragen samt Folgefragen in diesen Entwurf. Die andere Position bleibt unverändert, und veröffentlicht wird erst, wenn du es tust.">
                     <div class="field">
                         <label class="field__label" for="import-source">Position</label>
-                        <select id="import-source" class="form-select" @bind="importSourceId">
-                            @foreach (var source in importSources)
-                            {
-                                <option value="@source.PositionId">@source.Label</option>
-                            }
-                        </select>
+                        <SearchableSelect Id="import-source" Items="ImportSourceItems" AllowNone="false" Placeholder="Position suchen..." @bind-SelectedId="importSourceId"/>
                     </div>
                     <div class="form-foot">
                         <button type="button" class="btn btn-primary" disabled="@importing" @onclick="ImportQuestions">
@@ -189,6 +184,8 @@ else
 
     private List<ImportSource> importSources = new();
     private string importSourceId = "";
+
+    private List<(string Id, string Label)> ImportSourceItems => importSources.Select(s => (s.PositionId, s.Label)).ToList();
     private bool importing;
 
     private ImportSource? SelectedImportSource => importSources.FirstOrDefault(s => s.PositionId == importSourceId);

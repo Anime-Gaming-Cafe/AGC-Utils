@@ -106,15 +106,8 @@ else
                         {
                             <div class="field">
                                 <label class="field__label" for="d-template">Vorlage</label>
-                                <select id="d-template" class="form-select" @onchange="ApplyTemplate">
-                                    <option value="">Keine Vorlage</option>
-                                    @foreach (var template in templates)
-                                    {
-                                        <option value="@template.TemplateId">
-                                            @(template.Kind == TeamApplicationTemplateKind.Accept ? "Zusage" : "Absage"): @template.Name
-                                        </option>
-                                    }
-                                </select>
+                                <SearchableSelect TKey="string" Id="d-template" Items="TemplateItems" NoneLabel="Keine Vorlage" NoneValue="@string.Empty" Placeholder="Vorlage suchen..."
+                                                  SelectedId="selectedTemplateId" SelectedIdChanged="ApplyTemplate"/>
                             </div>
                         }
 
@@ -363,6 +356,11 @@ else
     private List<QuestionAnswerVm> answerVms = new();
     private List<TeamApplicationNote> notes = new();
     private List<TeamApplicationTemplate> templates = new();
+    private string selectedTemplateId = "";
+
+    private List<(string Id, string Label)> TemplateItems => templates
+        .Select(t => (t.TemplateId, $"{(t.Kind == TeamApplicationTemplateKind.Accept ? "Zusage" : "Absage")}: {t.Name}"))
+        .ToList();
     private TeamApplicationReapplyGrant? activeGrant;
     private bool sideDataRequested;
     private bool sideDataFailed;
@@ -580,9 +578,9 @@ else
         ToastService.Notify("Notiz gespeichert.", "ok");
     }
 
-    private void ApplyTemplate(ChangeEventArgs e)
+    private void ApplyTemplate(string id)
     {
-        var id = e.Value?.ToString();
+        selectedTemplateId = id;
         var template = templates.FirstOrDefault(t => t.TemplateId == id);
         if (template != null) decisionText = template.Text;
     }

@@ -82,14 +82,8 @@
     {
         <div class="field">
             <label class="field__label" for="q-condq-@Question.QuestionId">Abhängig von</label>
-            <select id="q-condq-@Question.QuestionId" class="form-select"
-                    @bind="Question.ConditionQuestionId" @bind:after="ConditionQuestionChanged">
-                <option value="">Immer sichtbar</option>
-                @foreach (var trigger in EligibleTriggers)
-                {
-                    <option value="@trigger.QuestionId">@trigger.Text</option>
-                }
-            </select>
+            <SearchableSelect TKey="string" Id="@($"q-condq-{Question.QuestionId}")" Items="EligibleTriggerItems" NoneLabel="Immer sichtbar" NoneValue="@string.Empty" Placeholder="Frage suchen..."
+                              @bind-SelectedId="Question.ConditionQuestionId" @bind-SelectedId:after="ConditionQuestionChanged"/>
         </div>
 
         @if (!string.IsNullOrEmpty(Question.ConditionQuestionId))
@@ -97,17 +91,8 @@
             var triggerQuestion = EligibleTriggers.FirstOrDefault(t => t.QuestionId == Question.ConditionQuestionId);
             <div class="field">
                 <label class="field__label" for="q-condv-@Question.QuestionId">Wert</label>
-                <select id="q-condv-@Question.QuestionId" class="form-select"
-                        @bind="Question.ConditionValue" @bind:after="Changed">
-                    <option value="">Wert wählen</option>
-                    @if (triggerQuestion != null)
-                    {
-                        @foreach (var option in triggerQuestion.Options)
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    }
-                </select>
+                <SearchableSelect TKey="string" Id="@($"q-condv-{Question.QuestionId}")" Items="TriggerValueItems(triggerQuestion)" NoneLabel="Wert wählen" NoneValue="@string.Empty" Placeholder="Wert suchen..."
+                                  @bind-SelectedId="Question.ConditionValue" @bind-SelectedId:after="Changed"/>
                 <span class="field__hint">Nur sichtbar, wenn „@triggerQuestion?.Text“ mit diesem Wert beantwortet wurde.</span>
             </div>
         }
@@ -176,6 +161,13 @@
 @code {
     [Parameter] [EditorRequired] public TeamApplicationQuestion Question { get; set; } = null!;
     [Parameter] [EditorRequired] public List<TeamApplicationQuestion> EligibleTriggers { get; set; } = new();
+
+    private List<(string Id, string Label)> EligibleTriggerItems => EligibleTriggers.Select(t => (t.QuestionId, t.Text)).ToList();
+
+    private static List<(string Id, string Label)> TriggerValueItems(TeamApplicationQuestion? triggerQuestion)
+    {
+        return triggerQuestion?.Options.Select(o => (o, o)).ToList() ?? [];
+    }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
     [Parameter] public EventCallback OnConditionChanged { get; set; }
 

@@ -73,14 +73,9 @@ else
                         </div>
                         <div class="field">
                             <label class="field__label" for="t-pos-@template.TemplateId">Position</label>
-                            <select id="t-pos-@template.TemplateId" class="form-select" value="@(template.PositionId ?? "")"
-                                    @onchange="e => { template.PositionId = EmptyToNull(e.Value?.ToString()); OnFieldChanged(); }">
-                                <option value="">Alle Positionen</option>
-                                @foreach (var position in positions)
-                                {
-                                    <option value="@position.PositionId">@position.PositionName</option>
-                                }
-                            </select>
+                            <SearchableSelect TKey="string" Id="@($"t-pos-{template.TemplateId}")" Items="PositionItems" NoneLabel="Alle Positionen" NoneValue="@string.Empty" Placeholder="Position suchen..."
+                                              SelectedId="@(template.PositionId ?? "")"
+                                              SelectedIdChanged="@(id => { template.PositionId = EmptyToNull(id); OnFieldChanged(); })"/>
                         </div>
                         <div class="field field--wide">
                             <label class="field__label" for="t-text-@template.TemplateId">Text</label>
@@ -166,6 +161,7 @@ else
     private bool mayManage;
 
     private List<TeamApplicationPosition> positions = new();
+    private List<(string Id, string Label)> PositionItems => positions.Select(p => (p.PositionId, p.PositionName)).ToList();
     private List<TeamApplicationTemplate> templates = new();
     private Dictionary<string, string> placeholders = new();
     private Dictionary<string, string> settings = new();

@@ -46,13 +46,8 @@ else
 
             <div class="field">
                 <label class="field__label" for="ls-channel">Levelup-Channel</label>
-                <select id="ls-channel" class="form-select" @bind="levelUpChannelId" @bind:after="OnFieldChanged">
-                    <option value="0">Kein Channel</option>
-                    @foreach (var channel in textChannels)
-                    {
-                        <option value="@channel.Id">#@channel.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ls-channel" Items="TextChannelItems" NoneLabel="Kein Channel" Placeholder="Channel suchen..."
+                                  @bind-SelectedId="levelUpChannelId" @bind-SelectedId:after="OnFieldChanged"/>
             </div>
 
             <div class="field field--wide">
@@ -112,13 +107,7 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="ls-reward-role">Rolle</label>
-                <select id="ls-reward-role" class="form-select" @bind="newRewardRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in assignableRoles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ls-reward-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newRewardRoleId"/>
             </div>
             <div class="field">
                 <label class="field__label" for="ls-reward-level">Ab Level</label>
@@ -173,13 +162,7 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="ls-override-role">Rolle</label>
-                <select id="ls-override-role" class="form-select" @bind="newOverrideRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in assignableRoles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ls-override-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newOverrideRoleId"/>
             </div>
             <div class="field">
                 <label class="field__label" for="ls-override-multi">Multiplikator</label>
@@ -233,13 +216,7 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="ls-blocked-channel">Channel</label>
-                <select id="ls-blocked-channel" class="form-select" @bind="newBlockedChannelId">
-                    <option value="0">Channel wählen</option>
-                    @foreach (var channel in textChannels)
-                    {
-                        <option value="@channel.Id">#@channel.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ls-blocked-channel" Items="TextChannelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..." @bind-SelectedId="newBlockedChannelId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -289,13 +266,7 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="ls-blocked-role">Rolle</label>
-                <select id="ls-blocked-role" class="form-select" @bind="newBlockedRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in assignableRoles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ls-blocked-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newBlockedRoleId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -317,6 +288,9 @@ else
 
     private List<DiscordChannel> textChannels = new();
     private List<DiscordRole> assignableRoles = new();
+
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+    private List<(ulong Id, string Label)> RoleItems => assignableRoles.Select(r => (r.Id, r.Name)).ToList();
 
     private List<Reward> rewardRoles = new();
     private ulong newRewardRoleId;

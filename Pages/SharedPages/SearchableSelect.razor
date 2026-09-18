@@ -1,0 +1,129 @@
+@typeparam TKey
+
+<div class="searchable-select">
+    <input type="text" class="form-control" id="@Id"
+           value="@(isOpen ? query : SelectedLabel)"
+           placeholder="@Placeholder"
+           autocomplete="off"
+           @oninput="OnInput"
+           @onfocus="OnFocus"
+           @onfocusout="OnBlur"
+           @onkeydown="OnKeyDown"/>
+
+    @if (isOpen)
+    {
+        <ul class="dropdown-menu show searchable-select__menu">
+            @if (AllowNone)
+            {
+                <li>
+                    <button type="button" class="dropdown-item @(IsSelected(NoneValue) ? "active" : null)"
+                            @onmousedown:preventDefault="true" @onmousedown="() => Select(NoneValue)">
+                        @NoneLabel
+                    </button>
+                </li>
+            }
+            @if (Filtered.Count == 0)
+            {
+                <li class="dropdown-item-text text-body-secondary">Keine Treffer</li>
+            }
+            else
+            {
+                @for (var i = 0; i < Filtered.Count; i++)
+                {
+                    var item = Filtered[i];
+                    var index = i;
+                    <li>
+                        <button type="button"
+                                class="dropdown-item @(IsSelected(item.Id) ? "active" : null) @(index == highlightedIndex ? "is-highlighted" : null)"
+                                @onmousedown:preventDefault="true" @onmousedown="() => Select(item.Id)">
+                            @item.Label
+                        </button>
+                    </li>
+                }
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private static readonly IEqualityComparer<TKey> Comparer = EqualityComparer<TKey>.Default;
+
+    [Parameter] [EditorRequired] public List<(TKey Id, string Label)> Items { get; set; } = [];
+    [Parameter] public TKey SelectedId { get; set; } = default!;
+    [Parameter] public EventCallback<TKey> SelectedIdChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Suchen...";
+    [Parameter] public string NoneLabel { get; set; } = "Keine Auswahl";
+    [Parameter] public bool AllowNone { get; set; } = true;
+    [Parameter] public TKey NoneValue { get; set; } = default!;
+    [Parameter] public string? Id { get; set; }
+
+    private bool isOpen;
+    private string query = "";
+    private int highlightedIndex = -1;
+
+    private bool IsSelected(TKey id)
+    {
+        return Comparer.Equals(id, SelectedId);
+    }
+
+    private string SelectedLabel =>
+        Items.FirstOrDefault(i => Comparer.Equals(i.Id, SelectedId)) is { Label: not null } found
+            ? found.Label
+            : NoneLabel;
+
+    private List<(TKey Id, string Label)> Filtered =>
+        string.IsNullOrWhiteSpace(query)
+            ? Items
+            : Items.Where(i => i.Label.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private void OnFocus()
+    {
+        isOpen = true;
+        query = "";
+        highlightedIndex = -1;
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? "";
+        isOpen = true;
+        highlightedIndex = -1;
+    }
+
+    private void OnBlur()
+    {
+        isOpen = false;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (!isOpen) return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                highlightedIndex = Math.Min(highlightedIndex + 1, Filtered.Count - 1);
+                break;
+            case "ArrowUp":
+                highlightedIndex = Math.Max(highlightedIndex - 1, 0);
+                break;
+            case "Enter":
+                if (highlightedIndex >= 0 && highlightedIndex < Filtered.Count) _ = Select(Filtered[highlightedIndex].Id);
+                else if (Filtered.Count == 1) _ = Select(Filtered[0].Id);
+                break;
+            case "Escape":
+                isOpen = false;
+                break;
+        }
+    }
+
+    private async Task Select(TKey id)
+    {
+        isOpen = false;
+        query = "";
+        if (Comparer.Equals(id, SelectedId)) return;
+
+        SelectedId = id;
+        await SelectedIdChanged.InvokeAsync(id);
+    }
+}

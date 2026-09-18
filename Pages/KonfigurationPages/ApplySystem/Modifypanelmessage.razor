@@ -61,13 +61,7 @@
 
             <div class="field">
                 <label class="field__label" for="panel-channel">Channel für ein neues Panel</label>
-                <select id="panel-channel" class="form-select" @bind="selectedChannelId">
-                    <option value="0">Channel wählen</option>
-                    @foreach (var channel in textChannels)
-                    {
-                        <option value="@channel.Id">#@channel.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="panel-channel" Items="TextChannelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..." @bind-SelectedId="selectedChannelId"/>
             </div>
 
             <div class="form-foot">
@@ -87,6 +81,7 @@
     private string panelmessagepreview = "";
 
     private List<DiscordChannel> textChannels = new();
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
     private ulong selectedChannelId;
     private ulong panelChannelId;
     private ulong panelMessageId;

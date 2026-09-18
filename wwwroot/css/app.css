@@ -1472,6 +1472,26 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     font-size: var(--f-xs);
 }
 
+
+.searchable-select {
+    position: relative;
+}
+
+.searchable-select__menu {
+    box-shadow: var(--shadow-overlay);
+    left: 0;
+    margin-top: var(--s-1);
+    max-height: 260px;
+    overflow-y: auto;
+    top: 100%;
+    width: 100%;
+}
+
+.searchable-select__menu .dropdown-item.is-highlighted {
+    background-color: var(--bs-dropdown-link-hover-bg);
+    color: var(--bs-dropdown-link-hover-color);
+}
+
 .weekly-chart__label {
     fill: var(--fg-subtle);
     font-size: var(--f-xs);

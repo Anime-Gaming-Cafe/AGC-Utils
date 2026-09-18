@@ -81,13 +81,8 @@ else
             {
                 <div class="field">
                     <label class="field__label" for="ar-threshold-role">Schwellenwert-Rolle</label>
-                    <select id="ar-threshold-role" class="form-select" @bind="thresholdRoleId" @bind:after="OnFieldChanged">
-                        <option value="0">Rolle wählen</option>
-                        @foreach (var role in assignableRoles)
-                        {
-                            <option value="@role.Id">@role.Name</option>
-                        }
-                    </select>
+                    <SearchableSelect Id="ar-threshold-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                      @bind-SelectedId="thresholdRoleId" @bind-SelectedId:after="OnFieldChanged"/>
                 </div>
                 <div class="field">
                     <label class="field__label" for="ar-threshold-comparator">Vergleich</label>
@@ -110,13 +105,8 @@ else
 
             <div class="field">
                 <label class="field__label" for="ar-announce-channel">Ankündigungs-Channel</label>
-                <select id="ar-announce-channel" class="form-select" @bind="announceChannelId" @bind:after="OnFieldChanged">
-                    <option value="0">Keine Ankündigung</option>
-                    @foreach (var channel in textChannels)
-                    {
-                        <option value="@channel.Id">#@channel.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="ar-announce-channel" Items="TextChannelItems" NoneLabel="Keine Ankündigung" Placeholder="Channel suchen..."
+                                  @bind-SelectedId="announceChannelId" @bind-SelectedId:after="OnFieldChanged"/>
             </div>
             <div class="field field--wide">
                 <label class="field__label" for="ar-announce-message">Ankündigungs-Nachricht</label>
@@ -147,13 +137,8 @@ else
         }
         <div class="field-grid mt-3">
             <div class="field">
-                <select class="form-select" @bind="newScopeId">
-                    <option value="0">Channel/Kategorie wählen</option>
-                    @foreach (var channel in scopeCandidates)
-                    {
-                        <option value="@channel.Id">@ChannelOrCategoryLabel(channel)</option>
-                    }
-                </select>
+                <SearchableSelect Items="ScopeItems" NoneLabel="Channel/Kategorie wählen" Placeholder="Channel/Kategorie suchen..."
+                                  @bind-SelectedId="newScopeId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -182,13 +167,8 @@ else
         }
         <div class="field-grid mt-3">
             <div class="field">
-                <select class="form-select" @bind="newExcludeScopeId">
-                    <option value="0">Channel/Kategorie wählen</option>
-                    @foreach (var channel in scopeCandidates)
-                    {
-                        <option value="@channel.Id">@ChannelOrCategoryLabel(channel)</option>
-                    }
-                </select>
+                <SearchableSelect Items="ScopeItems" NoneLabel="Channel/Kategorie wählen" Placeholder="Channel/Kategorie suchen..."
+                                  @bind-SelectedId="newExcludeScopeId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -231,13 +211,7 @@ else
                 </div>
                 <div class="field">
                     <label class="field__label">Rolle</label>
-                    <select class="form-select" @bind="newTierRoleId">
-                        <option value="0">Rolle wählen</option>
-                        @foreach (var role in assignableRoles)
-                        {
-                            <option value="@role.Id">@role.Name</option>
-                        }
-                    </select>
+                    <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newTierRoleId"/>
                 </div>
             </div>
             <div class="form-foot">
@@ -267,13 +241,7 @@ else
         }
         <div class="field-grid mt-3">
             <div class="field">
-                <select class="form-select" @bind="newWhitelistRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in assignableRoles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newWhitelistRoleId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -302,13 +270,7 @@ else
         }
         <div class="field-grid mt-3">
             <div class="field">
-                <select class="form-select" @bind="newBlacklistRoleId">
-                    <option value="0">Rolle wählen</option>
-                    @foreach (var role in assignableRoles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
-                </select>
+                <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newBlacklistRoleId"/>
             </div>
         </div>
         <div class="form-foot">
@@ -490,6 +452,10 @@ else
     private List<DiscordChannel> textChannels = [];
     private List<DiscordChannel> scopeCandidates = [];
     private List<DiscordRole> assignableRoles = [];
+
+    private List<(ulong Id, string Label)> RoleItems => assignableRoles.Select(r => (r.Id, r.Name)).ToList();
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+    private List<(ulong Id, string Label)> ScopeItems => scopeCandidates.Select(c => (c.Id, ChannelOrCategoryLabel(c))).ToList();
 
     private bool previewLoading;
     private List<ActivityRoleService.RankedGrant>? previewResults;

@@ -134,13 +134,7 @@ else
         <div class="field-grid">
             <div class="field">
                 <label class="field__label" for="bc-channel">Panel-Channel</label>
-                <select id="bc-channel" class="form-select" @bind="panelChannelId">
-                    <option value="0">Channel wählen</option>
-                    @foreach (var channel in textChannels)
-                    {
-                        <option value="@channel.Id">#@channel.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="bc-channel" Items="TextChannelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..." @bind-SelectedId="panelChannelId"/>
             </div>
             <div class="field">
                 <label class="field__label" for="bc-title">Embed-Titel</label>
@@ -178,6 +172,8 @@ else
     private List<ColorRoleVm> colorRoles = new();
     private List<DiscordChannel> textChannels = new();
     private Dictionary<ulong, ColorRoleVm> originalColorRoles = new();
+
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
 
     private ulong panelChannelId;
     private string embedTitle = "";

@@ -71,13 +71,8 @@ else
                     </div>
                     <div class="field">
                         <label class="field__label" for="ch-@position.PositionId">Benachrichtigungs-Channel</label>
-                        <select id="ch-@position.PositionId" class="form-select" @bind="position.NotifyChannelId" @bind:after="OnFieldChanged">
-                            <option value="0">Kein Channel</option>
-                            @foreach (var channel in textChannels)
-                            {
-                                <option value="@channel.Id">#@channel.Name</option>
-                            }
-                        </select>
+                        <SearchableSelect Id="@($"ch-{position.PositionId}")" Items="TextChannelItems" NoneLabel="Kein Channel" Placeholder="Channel suchen..."
+                                          @bind-SelectedId="position.NotifyChannelId" @bind-SelectedId:after="OnFieldChanged"/>
                     </div>
                     <div class="field field--wide">
                         <label class="field__label" for="desc-@position.PositionId">Beschreibung</label>
@@ -178,6 +173,7 @@ else
 
     private List<TeamApplicationPosition> positions = new();
     private List<DiscordChannel> textChannels = new();
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
     private Dictionary<string, TeamApplicationPosition> originalPositions = new();
 
     private string newName = "";
