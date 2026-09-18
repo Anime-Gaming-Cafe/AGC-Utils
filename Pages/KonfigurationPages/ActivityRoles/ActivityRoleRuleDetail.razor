@@ -124,6 +124,10 @@ else
                 </span>
             </div>
         </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@sendingAnnouncement" @onclick="SendAnnouncementNow">Ankündigung jetzt senden</button>
+            <span class="field__hint">Speichert ungespeicherte Änderungen zuerst, sendet dann sofort und setzt das Ankündigungsintervall zurück - es wird also nicht kurz danach nochmal automatisch gepostet.</span>
+        </div>
     </Panel>
 
     <Panel Title="Erlaubte Channels/Kategorien" Lead="Leer = alle Channels zählen. Eine Kategorie deckt automatisch ihre Channels ab." Flush="@(scopeIds.Count > 0)">
@@ -582,6 +586,8 @@ else
     private bool previewLoading;
     private List<ActivityRoleService.RankedGrant>? previewResults;
 
+    private bool sendingAnnouncement;
+
     private bool confirmingDelete;
     private bool deleting;
 
@@ -816,6 +822,22 @@ else
 
         previewResults = await ActivityRoleService.PreviewRuleAsync(RuleId);
         previewLoading = false;
+    }
+
+    private async Task SendAnnouncementNow()
+    {
+        if (sendingAnnouncement) return;
+        sendingAnnouncement = true;
+
+        if (Tracker.IsDirty) await Tracker.SaveAsync();
+
+        var sent = await ActivityRoleService.TriggerAnnouncementAsync(RuleId);
+        sendingAnnouncement = false;
+
+        ToastService.Notify(
+            sent ? "Ankündigung gesendet." : "Nichts gesendet - kein Ankündigungs-Channel gesetzt oder aktuell niemand in der Auswertung.",
+            sent ? "ok" : "bad");
+        await Load();
     }
 
     #region Scope

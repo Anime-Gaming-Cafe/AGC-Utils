@@ -441,8 +441,27 @@ public static class ActivityRoleService
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (now - rule.LastAnnouncedAt < rule.AnnounceIntervalDays * 86400L) return;
 
-        await SendAnnouncementAsync(rule, guild, desired);
-        await SetLastAnnouncedAsync(rule.RuleId, now);
+        if (await SendAnnouncementAsync(rule, guild, desired)) await SetLastAnnouncedAsync(rule.RuleId, now);
+    }
+
+    /// <summary>
+    ///     Manual "send now" for the WebUI - same send path as the periodic check, and it resets
+    ///     last_announced_at the same way so the interval clock does not immediately fire again right
+    ///     after. Returns false (no exception) when there is nothing to announce, so the caller can show
+    ///     a specific reason instead of a generic error.
+    /// </summary>
+    public static async Task<bool> TriggerAnnouncementAsync(string ruleId)
+    {
+        var rule = await GetRuleAsync(ruleId);
+        var guild = CurrentApplication.TargetGuild;
+        if (rule == null || guild == null || rule.AnnounceChannelId == 0) return false;
+
+        var desired = await ComputeDesiredGrantsAsync(rule, guild);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (!await SendAnnouncementAsync(rule, guild, desired)) return false;
+
+        await SetLastAnnouncedAsync(ruleId, now);
+        return true;
     }
 
     private static async Task ApplyDesiredGrantsAsync(ActivityRoleRule rule, DiscordGuild guild,
@@ -547,12 +566,12 @@ public static class ActivityRoleService
     ///     rank exactly where they want (own line, own section, mixed with other text); {winners} is the
     ///     lazy all-at-once alternative for anyone who does not care about layout.
     /// </summary>
-    private static async Task SendAnnouncementAsync(ActivityRoleRule rule, DiscordGuild guild,
+    private static async Task<bool> SendAnnouncementAsync(ActivityRoleRule rule, DiscordGuild guild,
         List<RankedGrant> winners)
     {
-        if (rule.AnnounceChannelId == 0) return;
-        if (winners.Count == 0) return;
-        if (!guild.Channels.TryGetValue(rule.AnnounceChannelId, out var channel)) return;
+        if (rule.AnnounceChannelId == 0) return false;
+        if (winners.Count == 0) return false;
+        if (!guild.Channels.TryGetValue(rule.AnnounceChannelId, out var channel)) return false;
 
         var byRank = winners.Where(w => w.Rank > 0).ToDictionary(w => w.Rank);
         var joined = winners
@@ -569,11 +588,13 @@ public static class ActivityRoleService
         try
         {
             await channel.SendMessageAsync(message);
+            return true;
         }
         catch (Exception e)
         {
             CurrentApplication.Logger.Error(e, "ActivityRoles: failed to send announcement for rule {RuleId}",
                 rule.RuleId);
+            return false;
         }
     }
 
