@@ -363,6 +363,34 @@ public static class DatabaseService
             {
                 "teamapplication_placeholder",
                 "CREATE TABLE IF NOT EXISTS teamapplication_placeholder (key TEXT PRIMARY KEY, text TEXT DEFAULT '')"
+            },
+            {
+                "activity_role_rules",
+                "CREATE TABLE IF NOT EXISTS activity_role_rules (rule_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT true, metric TEXT DEFAULT 'messages', mode TEXT DEFAULT 'topn', window_type TEXT DEFAULT 'rolling', window_days INTEGER DEFAULT 7, window_start BIGINT, window_end BIGINT, scope_ids BIGINT[] DEFAULT '{}', exclude_scope_ids BIGINT[] DEFAULT '{}', min_activity BIGINT DEFAULT 0, threshold_role_id BIGINT DEFAULT 0, threshold_value BIGINT DEFAULT 0, threshold_comparator TEXT DEFAULT 'gte', auto_revoke BOOLEAN DEFAULT true, announce_channel_id BIGINT DEFAULT 0, announce_message TEXT DEFAULT '', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0, last_period_key TEXT DEFAULT '')"
+            },
+            {
+                "activity_role_tiers",
+                "CREATE TABLE IF NOT EXISTS activity_role_tiers (tier_id TEXT PRIMARY KEY, rule_id TEXT, rank_from INTEGER DEFAULT 1, rank_to INTEGER DEFAULT 1, roleid BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_activity_role_tiers_rule",
+                "CREATE INDEX IF NOT EXISTS idx_activity_role_tiers_rule ON activity_role_tiers (rule_id)"
+            },
+            {
+                "activity_role_grants",
+                "CREATE TABLE IF NOT EXISTS activity_role_grants (rule_id TEXT, userid BIGINT, roleid BIGINT DEFAULT 0, rank INTEGER DEFAULT 0, granted_at BIGINT DEFAULT 0, PRIMARY KEY (rule_id, userid, roleid))"
+            },
+            {
+                "idx_activity_role_grants_userid",
+                "CREATE INDEX IF NOT EXISTS idx_activity_role_grants_userid ON activity_role_grants (userid)"
+            },
+            {
+                "eligibility_conditions",
+                "CREATE TABLE IF NOT EXISTS eligibility_conditions (condition_id TEXT PRIMARY KEY, owner_type TEXT, owner_id TEXT, group_id INTEGER DEFAULT 1, condition_type TEXT DEFAULT 'role', comparator TEXT DEFAULT 'gte', value BIGINT DEFAULT 0, scope_ids BIGINT[] DEFAULT '{}', negate BOOLEAN DEFAULT false, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_eligibility_conditions_owner",
+                "CREATE INDEX IF NOT EXISTS idx_eligibility_conditions_owner ON eligibility_conditions (owner_type, owner_id)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1201,6 +1229,151 @@ public static class DatabaseService
                 "pollvotes", new Dictionary<string, string>
                 {
                     { "drop", "DROP TABLE IF EXISTS pollvotes" }
+                }
+            },
+            {
+                "activity_role_rules", new Dictionary<string, string>
+                {
+                    { "name", "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS name TEXT DEFAULT ''" },
+                    {
+                        "enabled",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "metric",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS metric TEXT DEFAULT 'messages'"
+                    },
+                    { "mode", "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'topn'" },
+                    {
+                        "window_type",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS window_type TEXT DEFAULT 'rolling'"
+                    },
+                    {
+                        "window_days",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS window_days INTEGER DEFAULT 7"
+                    },
+                    {
+                        "window_start",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS window_start BIGINT"
+                    },
+                    { "window_end", "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS window_end BIGINT" },
+                    {
+                        "scope_ids",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS scope_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "exclude_scope_ids",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS exclude_scope_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "min_activity",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS min_activity BIGINT DEFAULT 0"
+                    },
+                    {
+                        "threshold_role_id",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS threshold_role_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "threshold_value",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS threshold_value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "threshold_comparator",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS threshold_comparator TEXT DEFAULT 'gte'"
+                    },
+                    {
+                        "auto_revoke",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS auto_revoke BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "announce_channel_id",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS announce_channel_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "announce_message",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS announce_message TEXT DEFAULT ''"
+                    },
+                    {
+                        "created_by",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "last_period_key",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS last_period_key TEXT DEFAULT ''"
+                    }
+                }
+            },
+            {
+                "activity_role_tiers", new Dictionary<string, string>
+                {
+                    { "rule_id", "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS rule_id TEXT" },
+                    {
+                        "rank_from",
+                        "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS rank_from INTEGER DEFAULT 1"
+                    },
+                    {
+                        "rank_to",
+                        "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS rank_to INTEGER DEFAULT 1"
+                    },
+                    {
+                        "roleid",
+                        "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS roleid BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "activity_role_grants", new Dictionary<string, string>
+                {
+                    { "rule_id", "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS rule_id TEXT" },
+                    { "userid", "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS userid BIGINT" },
+                    {
+                        "roleid",
+                        "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS roleid BIGINT DEFAULT 0"
+                    },
+                    { "rank", "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 0" },
+                    {
+                        "granted_at",
+                        "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS granted_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "eligibility_conditions", new Dictionary<string, string>
+                {
+                    { "owner_type", "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS owner_type TEXT" },
+                    { "owner_id", "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS owner_id TEXT" },
+                    {
+                        "group_id",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS group_id INTEGER DEFAULT 1"
+                    },
+                    {
+                        "condition_type",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS condition_type TEXT DEFAULT 'role'"
+                    },
+                    {
+                        "comparator",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS comparator TEXT DEFAULT 'gte'"
+                    },
+                    {
+                        "value",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS value BIGINT DEFAULT 0"
+                    },
+                    {
+                        "scope_ids",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS scope_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "negate",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS negate BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
                 }
             }
         };

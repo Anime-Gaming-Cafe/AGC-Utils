@@ -370,21 +370,7 @@ public static class ExtraPermissionService
     /// </summary>
     public static HashSet<ulong> ExpandScope(DiscordGuild? guild, long[] scopeIds)
     {
-        var expanded = new HashSet<ulong>();
-        foreach (var raw in scopeIds)
-        {
-            var id = (ulong)raw;
-            if (guild != null && guild.Channels.TryGetValue(id, out var channel) &&
-                channel.Type == ChannelType.Category)
-            {
-                foreach (var child in guild.Channels.Values.Where(c => c.ParentId == id)) expanded.Add(child.Id);
-                continue;
-            }
-
-            expanded.Add(id);
-        }
-
-        return expanded;
+        return MetricsQueryService.ExpandScope(guild, scopeIds);
     }
 
     public static string MetricTableFor(ExtraPermissionConditionType type)
@@ -400,49 +386,25 @@ public static class ExtraPermissionService
 
     /// <summary>
     ///     Both metric tables are row logs, so a count is the metric: one row per message, and one row per
-    ///     user and minute for voice. A window of 0 counts everything ever recorded.
+    ///     user and minute for voice. A window of 0 counts everything ever recorded. Thin wrapper around
+    ///     the shared <see cref="MetricsQueryService" /> so other callers (TeamApplicationService) keep
+    ///     their existing windowDays-based signature.
     /// </summary>
-    public static async Task<long> CountMetricAsync(string table, ulong userId, int windowDays,
+    public static Task<long> CountMetricAsync(string table, ulong userId, int windowDays,
         long[] scopeIds, DiscordGuild? guild = null)
     {
-        var scope = ExpandScope(guild, scopeIds);
-        var sql = new StringBuilder($"SELECT COUNT(*) FROM {table} WHERE userid = @userid");
-        if (scope.Count > 0) sql.Append(" AND channelid = ANY(@channels)");
-        if (windowDays > 0) sql.Append(" AND timestamp >= @since");
-
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var cmd = con.CreateCommand(sql.ToString());
-        cmd.Parameters.AddWithValue("userid", (long)userId);
-        if (scope.Count > 0) cmd.Parameters.AddWithValue("channels", scope.Select(x => (long)x).ToArray());
-        if (windowDays > 0)
-            cmd.Parameters.AddWithValue("since", DateTimeOffset.UtcNow.AddDays(-windowDays).ToUnixTimeSeconds());
-
-        var result = await cmd.ExecuteScalarAsync();
-        return result is long count ? count : 0;
+        var sinceUnix = windowDays > 0 ? DateTimeOffset.UtcNow.AddDays(-windowDays).ToUnixTimeSeconds() : 0;
+        return MetricsQueryService.CountMetricAsync(table, userId, sinceUnix, null, scopeIds, [], guild);
     }
 
     public static async Task<List<ulong>> GetMembersOverThresholdAsync(DiscordGuild guild,
         ExtraPermissionCondition condition)
     {
-        var userIds = new List<ulong>();
-        var scope = ExpandScope(guild, condition.ScopeIds);
-        var sql = new StringBuilder($"SELECT userid FROM {MetricTableFor(condition.Type)} WHERE true");
-        if (scope.Count > 0) sql.Append(" AND channelid = ANY(@channels)");
-        if (condition.WindowDays > 0) sql.Append(" AND timestamp >= @since");
-        sql.Append(" GROUP BY userid HAVING COUNT(*) >= @threshold");
-
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var cmd = con.CreateCommand(sql.ToString());
-        cmd.Parameters.AddWithValue("threshold", condition.Value);
-        if (scope.Count > 0) cmd.Parameters.AddWithValue("channels", scope.Select(x => (long)x).ToArray());
-        if (condition.WindowDays > 0)
-            cmd.Parameters.AddWithValue("since",
-                DateTimeOffset.UtcNow.AddDays(-condition.WindowDays).ToUnixTimeSeconds());
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync()) userIds.Add((ulong)reader.GetInt64(0));
-
-        return userIds;
+        var sinceUnix = condition.WindowDays > 0
+            ? DateTimeOffset.UtcNow.AddDays(-condition.WindowDays).ToUnixTimeSeconds()
+            : 0;
+        return await MetricsQueryService.GetUsersOverThresholdAsync(MetricTableFor(condition.Type), sinceUnix, null,
+            condition.ScopeIds, [], false, condition.Value, guild);
     }
 
     #endregion

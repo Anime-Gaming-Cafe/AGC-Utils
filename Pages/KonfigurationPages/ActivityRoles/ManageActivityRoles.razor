@@ -1,0 +1,167 @@
+@page "/konfiguration/activityroles"
+@using AGC_Management.Entities.ActivityRoles
+@using AGC_Management.Enums.ActivityRoles
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Activity-Rollen"
+            Lead="Rollen, die automatisch nach Chat- oder Voice-Aktivität vergeben werden."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Regeln werden geladen"
+                Description="Activity-Rollen-Regeln werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Regeln" Lead="Jede Regel läuft unabhängig und wird alle paar Minuten neu ausgewertet." Flush="@(rules.Count > 0)">
+        @if (rules.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch keine Regel angelegt" Description="Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var rule in rules)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@rule.Name</p>
+                            <p class="rows__text">@MetricLabel(rule.Metric) &middot; @ModeLabel(rule.Mode) &middot; @WindowLabel(rule)</p>
+                        </div>
+                        <div class="rows__side">
+                            <div class="form-check form-switch m-0" title="@(rule.Enabled ? "Aktiv" : "Deaktiviert")">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       checked="@rule.Enabled" @onchange="@(e => ToggleEnabled(rule, (bool)e.Value!))"/>
+                            </div>
+                            <a class="btn btn-secondary btn-sm" href="/konfiguration/activityroles/@rule.RuleId">Bearbeiten</a>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Neue Regel">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="ar-name">Name</label>
+                <input id="ar-name" class="form-control" @bind="newName" placeholder="z.B. Wöchentliche Chat-Champions"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-metric">Metrik</label>
+                <select id="ar-metric" class="form-select" @bind="newMetric">
+                    <option value="@ActivityRoleMetric.Messages">Chat-Nachrichten</option>
+                    <option value="@ActivityRoleMetric.VoiceMinutes">Voice-Minuten</option>
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-mode">Modus</label>
+                <select id="ar-mode" class="form-select" @bind="newMode">
+                    <option value="@ActivityRoleMode.TopN">Rangliste (Top-N)</option>
+                    <option value="@ActivityRoleMode.Threshold">Schwellenwert</option>
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-window">Zeitfenster</label>
+                <select id="ar-window" class="form-select" @bind="newWindowType">
+                    <option value="@ActivityRoleWindowType.Rolling">Rollierend (letzte X Tage)</option>
+                    <option value="@ActivityRoleWindowType.CalendarDaily">Kalendertag</option>
+                    <option value="@ActivityRoleWindowType.CalendarWeekly">Kalenderwoche (ab Montag)</option>
+                    <option value="@ActivityRoleWindowType.CalendarMonthly">Kalendermonat</option>
+                    <option value="@ActivityRoleWindowType.AllTime">Alltime</option>
+                </select>
+            </div>
+            @if (newWindowType == ActivityRoleWindowType.Rolling)
+            {
+                <div class="field">
+                    <label class="field__label" for="ar-window-days">Rollierende Tage</label>
+                    <input id="ar-window-days" type="number" min="1" class="form-control" @bind="newWindowDays"/>
+                </div>
+            }
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="CreateRule">Regel anlegen</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<ActivityRoleRule> rules = [];
+
+    private string newName = "";
+    private ActivityRoleMetric newMetric = ActivityRoleMetric.Messages;
+    private ActivityRoleMode newMode = ActivityRoleMode.TopN;
+    private ActivityRoleWindowType newWindowType = ActivityRoleWindowType.Rolling;
+    private int newWindowDays = 7;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        loaded = true;
+    }
+
+    private async Task Load()
+    {
+        rules = await ActivityRoleService.GetRulesAsync();
+    }
+
+    private static string MetricLabel(ActivityRoleMetric metric)
+    {
+        return metric == ActivityRoleMetric.Messages ? "Chat" : "Voice";
+    }
+
+    private static string ModeLabel(ActivityRoleMode mode)
+    {
+        return mode == ActivityRoleMode.TopN ? "Rangliste" : "Schwellenwert";
+    }
+
+    private static string WindowLabel(ActivityRoleRule rule)
+    {
+        return rule.WindowType switch
+        {
+            ActivityRoleWindowType.Rolling => $"Rollierend, {rule.WindowDays} Tage",
+            ActivityRoleWindowType.CalendarDaily => "Täglich",
+            ActivityRoleWindowType.CalendarWeekly => "Wöchentlich",
+            ActivityRoleWindowType.CalendarMonthly => "Monatlich",
+            ActivityRoleWindowType.AllTime => "Alltime",
+            _ => "Event-Zeitraum (bald verfügbar)"
+        };
+    }
+
+    private async Task ToggleEnabled(ActivityRoleRule rule, bool enabled)
+    {
+        rule.Enabled = enabled;
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify(enabled ? "Regel aktiviert." : "Regel deaktiviert.", "ok");
+    }
+
+    private async Task CreateRule()
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            ToastService.Notify("Bitte einen Namen vergeben.", "bad");
+            return;
+        }
+
+        var rule = new ActivityRoleRule
+        {
+            RuleId = ToolSet.GenerateCaseID(),
+            Name = newName.Trim(),
+            Metric = newMetric,
+            Mode = newMode,
+            WindowType = newWindowType,
+            WindowDays = Math.Max(newWindowDays, 1),
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        };
+
+        await ActivityRoleService.AddRuleAsync(rule);
+        ToastService.Notify("Regel angelegt.", "ok");
+        Nav.NavigateTo($"/konfiguration/activityroles/{rule.RuleId}");
+    }
+}

@@ -24,6 +24,13 @@ public static class MemberCacheService
     public static ulong TargetGuildId => ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["ServerId"]);
 
     /// <summary>
+    ///     True once the first member download after a (re)connect has completed. Features that read
+    ///     guild.Members for role/condition checks (e.g. ActivityRoleTask) should wait for this instead
+    ///     of running against a cache that is still empty or only holds the initial GUILD_CREATE subset.
+    /// </summary>
+    public static bool InitialDownloadComplete { get; private set; }
+
+    /// <summary>
     ///     Safety net in case a refresh is missed. The actual trigger is GuildAvailable.
     /// </summary>
     public static Task StartPeriodicRefresh(DiscordClient client, ulong guildId)
@@ -74,6 +81,7 @@ public static class MemberCacheService
 
             CurrentApplication.Logger.Information(
                 $"Member download complete: cache now holds {guild.Members.Count} members.");
+            InitialDownloadComplete = true;
         }
         catch (Exception ex)
         {

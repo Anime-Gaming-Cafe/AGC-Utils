@@ -196,6 +196,7 @@ public class DiscordBotService : IHostedService
         _ = BoosterColorCleanupTask.LaunchLoops();
         _ = ExtraPermissionSyncTask.LaunchLoops();
         _ = TeamApplicationPhaseTask.LaunchLoops();
+        _ = ActivityRoleTask.Run();
 
         return Task.CompletedTask;
     }

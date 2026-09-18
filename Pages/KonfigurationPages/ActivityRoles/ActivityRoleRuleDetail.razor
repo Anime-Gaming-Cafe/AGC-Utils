@@ -1,0 +1,931 @@
+@page "/konfiguration/activityroles/{RuleId}"
+@using AGC_Management.Entities.ActivityRoles
+@using AGC_Management.Entities.Conditions
+@using AGC_Management.Enums.ActivityRoles
+@using AGC_Management.Enums.Conditions
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="@(rule?.Name ?? "Activity-Regel")"
+            Lead="Metrik, Zeitfenster, Rollen und Ausnahmen dieser Regel."
+            BackHref="/konfiguration/activityroles" BackText="Activity-Rollen"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading" Title="Regel wird geladen" Description="Einstellungen, Rangstufen und Bedingungen werden abgefragt."/>
+}
+else if (rule == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Regel nicht gefunden"
+                Description="Diese Regel existiert nicht mehr, oder sie wurde gelöscht."
+                ActionText="Zu den Activity-Rollen" ActionHref="/konfiguration/activityroles"/>
+}
+else
+{
+    <Panel Title="Einstellungen">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="ar-name">Name</label>
+                <input id="ar-name" class="form-control" @bind="name" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ar-enabled" @bind="enabled" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="ar-enabled">Regel aktiv</label>
+                </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-metric">Metrik</label>
+                <select id="ar-metric" class="form-select" @bind="metric" @bind:after="OnFieldChanged">
+                    <option value="@ActivityRoleMetric.Messages">Chat-Nachrichten</option>
+                    <option value="@ActivityRoleMetric.VoiceMinutes">Voice-Minuten</option>
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-mode">Modus</label>
+                <select id="ar-mode" class="form-select" @bind="mode" @bind:after="OnFieldChanged">
+                    <option value="@ActivityRoleMode.TopN">Rangliste (Top-N)</option>
+                    <option value="@ActivityRoleMode.Threshold">Schwellenwert</option>
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-window">Zeitfenster</label>
+                <select id="ar-window" class="form-select" @bind="windowType" @bind:after="OnFieldChanged">
+                    <option value="@ActivityRoleWindowType.Rolling">Rollierend (letzte X Tage)</option>
+                    <option value="@ActivityRoleWindowType.CalendarDaily">Kalendertag</option>
+                    <option value="@ActivityRoleWindowType.CalendarWeekly">Kalenderwoche (ab Montag)</option>
+                    <option value="@ActivityRoleWindowType.CalendarMonthly">Kalendermonat</option>
+                    <option value="@ActivityRoleWindowType.AllTime">Alltime</option>
+                </select>
+            </div>
+            @if (windowType == ActivityRoleWindowType.Rolling)
+            {
+                <div class="field">
+                    <label class="field__label" for="ar-window-days">Rollierende Tage</label>
+                    <input id="ar-window-days" type="number" min="1" class="form-control" @bind="windowDays" @bind:after="OnFieldChanged"/>
+                </div>
+            }
+            <div class="field">
+                <label class="field__label" for="ar-min-activity">Mindestaktivität</label>
+                <input id="ar-min-activity" type="number" min="0" class="form-control" @bind="minActivity" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Nur bei mindestens so vielen Ereignissen im Fenster wird ein Rang vergeben.</span>
+            </div>
+
+            @if (mode == ActivityRoleMode.Threshold)
+            {
+                <div class="field">
+                    <label class="field__label" for="ar-threshold-role">Schwellenwert-Rolle</label>
+                    <select id="ar-threshold-role" class="form-select" @bind="thresholdRoleId" @bind:after="OnFieldChanged">
+                        <option value="0">Rolle wählen</option>
+                        @foreach (var role in assignableRoles)
+                        {
+                            <option value="@role.Id">@role.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field__label" for="ar-threshold-comparator">Vergleich</label>
+                    <select id="ar-threshold-comparator" class="form-select" @bind="thresholdComparator" @bind:after="OnFieldChanged">
+                        <option value="@EligibilityComparator.Gte">Mindestens (&gt;=)</option>
+                        <option value="@EligibilityComparator.Lte">Höchstens (&lt;=)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field__label" for="ar-threshold-value">Wert</label>
+                    <input id="ar-threshold-value" type="number" min="0" class="form-control" @bind="thresholdValue" @bind:after="OnFieldChanged"/>
+                </div>
+                <div class="field">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ar-auto-revoke" @bind="autoRevoke" @bind:after="OnFieldChanged"/>
+                        <label class="form-check-label" for="ar-auto-revoke">Rolle wieder entziehen, wenn Aktivität unter den Wert fällt</label>
+                    </div>
+                </div>
+            }
+
+            <div class="field">
+                <label class="field__label" for="ar-announce-channel">Ankündigungs-Channel</label>
+                <select id="ar-announce-channel" class="form-select" @bind="announceChannelId" @bind:after="OnFieldChanged">
+                    <option value="0">Keine Ankündigung</option>
+                    @foreach (var channel in textChannels)
+                    {
+                        <option value="@channel.Id">#@channel.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="ar-announce-message">Ankündigungs-Nachricht</label>
+                <textarea id="ar-announce-message" class="form-control" rows="2" @bind="announceMessage" @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">Platzhalter: {winners} (eine Zeile pro Gewinner). Wird nur bei Kalender-Zeitfenstern gepostet, wenn eine neue Periode beginnt.</span>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Erlaubte Channels/Kategorien" Lead="Leer = alle Channels zählen. Eine Kategorie deckt automatisch ihre Channels ab." Flush="@(scopeIds.Count > 0)">
+        @if (scopeIds.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Einschränkung" Description="Alle Channels zählen mit."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var id in scopeIds)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@ChannelOrCategoryName(id)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveScope(id)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <select class="form-select" @bind="newScopeId">
+                    <option value="0">Channel/Kategorie wählen</option>
+                    @foreach (var channel in scopeCandidates)
+                    {
+                        <option value="@channel.Id">@ChannelOrCategoryLabel(channel)</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddScope">Hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Ausgeschlossene Channels/Kategorien" Lead="Diese Channels zählen nie mit, auch wenn sie in der Einschluss-Liste stehen." Flush="@(excludeScopeIds.Count > 0)">
+        @if (excludeScopeIds.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Kein Ausschluss" Description="Es ist nichts ausgeschlossen."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var id in excludeScopeIds)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@ChannelOrCategoryName(id)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveExcludeScope(id)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <select class="form-select" @bind="newExcludeScopeId">
+                    <option value="0">Channel/Kategorie wählen</option>
+                    @foreach (var channel in scopeCandidates)
+                    {
+                        <option value="@channel.Id">@ChannelOrCategoryLabel(channel)</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddExcludeScope">Ausschließen</button>
+        </div>
+    </Panel>
+
+    @if (mode == ActivityRoleMode.TopN)
+    {
+        <Panel Title="Rangstufen" Lead="Jede Stufe deckt einen Rangbereich ab. Dieselbe Rolle darf mehrfach vergeben werden." Flush="@(tiers.Count > 0)">
+            @if (tiers.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Noch keine Rangstufe" Description="Ohne Rangstufe vergibt diese Regel keine Rolle."/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var tier in tiers.OrderBy(t => t.RankFrom))
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">Rang @tier.RankFrom@(tier.RankTo != tier.RankFrom ? $" - {tier.RankTo}" : "")</p>
+                                <p class="rows__text">@RoleName(tier.RoleId)</p>
+                            </div>
+                            <div class="rows__side">
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveTier(tier)">Entfernen</button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            <div class="field-grid mt-3">
+                <div class="field">
+                    <label class="field__label">Von Rang</label>
+                    <input type="number" min="1" class="form-control" @bind="newTierFrom"/>
+                </div>
+                <div class="field">
+                    <label class="field__label">Bis Rang</label>
+                    <input type="number" min="1" class="form-control" @bind="newTierTo"/>
+                </div>
+                <div class="field">
+                    <label class="field__label">Rolle</label>
+                    <select class="form-select" @bind="newTierRoleId">
+                        <option value="0">Rolle wählen</option>
+                        @foreach (var role in assignableRoles)
+                        {
+                            <option value="@role.Id">@role.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="form-foot">
+                <button type="button" class="btn btn-primary" @onclick="AddTier">Rangstufe hinzufügen</button>
+            </div>
+        </Panel>
+    }
+
+    <Panel Title="Erlaubte Rollen" Lead="Nur Mitglieder mit mindestens einer dieser Rollen sind teilnahmeberechtigt. Leer = keine Einschränkung." Flush="@(whitelistRoles.Count > 0)">
+        @if (whitelistRoles.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Einschränkung" Description="Alle Mitglieder dürfen teilnehmen."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var condition in whitelistRoles)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@RoleName((ulong)condition.Value)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveCondition(condition)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <select class="form-select" @bind="newWhitelistRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in assignableRoles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddWhitelistRole">Zur Whitelist hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Ausgeschlossene Rollen" Lead="Mitglieder mit einer dieser Rollen sind nie teilnahmeberechtigt." Flush="@(blacklistRoles.Count > 0)">
+        @if (blacklistRoles.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Ausschlüsse" Description="Keine Rolle ist ausgeschlossen."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var condition in blacklistRoles)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@RoleName((ulong)condition.Value)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveCondition(condition)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <select class="form-select" @bind="newBlacklistRoleId">
+                    <option value="0">Rolle wählen</option>
+                    @foreach (var role in assignableRoles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddBlacklistRole">Ausschließen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Mitglieder-Ausnahmen" Lead="Einzelne Mitglieder unabhängig von ihren Rollen von dieser Regel ausschließen." Flush="@(memberExceptions.Count > 0)">
+        @if (memberExceptions.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Ausnahmen" Description="Kein Mitglied ist einzeln ausgeschlossen."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var condition in memberExceptions)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@MemberLabel((ulong)condition.Value)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveCondition(condition)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <label class="field__label">Discord-User-ID</label>
+                <input class="form-control" @bind="newExceptionMemberId" placeholder="z.B. 123456789012345678"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddMemberException">Ausschließen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Erweitert" Lead="Weitere Teilnahmebedingungen: Mitgliedsalter, Server-Boost, Level." Flush="@(advancedConditions.Count > 0)">
+        @if (advancedConditions.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine weiteren Bedingungen" Description="Lege unten bei Bedarf eine an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var condition in advancedConditions)
+                {
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@AdvancedConditionLabel(condition)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveCondition(condition)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <div class="field-grid mt-3">
+            <div class="field">
+                <label class="field__label">Typ</label>
+                <select class="form-select" @bind="newAdvancedType">
+                    <option value="@EligibilityConditionType.MembershipAge">Mitgliedsalter (Tage im Server)</option>
+                    <option value="@EligibilityConditionType.Boost">Server-Boost</option>
+                    <option value="@EligibilityConditionType.Level">Level</option>
+                </select>
+            </div>
+            @if (newAdvancedType != EligibilityConditionType.Boost)
+            {
+                <div class="field">
+                    <label class="field__label">Vergleich</label>
+                    <select class="form-select" @bind="newAdvancedComparator">
+                        <option value="@EligibilityComparator.Gte">Mindestens (&gt;=)</option>
+                        <option value="@EligibilityComparator.Lte">Höchstens (&lt;=)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field__label">Wert</label>
+                    <input type="number" min="0" class="form-control" @bind="newAdvancedValue"/>
+                </div>
+            }
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ar-advanced-negate" @bind="newAdvancedNegate"/>
+                    <label class="form-check-label" for="ar-advanced-negate">Verneinen (Bedingung ausschließen statt fordern)</label>
+                </div>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddAdvancedCondition">Bedingung hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Vorschau" Lead="Zeigt die aktuell berechnete Rangliste bzw. Schwellenwert-Treffer, ohne den nächsten Auswertungszyklus abzuwarten.">
+        <div class="form-foot mb-3">
+            <button type="button" class="btn btn-secondary" disabled="@previewLoading" @onclick="RunPreview">Jetzt berechnen</button>
+        </div>
+        @if (previewLoading)
+        {
+            <StateBlock Inline="true" Kind="StateBlock.StateKind.Loading" Title="Vorschau wird berechnet" Description="Aktivitätsdaten werden ausgewertet."/>
+        }
+        else if (previewResults == null)
+        {
+            <StateBlock Inline="true" Title="Noch keine Vorschau" Description="Klicke auf 'Jetzt berechnen', um die aktuelle Auswertung zu sehen."/>
+        }
+        else if (previewResults.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Treffer" Description="Aktuell erfüllt niemand die konfigurierten Bedingungen."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var result in previewResults.OrderBy(r => r.Rank == 0 ? int.MaxValue : r.Rank))
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@(result.Rank > 0 ? $"Rang {result.Rank}" : "Über Schwellenwert") &middot; @MemberLabel(result.UserId)</p>
+                            <p class="rows__text">@RoleName(result.RoleId) &middot; @result.Count im Fenster</p>
+                        </div>
+                    </li>
+                }
+            </ul>
+            <p class="field__hint mt-2">Momentaufnahme. Rollen werden erst beim nächsten regulären Lauf tatsächlich vergeben/entzogen.</p>
+        }
+    </Panel>
+
+    <Panel Title="Regel löschen">
+        @if (!confirmingDelete)
+        {
+            <button type="button" class="btn btn-danger" @onclick="() => confirmingDelete = true">Regel löschen</button>
+        }
+        else
+        {
+            <ConfirmInline Title="Regel wirklich löschen?" ConfirmText="Ja, löschen" Busy="deleting"
+                           OnConfirm="DeleteRule" OnCancel="() => confirmingDelete = false">
+                <p>Alle Rangstufen, Bedingungen und vom Bot vergebenen Rollen dieser Regel werden entfernt. Bereits vergebene Rollen werden dabei nicht automatisch entzogen.</p>
+            </ConfirmInline>
+        }
+    </Panel>
+}
+
+@code {
+    [Parameter] public string RuleId { get; set; } = "";
+
+    private bool loaded;
+    private ActivityRoleRule? rule;
+
+    private string name = "";
+    private bool enabled = true;
+    private ActivityRoleMetric metric;
+    private ActivityRoleMode mode;
+    private ActivityRoleWindowType windowType;
+    private int windowDays = 7;
+    private long minActivity;
+    private ulong thresholdRoleId;
+    private EligibilityComparator thresholdComparator;
+    private long thresholdValue;
+    private bool autoRevoke = true;
+    private ulong announceChannelId;
+    private string announceMessage = "";
+
+    private List<long> scopeIds = [];
+    private List<long> excludeScopeIds = [];
+    private ulong newScopeId;
+    private ulong newExcludeScopeId;
+
+    private List<ActivityRoleTier> tiers = [];
+    private int newTierFrom = 1;
+    private int newTierTo = 1;
+    private ulong newTierRoleId;
+
+    private List<EligibilityCondition> conditions = [];
+    private ulong newWhitelistRoleId;
+    private ulong newBlacklistRoleId;
+    private string newExceptionMemberId = "";
+    private EligibilityConditionType newAdvancedType = EligibilityConditionType.MembershipAge;
+    private EligibilityComparator newAdvancedComparator = EligibilityComparator.Gte;
+    private long newAdvancedValue;
+    private bool newAdvancedNegate;
+
+    private List<DiscordChannel> textChannels = [];
+    private List<DiscordChannel> scopeCandidates = [];
+    private List<DiscordRole> assignableRoles = [];
+
+    private bool previewLoading;
+    private List<ActivityRoleService.RankedGrant>? previewResults;
+
+    private bool confirmingDelete;
+    private bool deleting;
+
+    private List<EligibilityCondition> whitelistRoles =>
+        conditions.Where(c => c.Type == EligibilityConditionType.Role && !c.Negate).ToList();
+
+    private List<EligibilityCondition> blacklistRoles =>
+        conditions.Where(c => c.Type == EligibilityConditionType.Role && c.Negate).ToList();
+
+    private List<EligibilityCondition> memberExceptions =>
+        conditions.Where(c => c.Type == EligibilityConditionType.Member).ToList();
+
+    private List<EligibilityCondition> advancedConditions =>
+        conditions.Where(c => c.Type is EligibilityConditionType.MembershipAge or EligibilityConditionType.Boost or EligibilityConditionType.Level).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        if (rule != null)
+        {
+            RebuildSnapshot();
+            Tracker.Register(SaveSettings, DiscardSettings);
+        }
+
+        loaded = true;
+    }
+
+    public void Dispose()
+    {
+        Tracker.Unregister();
+    }
+
+    private void OnFieldChanged()
+    {
+        Tracker.MarkDirty();
+    }
+
+    private async Task Load()
+    {
+        rule = await ActivityRoleService.GetRuleAsync(RuleId);
+        if (rule == null) return;
+
+        name = rule.Name;
+        enabled = rule.Enabled;
+        metric = rule.Metric;
+        mode = rule.Mode;
+        windowType = rule.WindowType;
+        windowDays = rule.WindowDays;
+        minActivity = rule.MinActivity;
+        thresholdRoleId = rule.ThresholdRoleId;
+        thresholdComparator = rule.ThresholdComparator;
+        thresholdValue = rule.ThresholdValue;
+        autoRevoke = rule.AutoRevoke;
+        announceChannelId = rule.AnnounceChannelId;
+        announceMessage = rule.AnnounceMessage;
+        scopeIds = rule.ScopeIds.ToList();
+        excludeScopeIds = rule.ExcludeScopeIds.ToList();
+        tiers = rule.Tiers.ToList();
+
+        conditions = await EligibilityService.GetConditionsAsync(ActivityRoleService.OwnerType, RuleId);
+
+        var guild = CurrentApplication.TargetGuild;
+        textChannels = guild.Channels.Values.Where(c => c.Type == ChannelType.Text).OrderBy(c => c.Position).ToList();
+        scopeCandidates = guild.Channels.Values
+            .Where(c => c.Type is ChannelType.Text or ChannelType.Voice or ChannelType.Stage or ChannelType.Category)
+            .OrderBy(c => c.Position).ToList();
+        assignableRoles = guild.Roles.Values.Where(r => !r.IsManaged && r.Id != guild.Id)
+            .OrderByDescending(r => r.Position).ToList();
+    }
+
+    private long originalMinActivity, originalThresholdValue, originalWindowDays;
+    private string originalName = "";
+    private bool originalEnabled, originalAutoRevoke;
+    private ActivityRoleMetric originalMetric;
+    private ActivityRoleMode originalMode;
+    private ActivityRoleWindowType originalWindowType;
+    private ulong originalThresholdRoleId, originalAnnounceChannelId;
+    private EligibilityComparator originalThresholdComparator;
+    private string originalAnnounceMessage = "";
+
+    private void RebuildSnapshot()
+    {
+        originalName = name;
+        originalEnabled = enabled;
+        originalMetric = metric;
+        originalMode = mode;
+        originalWindowType = windowType;
+        originalWindowDays = windowDays;
+        originalMinActivity = minActivity;
+        originalThresholdRoleId = thresholdRoleId;
+        originalThresholdComparator = thresholdComparator;
+        originalThresholdValue = thresholdValue;
+        originalAutoRevoke = autoRevoke;
+        originalAnnounceChannelId = announceChannelId;
+        originalAnnounceMessage = announceMessage;
+    }
+
+    private void DiscardSettings()
+    {
+        name = originalName;
+        enabled = originalEnabled;
+        metric = originalMetric;
+        mode = originalMode;
+        windowType = originalWindowType;
+        windowDays = (int)originalWindowDays;
+        minActivity = originalMinActivity;
+        thresholdRoleId = originalThresholdRoleId;
+        thresholdComparator = originalThresholdComparator;
+        thresholdValue = originalThresholdValue;
+        autoRevoke = originalAutoRevoke;
+        announceChannelId = originalAnnounceChannelId;
+        announceMessage = originalAnnounceMessage;
+    }
+
+    private async Task SaveSettings()
+    {
+        if (rule == null) return;
+
+        rule.Name = name.Trim();
+        rule.Enabled = enabled;
+        rule.Metric = metric;
+        rule.Mode = mode;
+        rule.WindowType = windowType;
+        rule.WindowDays = Math.Max(windowDays, 1);
+        rule.MinActivity = Math.Max(minActivity, 0);
+        rule.ThresholdRoleId = thresholdRoleId;
+        rule.ThresholdComparator = thresholdComparator;
+        rule.ThresholdValue = Math.Max(thresholdValue, 0);
+        rule.AutoRevoke = autoRevoke;
+        rule.AnnounceChannelId = announceChannelId;
+        rule.AnnounceMessage = announceMessage;
+
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify("Einstellungen gespeichert.", "ok");
+        await Load();
+        RebuildSnapshot();
+    }
+
+    private string RoleName(ulong roleId)
+    {
+        var role = CurrentApplication.TargetGuild.GetRole(roleId);
+        return role is null ? $"Rolle gelöscht ({roleId})" : role.Name;
+    }
+
+    private string ChannelOrCategoryName(long id)
+    {
+        var channel = CurrentApplication.TargetGuild.GetChannel((ulong)id);
+        if (channel is null) return $"Channel gelöscht ({id})";
+        return ChannelOrCategoryLabel(channel);
+    }
+
+    private static string ChannelOrCategoryLabel(DiscordChannel channel)
+    {
+        return channel.Type == ChannelType.Category ? $"Kategorie: {channel.Name}" : $"#{channel.Name}";
+    }
+
+    private string MemberLabel(ulong userId)
+    {
+        return CurrentApplication.TargetGuild.Members.TryGetValue(userId, out var member)
+            ? member.DisplayName
+            : $"Unbekannt ({userId})";
+    }
+
+    private string AdvancedConditionLabel(EligibilityCondition condition)
+    {
+        var negatePrefix = condition.Negate ? "NICHT " : "";
+        return condition.Type switch
+        {
+            EligibilityConditionType.Boost => $"{negatePrefix}Server-Boost",
+            EligibilityConditionType.MembershipAge => $"{negatePrefix}Mitgliedsalter {ComparatorLabel(condition.Comparator)} {condition.Value} Tage",
+            EligibilityConditionType.Level => $"{negatePrefix}Level {ComparatorLabel(condition.Comparator)} {condition.Value}",
+            _ => condition.Type.ToString()
+        };
+    }
+
+    private static string ComparatorLabel(EligibilityComparator comparator)
+    {
+        return comparator == EligibilityComparator.Lte ? "<=" : ">=";
+    }
+
+    private async Task RunPreview()
+    {
+        previewLoading = true;
+        previewResults = null;
+        StateHasChanged();
+
+        previewResults = await ActivityRoleService.PreviewRuleAsync(RuleId);
+        previewLoading = false;
+    }
+
+    #region Scope
+
+    private async Task AddScope()
+    {
+        if (newScopeId == 0 || rule == null)
+        {
+            ToastService.Notify("Bitte einen Channel oder eine Kategorie wählen.", "bad");
+            return;
+        }
+
+        if (scopeIds.Contains((long)newScopeId))
+        {
+            ToastService.Notify("Ist bereits in der Liste.", "bad");
+            return;
+        }
+
+        scopeIds.Add((long)newScopeId);
+        rule.ScopeIds = scopeIds.ToArray();
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        newScopeId = 0;
+        ToastService.Notify("Hinzugefügt.", "ok");
+    }
+
+    private async Task RemoveScope(long id)
+    {
+        if (rule == null) return;
+        scopeIds.Remove(id);
+        rule.ScopeIds = scopeIds.ToArray();
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify("Entfernt.", "ok");
+    }
+
+    private async Task AddExcludeScope()
+    {
+        if (newExcludeScopeId == 0 || rule == null)
+        {
+            ToastService.Notify("Bitte einen Channel oder eine Kategorie wählen.", "bad");
+            return;
+        }
+
+        if (excludeScopeIds.Contains((long)newExcludeScopeId))
+        {
+            ToastService.Notify("Ist bereits in der Liste.", "bad");
+            return;
+        }
+
+        excludeScopeIds.Add((long)newExcludeScopeId);
+        rule.ExcludeScopeIds = excludeScopeIds.ToArray();
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        newExcludeScopeId = 0;
+        ToastService.Notify("Ausgeschlossen.", "ok");
+    }
+
+    private async Task RemoveExcludeScope(long id)
+    {
+        if (rule == null) return;
+        excludeScopeIds.Remove(id);
+        rule.ExcludeScopeIds = excludeScopeIds.ToArray();
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify("Entfernt.", "ok");
+    }
+
+    #endregion
+
+    #region Tiers
+
+    private async Task AddTier()
+    {
+        if (newTierRoleId == 0)
+        {
+            ToastService.Notify("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        if (newTierFrom < 1 || newTierTo < newTierFrom)
+        {
+            ToastService.Notify("Ungültiger Rangbereich.", "bad");
+            return;
+        }
+
+        await ActivityRoleService.AddTierAsync(new ActivityRoleTier
+        {
+            TierId = ToolSet.GenerateCaseID(),
+            RuleId = RuleId,
+            RankFrom = newTierFrom,
+            RankTo = newTierTo,
+            RoleId = newTierRoleId
+        });
+
+        newTierFrom = 1;
+        newTierTo = 1;
+        newTierRoleId = 0;
+        ToastService.Notify("Rangstufe hinzugefügt.", "ok");
+        await Load();
+    }
+
+    private async Task RemoveTier(ActivityRoleTier tier)
+    {
+        await ActivityRoleService.RemoveTierAsync(tier.TierId);
+        ToastService.Notify("Rangstufe entfernt.", "ok");
+        await Load();
+    }
+
+    #endregion
+
+    #region Conditions
+
+    private async Task AddWhitelistRole()
+    {
+        if (newWhitelistRoleId == 0)
+        {
+            ToastService.Notify("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        if (whitelistRoles.Any(c => (ulong)c.Value == newWhitelistRoleId))
+        {
+            ToastService.Notify("Ist bereits in der Whitelist.", "bad");
+            return;
+        }
+
+        await EligibilityService.AddConditionAsync(new EligibilityCondition
+        {
+            ConditionId = ToolSet.GenerateCaseID(),
+            OwnerType = ActivityRoleService.OwnerType,
+            OwnerId = RuleId,
+            GroupId = 0,
+            Type = EligibilityConditionType.Role,
+            Value = (long)newWhitelistRoleId,
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        });
+
+        newWhitelistRoleId = 0;
+        ToastService.Notify("Zur Whitelist hinzugefügt.", "ok");
+        await Load();
+    }
+
+    private async Task AddBlacklistRole()
+    {
+        if (newBlacklistRoleId == 0)
+        {
+            ToastService.Notify("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        if (blacklistRoles.Any(c => (ulong)c.Value == newBlacklistRoleId))
+        {
+            ToastService.Notify("Ist bereits ausgeschlossen.", "bad");
+            return;
+        }
+
+        await EligibilityService.AddConditionAsync(new EligibilityCondition
+        {
+            ConditionId = ToolSet.GenerateCaseID(),
+            OwnerType = ActivityRoleService.OwnerType,
+            OwnerId = RuleId,
+            GroupId = NextGroupId(),
+            Type = EligibilityConditionType.Role,
+            Negate = true,
+            Value = (long)newBlacklistRoleId,
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        });
+
+        newBlacklistRoleId = 0;
+        ToastService.Notify("Ausgeschlossen.", "ok");
+        await Load();
+    }
+
+    private async Task AddMemberException()
+    {
+        if (!ulong.TryParse(newExceptionMemberId.Trim(), out var userId) || userId == 0)
+        {
+            ToastService.Notify("Bitte eine gültige Discord-User-ID eingeben.", "bad");
+            return;
+        }
+
+        if (memberExceptions.Any(c => (ulong)c.Value == userId))
+        {
+            ToastService.Notify("Ist bereits ausgeschlossen.", "bad");
+            return;
+        }
+
+        await EligibilityService.AddConditionAsync(new EligibilityCondition
+        {
+            ConditionId = ToolSet.GenerateCaseID(),
+            OwnerType = ActivityRoleService.OwnerType,
+            OwnerId = RuleId,
+            GroupId = NextGroupId(),
+            Type = EligibilityConditionType.Member,
+            Negate = true,
+            Value = (long)userId,
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        });
+
+        newExceptionMemberId = "";
+        ToastService.Notify("Mitglied ausgeschlossen.", "ok");
+        await Load();
+    }
+
+    private async Task AddAdvancedCondition()
+    {
+        await EligibilityService.AddConditionAsync(new EligibilityCondition
+        {
+            ConditionId = ToolSet.GenerateCaseID(),
+            OwnerType = ActivityRoleService.OwnerType,
+            OwnerId = RuleId,
+            GroupId = NextGroupId(),
+            Type = newAdvancedType,
+            Comparator = newAdvancedComparator,
+            Value = newAdvancedValue,
+            Negate = newAdvancedNegate,
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        });
+
+        newAdvancedValue = 0;
+        newAdvancedNegate = false;
+        ToastService.Notify("Bedingung hinzugefügt.", "ok");
+        await Load();
+    }
+
+    private async Task RemoveCondition(EligibilityCondition condition)
+    {
+        await EligibilityService.RemoveConditionAsync(condition.ConditionId);
+        ToastService.Notify("Entfernt.", "ok");
+        await Load();
+    }
+
+    private int NextGroupId()
+    {
+        var used = conditions.Where(c => c.GroupId != 0).Select(c => c.GroupId).ToList();
+        return used.Count == 0 ? 1 : used.Max() + 1;
+    }
+
+    #endregion
+
+    private async Task DeleteRule()
+    {
+        if (deleting) return;
+        deleting = true;
+        await ActivityRoleService.DeleteRuleAsync(RuleId);
+        deleting = false;
+        ToastService.Notify("Regel gelöscht.", "ok");
+        Nav.NavigateTo("/konfiguration/activityroles");
+    }
+}
