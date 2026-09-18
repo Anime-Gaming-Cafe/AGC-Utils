@@ -496,7 +496,7 @@ else
                     <li>
                         <div class="rows__main">
                             <p class="rows__title">@(result.Rank > 0 ? $"Rang {result.Rank}" : "Über Schwellenwert") &middot; @MemberLabel(result.UserId)</p>
-                            <p class="rows__text">@RoleName(result.RoleId) &middot; @result.Count im Fenster</p>
+                            <p class="rows__text">@RoleName(result.RoleId) &middot; @FormatPreviewCount(result.Count) im Auswertungsfenster</p>
                         </div>
                     </li>
                 }
@@ -780,8 +780,15 @@ else
     private string MemberLabel(ulong userId)
     {
         return CurrentApplication.TargetGuild.Members.TryGetValue(userId, out var member)
-            ? member.DisplayName
+            ? $"{member.DisplayName} ({userId})"
             : $"Unbekannt ({userId})";
+    }
+
+    /// <summary>Uses the rule's own count formatting (Divisor/Suffix) so the preview matches the announcement.</summary>
+    private string FormatPreviewCount(long count)
+    {
+        var divisor = countDivisor <= 0 ? 1 : countDivisor;
+        return $"{count / divisor}{countSuffix}";
     }
 
     private string AdvancedConditionLabel(EligibilityCondition condition)
