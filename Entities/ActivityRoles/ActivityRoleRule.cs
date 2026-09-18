@@ -27,9 +27,13 @@ public class ActivityRoleRule
     public bool AutoRevoke { get; set; } = true;
     public ulong AnnounceChannelId { get; set; }
     public string AnnounceMessage { get; set; } = "";
+
+    /// <summary>0 = Ankündigung deaktiviert. Gilt für jedes Zeitfenster, auch rollierend/alltime.</summary>
+    public int AnnounceIntervalDays { get; set; }
+
+    public long LastAnnouncedAt { get; set; }
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }
-    public string LastPeriodKey { get; set; } = "";
 
     public List<ActivityRoleTier> Tiers { get; set; } = [];
 }

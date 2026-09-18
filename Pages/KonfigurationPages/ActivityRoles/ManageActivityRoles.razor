@@ -57,6 +57,7 @@ else
                 <select id="ar-metric" class="form-select" @bind="newMetric">
                     <option value="@ActivityRoleMetric.Messages">Chat-Nachrichten</option>
                     <option value="@ActivityRoleMetric.VoiceMinutes">Voice-Minuten</option>
+                    <option value="@ActivityRoleMetric.Combined">Kombiniert (Chat + Voice)</option>
                 </select>
             </div>
             <div class="field">
@@ -113,7 +114,12 @@ else
 
     private static string MetricLabel(ActivityRoleMetric metric)
     {
-        return metric == ActivityRoleMetric.Messages ? "Chat" : "Voice";
+        return metric switch
+        {
+            ActivityRoleMetric.Messages => "Chat",
+            ActivityRoleMetric.VoiceMinutes => "Voice",
+            _ => "Chat + Voice"
+        };
     }
 
     private static string ModeLabel(ActivityRoleMode mode)

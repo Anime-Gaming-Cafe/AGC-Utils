@@ -45,6 +45,7 @@ else
                 <select id="ar-metric" class="form-select" @bind="metric" @bind:after="OnFieldChanged">
                     <option value="@ActivityRoleMetric.Messages">Chat-Nachrichten</option>
                     <option value="@ActivityRoleMetric.VoiceMinutes">Voice-Minuten</option>
+                    <option value="@ActivityRoleMetric.Combined">Kombiniert (Chat + Voice)</option>
                 </select>
             </div>
             <div class="field">
@@ -108,10 +109,19 @@ else
                 <SearchableSelect Id="ar-announce-channel" Items="TextChannelItems" NoneLabel="Keine Ankündigung" Placeholder="Channel suchen..."
                                   @bind-SelectedId="announceChannelId" @bind-SelectedId:after="OnFieldChanged"/>
             </div>
+            <div class="field">
+                <label class="field__label" for="ar-announce-interval">Ankündigungsintervall (Tage)</label>
+                <input id="ar-announce-interval" type="number" min="0" class="form-control" @bind="announceIntervalDays" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 = deaktiviert. Gilt für jedes Zeitfenster, auch rollierend oder Alltime - es ist unabhängig vom Auswertungsfenster selbst.</span>
+            </div>
             <div class="field field--wide">
                 <label class="field__label" for="ar-announce-message">Ankündigungs-Nachricht</label>
-                <textarea id="ar-announce-message" class="form-control" rows="2" @bind="announceMessage" @bind:after="OnFieldChanged"></textarea>
-                <span class="field__hint">Platzhalter: {winners} (eine Zeile pro Gewinner). Wird nur bei Kalender-Zeitfenstern gepostet, wenn eine neue Periode beginnt.</span>
+                <textarea id="ar-announce-message" class="form-control" rows="8" @bind="announceMessage" @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">
+                    Volle Kontrolle über den Text - schreib selbst Titel, Erklärung, Fußzeile usw. Platzhalter dafür: {rank1}, {rank2}, {rank3}, ... eine fertig formatierte Zeile
+                    pro Rang (Medaille bei 1-3, sonst `#Rang`, Nutzer-Erwähnung, Zählwert - Voice als Stunden - und Rollen-Erwähnung), leer wenn dieser Rang gerade niemand hält.
+                    {winners} setzt stattdessen alle Ränge auf einmal untereinander ein, falls dir das reicht.
+                </span>
             </div>
         </div>
     </Panel>
@@ -135,7 +145,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Channel/Kategorie erlauben">
+        <div class="field-grid">
             <div class="field">
                 <SearchableSelect Items="ScopeItems" NoneLabel="Channel/Kategorie wählen" Placeholder="Channel/Kategorie suchen..."
                                   @bind-SelectedId="newScopeId"/>
@@ -165,7 +178,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Channel/Kategorie ausschließen">
+        <div class="field-grid">
             <div class="field">
                 <SearchableSelect Items="ScopeItems" NoneLabel="Channel/Kategorie wählen" Placeholder="Channel/Kategorie suchen..."
                                   @bind-SelectedId="newExcludeScopeId"/>
@@ -200,7 +216,10 @@ else
                     }
                 </ul>
             }
-            <div class="field-grid mt-3">
+        </Panel>
+
+        <Panel Title="Rangstufe hinzufügen">
+            <div class="field-grid">
                 <div class="field">
                     <label class="field__label">Von Rang</label>
                     <input type="number" min="1" class="form-control" @bind="newTierFrom"/>
@@ -239,7 +258,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Rolle erlauben">
+        <div class="field-grid">
             <div class="field">
                 <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newWhitelistRoleId"/>
             </div>
@@ -268,7 +290,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Rolle ausschließen">
+        <div class="field-grid">
             <div class="field">
                 <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..." @bind-SelectedId="newBlacklistRoleId"/>
             </div>
@@ -297,7 +322,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Mitglied ausschließen">
+        <div class="field-grid">
             <div class="field">
                 <label class="field__label">Discord-User-ID</label>
                 <input class="form-control" @bind="newExceptionMemberId" placeholder="z.B. 123456789012345678"/>
@@ -327,7 +355,10 @@ else
                 }
             </ul>
         }
-        <div class="field-grid mt-3">
+    </Panel>
+
+    <Panel Title="Bedingung hinzufügen">
+        <div class="field-grid">
             <div class="field">
                 <label class="field__label">Typ</label>
                 <select class="form-select" @bind="newAdvancedType">
@@ -428,6 +459,7 @@ else
     private long thresholdValue;
     private bool autoRevoke = true;
     private ulong announceChannelId;
+    private int announceIntervalDays;
     private string announceMessage = "";
 
     private List<long> scopeIds = [];
@@ -514,6 +546,7 @@ else
         thresholdValue = rule.ThresholdValue;
         autoRevoke = rule.AutoRevoke;
         announceChannelId = rule.AnnounceChannelId;
+        announceIntervalDays = rule.AnnounceIntervalDays;
         announceMessage = rule.AnnounceMessage;
         scopeIds = rule.ScopeIds.ToList();
         excludeScopeIds = rule.ExcludeScopeIds.ToList();
@@ -538,6 +571,7 @@ else
     private ActivityRoleWindowType originalWindowType;
     private ulong originalThresholdRoleId, originalAnnounceChannelId;
     private EligibilityComparator originalThresholdComparator;
+    private int originalAnnounceIntervalDays;
     private string originalAnnounceMessage = "";
 
     private void RebuildSnapshot()
@@ -554,6 +588,7 @@ else
         originalThresholdValue = thresholdValue;
         originalAutoRevoke = autoRevoke;
         originalAnnounceChannelId = announceChannelId;
+        originalAnnounceIntervalDays = announceIntervalDays;
         originalAnnounceMessage = announceMessage;
     }
 
@@ -571,6 +606,7 @@ else
         thresholdValue = originalThresholdValue;
         autoRevoke = originalAutoRevoke;
         announceChannelId = originalAnnounceChannelId;
+        announceIntervalDays = originalAnnounceIntervalDays;
         announceMessage = originalAnnounceMessage;
     }
 
@@ -590,6 +626,7 @@ else
         rule.ThresholdValue = Math.Max(thresholdValue, 0);
         rule.AutoRevoke = autoRevoke;
         rule.AnnounceChannelId = announceChannelId;
+        rule.AnnounceIntervalDays = Math.Max(announceIntervalDays, 0);
         rule.AnnounceMessage = announceMessage;
 
         await ActivityRoleService.UpdateRuleAsync(rule);

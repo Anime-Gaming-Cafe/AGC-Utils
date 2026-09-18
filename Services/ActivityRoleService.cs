@@ -1,6 +1,6 @@
 #region
 
-using System.Globalization;
+using System.Text.RegularExpressions;
 using AGC_Management.Entities.ActivityRoles;
 using AGC_Management.Enums.ActivityRoles;
 using AGC_Management.Enums.Conditions;
@@ -39,7 +39,8 @@ public static class ActivityRoleService
         await using (var cmd = con.CreateCommand(
                          "SELECT rule_id, name, enabled, metric, mode, window_type, window_days, window_start, window_end, " +
                          "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
-                         "auto_revoke, announce_channel_id, announce_message, created_by, created_at, last_period_key " +
+                         "auto_revoke, announce_channel_id, announce_message, announce_interval_days, last_announced_at, " +
+                         "created_by, created_at " +
                          "FROM activity_role_rules ORDER BY name"))
         {
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -94,9 +95,10 @@ public static class ActivityRoleService
             AutoRevoke = !reader.IsDBNull(15) && reader.GetBoolean(15),
             AnnounceChannelId = reader.IsDBNull(16) ? 0 : (ulong)reader.GetInt64(16),
             AnnounceMessage = reader.IsDBNull(17) ? "" : reader.GetString(17),
-            CreatedBy = reader.IsDBNull(18) ? 0 : (ulong)reader.GetInt64(18),
-            CreatedAt = reader.IsDBNull(19) ? 0 : reader.GetInt64(19),
-            LastPeriodKey = reader.IsDBNull(20) ? "" : reader.GetString(20)
+            AnnounceIntervalDays = reader.IsDBNull(18) ? 0 : reader.GetInt32(18),
+            LastAnnouncedAt = reader.IsDBNull(19) ? 0 : reader.GetInt64(19),
+            CreatedBy = reader.IsDBNull(20) ? 0 : (ulong)reader.GetInt64(20),
+            CreatedAt = reader.IsDBNull(21) ? 0 : reader.GetInt64(21)
         };
     }
 
@@ -111,10 +113,10 @@ public static class ActivityRoleService
         await using var cmd = con.CreateCommand(
             "INSERT INTO activity_role_rules (rule_id, name, enabled, metric, mode, window_type, window_days, " +
             "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
-            "auto_revoke, announce_channel_id, announce_message, created_by, created_at) " +
+            "auto_revoke, announce_channel_id, announce_message, announce_interval_days, created_by, created_at) " +
             "VALUES (@rule_id, @name, @enabled, @metric, @mode, @window_type, @window_days, @scope_ids, @exclude_scope_ids, " +
             "@min_activity, @threshold_role_id, @threshold_value, @threshold_comparator, @auto_revoke, @announce_channel_id, " +
-            "@announce_message, @created_by, @created_at)");
+            "@announce_message, @announce_interval_days, @created_by, @created_at)");
         BindRuleParameters(cmd, rule);
         cmd.Parameters.AddWithValue("created_by", (long)rule.CreatedBy);
         cmd.Parameters.AddWithValue("created_at", rule.CreatedAt);
@@ -130,7 +132,8 @@ public static class ActivityRoleService
             "window_type = @window_type, window_days = @window_days, scope_ids = @scope_ids, " +
             "exclude_scope_ids = @exclude_scope_ids, min_activity = @min_activity, threshold_role_id = @threshold_role_id, " +
             "threshold_value = @threshold_value, threshold_comparator = @threshold_comparator, auto_revoke = @auto_revoke, " +
-            "announce_channel_id = @announce_channel_id, announce_message = @announce_message WHERE rule_id = @rule_id");
+            "announce_channel_id = @announce_channel_id, announce_message = @announce_message, " +
+            "announce_interval_days = @announce_interval_days WHERE rule_id = @rule_id");
         BindRuleParameters(cmd, rule);
         await cmd.ExecuteNonQueryAsync();
         InvalidateCache();
@@ -154,6 +157,7 @@ public static class ActivityRoleService
         cmd.Parameters.AddWithValue("auto_revoke", rule.AutoRevoke);
         cmd.Parameters.AddWithValue("announce_channel_id", (long)rule.AnnounceChannelId);
         cmd.Parameters.AddWithValue("announce_message", rule.AnnounceMessage);
+        cmd.Parameters.AddWithValue("announce_interval_days", rule.AnnounceIntervalDays);
     }
 
     public static async Task DeleteRuleAsync(string ruleId)
@@ -174,13 +178,13 @@ public static class ActivityRoleService
         InvalidateCache();
     }
 
-    public static async Task SetLastPeriodKeyAsync(string ruleId, string periodKey)
+    public static async Task SetLastAnnouncedAsync(string ruleId, long timestamp)
     {
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand(
-            "UPDATE activity_role_rules SET last_period_key = @key WHERE rule_id = @rule_id");
+            "UPDATE activity_role_rules SET last_announced_at = @timestamp WHERE rule_id = @rule_id");
         cmd.Parameters.AddWithValue("rule_id", ruleId);
-        cmd.Parameters.AddWithValue("key", periodKey);
+        cmd.Parameters.AddWithValue("timestamp", timestamp);
         await cmd.ExecuteNonQueryAsync();
         InvalidateCache();
     }
@@ -289,46 +293,29 @@ public static class ActivityRoleService
 
     #region Window
 
-    /// <summary>
-    ///     Rolling and Alltime windows never "roll over" to a new period on their own, so their period
-    ///     key is constant - only the three calendar window types drive the periodic announcement.
-    /// </summary>
-    public static (long SinceUnix, string PeriodKey) ResolveWindow(ActivityRoleRule rule, DateTimeOffset now)
+    public static long ResolveWindow(ActivityRoleRule rule, DateTimeOffset now)
     {
         switch (rule.WindowType)
         {
             case ActivityRoleWindowType.CalendarDaily:
-            {
-                var start = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
-                return (start.ToUnixTimeSeconds(), start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            }
+                return new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero).ToUnixTimeSeconds();
             case ActivityRoleWindowType.CalendarWeekly:
             {
                 var diff = ((int)now.UtcDateTime.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
                 var monday = now.UtcDateTime.Date.AddDays(-diff);
-                var start = new DateTimeOffset(monday, TimeSpan.Zero);
-                return (start.ToUnixTimeSeconds(), $"{ISOWeek.GetYear(monday)}-W{ISOWeek.GetWeekOfYear(monday):D2}");
+                return new DateTimeOffset(monday, TimeSpan.Zero).ToUnixTimeSeconds();
             }
             case ActivityRoleWindowType.CalendarMonthly:
-            {
-                var start = new DateTimeOffset(new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, 1),
-                    TimeSpan.Zero);
-                return (start.ToUnixTimeSeconds(), start.ToString("yyyy-MM", CultureInfo.InvariantCulture));
-            }
+                return new DateTimeOffset(new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, 1), TimeSpan.Zero)
+                    .ToUnixTimeSeconds();
             case ActivityRoleWindowType.AllTime:
-                return (0, "all");
+                return 0;
             case ActivityRoleWindowType.FixedRange:
                 // Reserved for a future fixed start/end date window - not evaluated yet.
-                return (rule.WindowStart ?? 0, "fixed");
+                return rule.WindowStart ?? 0;
             default:
-                return (now.AddDays(-Math.Max(rule.WindowDays, 1)).ToUnixTimeSeconds(), "rolling");
+                return now.AddDays(-Math.Max(rule.WindowDays, 1)).ToUnixTimeSeconds();
         }
-    }
-
-    private static bool IsCalendarWindow(ActivityRoleWindowType type)
-    {
-        return type is ActivityRoleWindowType.CalendarDaily or ActivityRoleWindowType.CalendarWeekly
-            or ActivityRoleWindowType.CalendarMonthly;
     }
 
     #endregion
@@ -340,9 +327,8 @@ public static class ActivityRoleService
     /// </summary>
     public static async Task<List<RankedGrant>> ComputeDesiredGrantsAsync(ActivityRoleRule rule, DiscordGuild guild)
     {
-        var (sinceUnix, _) = ResolveWindow(rule, DateTimeOffset.UtcNow);
+        var sinceUnix = ResolveWindow(rule, DateTimeOffset.UtcNow);
         var conditions = await EligibilityService.GetConditionsAsync(OwnerType, rule.RuleId);
-        var table = MetricsQueryService.MetricTableFor(rule.Metric);
         var desired = new List<RankedGrant>();
 
         if (rule.Mode == ActivityRoleMode.TopN)
@@ -351,8 +337,12 @@ public static class ActivityRoleService
 
             var maxRank = rule.Tiers.Max(t => t.RankTo);
             var fetchLimit = Math.Max(maxRank * 3, 50);
-            var candidates = await MetricsQueryService.GetRankedUsersAsync(table, sinceUnix, null, rule.ScopeIds,
-                rule.ExcludeScopeIds, Math.Max(rule.MinActivity, 1), fetchLimit, guild);
+            var minCount = Math.Max(rule.MinActivity, 1);
+            var candidates = rule.Metric == ActivityRoleMetric.Combined
+                ? await MetricsQueryService.GetRankedUsersCombinedAsync(sinceUnix, null, rule.ScopeIds,
+                    rule.ExcludeScopeIds, minCount, fetchLimit, guild)
+                : await MetricsQueryService.GetRankedUsersAsync(MetricsQueryService.MetricTableFor(rule.Metric),
+                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, minCount, fetchLimit, guild);
 
             var rank = 0;
             foreach (var candidate in candidates)
@@ -370,9 +360,12 @@ public static class ActivityRoleService
         {
             if (rule.ThresholdRoleId == 0) return desired;
 
-            var overThreshold = await MetricsQueryService.GetUsersOverThresholdAsync(table, sinceUnix, null,
-                rule.ScopeIds, rule.ExcludeScopeIds, rule.ThresholdComparator == EligibilityComparator.Lte,
-                rule.ThresholdValue, guild);
+            var lte = rule.ThresholdComparator == EligibilityComparator.Lte;
+            var overThreshold = rule.Metric == ActivityRoleMetric.Combined
+                ? await MetricsQueryService.GetUsersOverThresholdCombinedAsync(sinceUnix, null, rule.ScopeIds,
+                    rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild)
+                : await MetricsQueryService.GetUsersOverThresholdAsync(MetricsQueryService.MetricTableFor(rule.Metric),
+                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild);
 
             foreach (var userId in overThreshold)
             {
@@ -396,13 +389,13 @@ public static class ActivityRoleService
         var desired = await ComputeDesiredGrantsAsync(rule, guild);
         await ApplyDesiredGrantsAsync(rule, guild, desired);
 
-        if (!IsCalendarWindow(rule.WindowType)) return;
+        if (rule.AnnounceChannelId == 0 || rule.AnnounceIntervalDays <= 0) return;
 
-        var (_, periodKey) = ResolveWindow(rule, DateTimeOffset.UtcNow);
-        if (periodKey == rule.LastPeriodKey) return;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (now - rule.LastAnnouncedAt < rule.AnnounceIntervalDays * 86400L) return;
 
-        await AnnouncePeriodAsync(rule, guild, desired);
-        await SetLastPeriodKeyAsync(rule.RuleId, periodKey);
+        await SendAnnouncementAsync(rule, guild, desired);
+        await SetLastAnnouncedAsync(rule.RuleId, now);
     }
 
     private static async Task ApplyDesiredGrantsAsync(ActivityRoleRule rule, DiscordGuild guild,
@@ -499,19 +492,32 @@ public static class ActivityRoleService
         return await ComputeDesiredGrantsAsync(rule, guild);
     }
 
-    private static async Task AnnouncePeriodAsync(ActivityRoleRule rule, DiscordGuild guild,
+    private static readonly Regex RankPlaceholder = new(@"\{rank(\d+)\}", RegexOptions.Compiled);
+
+    /// <summary>
+    ///     The template is free text the rule owner writes themselves (title, explanation, perks, small
+    ///     print, ...) - this only fills in the activity data. {rank1}/{rank2}/... let them place each
+    ///     rank exactly where they want (own line, own section, mixed with other text); {winners} is the
+    ///     lazy all-at-once alternative for anyone who does not care about layout.
+    /// </summary>
+    private static async Task SendAnnouncementAsync(ActivityRoleRule rule, DiscordGuild guild,
         List<RankedGrant> winners)
     {
         if (rule.AnnounceChannelId == 0) return;
         if (winners.Count == 0) return;
         if (!guild.Channels.TryGetValue(rule.AnnounceChannelId, out var channel)) return;
 
-        var lines = winners
+        var byRank = winners.Where(w => w.Rank > 0).ToDictionary(w => w.Rank);
+        var joined = winners
             .OrderBy(w => w.Rank == 0 ? int.MaxValue : w.Rank)
-            .Select(w => w.Rank > 0 ? $"#{w.Rank} <@{w.UserId}>" : $"<@{w.UserId}>");
+            .Select(w => FormatWinnerLine(w, rule.Metric));
 
         var template = string.IsNullOrWhiteSpace(rule.AnnounceMessage) ? "{winners}" : rule.AnnounceMessage;
-        var message = template.Replace("{winners}", string.Join("\n", lines));
+        var message = RankPlaceholder.Replace(template,
+            m => byRank.TryGetValue(int.Parse(m.Groups[1].Value), out var winner)
+                ? FormatWinnerLine(winner, rule.Metric)
+                : "");
+        message = message.Replace("{winners}", string.Join("\n", joined));
 
         try
         {
@@ -522,6 +528,27 @@ public static class ActivityRoleService
             CurrentApplication.Logger.Error(e, "ActivityRoles: failed to send announcement for rule {RuleId}",
                 rule.RuleId);
         }
+    }
+
+    /// <summary>
+    ///     Medal for the top 3, a plain rank badge below that, none for threshold mode (rank 0). Voice
+    ///     minutes render as hours to match how people actually talk about voice activity.
+    /// </summary>
+    private static string FormatWinnerLine(RankedGrant winner, ActivityRoleMetric metric)
+    {
+        var medal = winner.Rank switch
+        {
+            1 => "🥇",
+            2 => "🥈",
+            3 => "🥉",
+            > 3 => $"`#{winner.Rank}`",
+            _ => ""
+        };
+
+        var count = metric == ActivityRoleMetric.VoiceMinutes ? $"`{winner.Count / 60}h`" : $"`{winner.Count}`";
+
+        return string.Join(" ",
+            new[] { medal, $"<@{winner.UserId}>", count, $"<@&{winner.RoleId}>" }.Where(p => p.Length > 0));
     }
 
     #endregion

@@ -58,6 +58,8 @@ The schema is code, in `Services/DatabaseService.cs`:
 
 **Adding a column means editing both**: the `CREATE TABLE` (for fresh databases) *and* an `ADD COLUMN IF NOT EXISTS` entry (for existing ones). `DatabaseService` also has generic `InsertDataIntoTable` / `SelectDataFromTable` / `DeleteDataFromTable` helpers, but most feature code writes SQL directly.
 
+**Removing a column that already shipped is a revert migration, not a deletion.** Never just delete its `ADD COLUMN IF NOT EXISTS` entry from `UpdateTables()` - a live database already has the column, so silently dropping the entry only stops re-asserting it and creates schema drift between fresh and upgraded installs. Instead replace that entry's SQL with an explicit `ALTER TABLE ... DROP COLUMN IF EXISTS ...` (same idea as the `DROP TABLE IF EXISTS` entries already in the file, e.g. `dashboardlogins`), and remove the column from `CREATE TABLE` too so fresh installs converge to the same end state.
+
 ### Permission checks
 
 Check attributes live in `Utils/AttributeHelper.cs`, namespace `AGC_Management.Attributes`. CommandsNext and application commands need *different* base types:

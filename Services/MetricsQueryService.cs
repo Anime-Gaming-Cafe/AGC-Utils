@@ -144,4 +144,72 @@ public static class MetricsQueryService
 
         return userIds;
     }
+
+    private static async Task<Dictionary<ulong, long>> GetPerUserCountsAsync(string table, long sinceUnix,
+        long? untilUnix, long[] includeScope, long[] excludeScope, DiscordGuild? guild)
+    {
+        var include = ExpandScope(guild, includeScope);
+        var exclude = ExpandScope(guild, excludeScope);
+
+        var sql = new StringBuilder($"SELECT userid, COUNT(*) AS cnt FROM {table} WHERE true");
+        if (sinceUnix > 0) sql.Append(" AND timestamp >= @since");
+        if (untilUnix.HasValue) sql.Append(" AND timestamp < @until");
+        AppendScopeFilters(sql, include, exclude);
+        sql.Append(" GROUP BY userid");
+
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(sql.ToString());
+        if (sinceUnix > 0) cmd.Parameters.AddWithValue("since", sinceUnix);
+        if (untilUnix.HasValue) cmd.Parameters.AddWithValue("until", untilUnix.Value);
+        AddScopeParameters(cmd, include, exclude);
+
+        var counts = new Dictionary<ulong, long>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) counts[(ulong)reader.GetInt64(0)] = reader.GetInt64(1);
+
+        return counts;
+    }
+
+    /// <summary>
+    ///     Sums each user's message count and voice-minute count in the window into one score, for
+    ///     <see cref="ActivityRoleMetric.Combined" />. Both queries share the same include/exclude scope,
+    ///     which works because a text-channel id simply never matches a voice-log row and vice versa.
+    /// </summary>
+    private static async Task<Dictionary<ulong, long>> GetCombinedCountsAsync(long sinceUnix, long? untilUnix,
+        long[] includeScope, long[] excludeScope, DiscordGuild? guild)
+    {
+        var messages = await GetPerUserCountsAsync("metrics_messages", sinceUnix, untilUnix, includeScope,
+            excludeScope, guild);
+        var voice = await GetPerUserCountsAsync("metrics_voice", sinceUnix, untilUnix, includeScope, excludeScope,
+            guild);
+
+        var combined = new Dictionary<ulong, long>(messages);
+        foreach (var (userId, count) in voice)
+            combined[userId] = combined.TryGetValue(userId, out var existing) ? existing + count : count;
+
+        return combined;
+    }
+
+    public static async Task<List<ActivityRoleCandidate>> GetRankedUsersCombinedAsync(long sinceUnix,
+        long? untilUnix, long[] includeScope, long[] excludeScope, long minCount, int limit,
+        DiscordGuild? guild = null)
+    {
+        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild);
+        return combined
+            .Where(kv => kv.Value >= minCount)
+            .OrderByDescending(kv => kv.Value)
+            .Take(limit)
+            .Select(kv => new ActivityRoleCandidate { UserId = kv.Key, Count = kv.Value })
+            .ToList();
+    }
+
+    public static async Task<List<ulong>> GetUsersOverThresholdCombinedAsync(long sinceUnix, long? untilUnix,
+        long[] includeScope, long[] excludeScope, bool lte, long value, DiscordGuild? guild = null)
+    {
+        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild);
+        return combined
+            .Where(kv => lte ? kv.Value <= value : kv.Value >= value)
+            .Select(kv => kv.Key)
+            .ToList();
+    }
 }

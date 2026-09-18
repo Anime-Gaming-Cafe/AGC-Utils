@@ -366,7 +366,7 @@ public static class DatabaseService
             },
             {
                 "activity_role_rules",
-                "CREATE TABLE IF NOT EXISTS activity_role_rules (rule_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT true, metric TEXT DEFAULT 'messages', mode TEXT DEFAULT 'topn', window_type TEXT DEFAULT 'rolling', window_days INTEGER DEFAULT 7, window_start BIGINT, window_end BIGINT, scope_ids BIGINT[] DEFAULT '{}', exclude_scope_ids BIGINT[] DEFAULT '{}', min_activity BIGINT DEFAULT 0, threshold_role_id BIGINT DEFAULT 0, threshold_value BIGINT DEFAULT 0, threshold_comparator TEXT DEFAULT 'gte', auto_revoke BOOLEAN DEFAULT true, announce_channel_id BIGINT DEFAULT 0, announce_message TEXT DEFAULT '', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0, last_period_key TEXT DEFAULT '')"
+                "CREATE TABLE IF NOT EXISTS activity_role_rules (rule_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT true, metric TEXT DEFAULT 'messages', mode TEXT DEFAULT 'topn', window_type TEXT DEFAULT 'rolling', window_days INTEGER DEFAULT 7, window_start BIGINT, window_end BIGINT, scope_ids BIGINT[] DEFAULT '{}', exclude_scope_ids BIGINT[] DEFAULT '{}', min_activity BIGINT DEFAULT 0, threshold_role_id BIGINT DEFAULT 0, threshold_value BIGINT DEFAULT 0, threshold_comparator TEXT DEFAULT 'gte', auto_revoke BOOLEAN DEFAULT true, announce_channel_id BIGINT DEFAULT 0, announce_message TEXT DEFAULT '', announce_interval_days INTEGER DEFAULT 0, last_announced_at BIGINT DEFAULT 0, created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
             },
             {
                 "activity_role_tiers",
@@ -1294,6 +1294,14 @@ public static class DatabaseService
                         "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS announce_message TEXT DEFAULT ''"
                     },
                     {
+                        "announce_interval_days",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS announce_interval_days INTEGER DEFAULT 0"
+                    },
+                    {
+                        "last_announced_at",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS last_announced_at BIGINT DEFAULT 0"
+                    },
+                    {
                         "created_by",
                         "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
                     },
@@ -1302,8 +1310,11 @@ public static class DatabaseService
                         "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
                     },
                     {
+                        // Superseded by announce_interval_days + last_announced_at (work for every window
+                        // type, not just calendar ones). Explicit revert migration, not a silent removal -
+                        // this already shipped, so dropping it has to be a real, deliberate ALTER TABLE step.
                         "last_period_key",
-                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS last_period_key TEXT DEFAULT ''"
+                        "ALTER TABLE activity_role_rules DROP COLUMN IF EXISTS last_period_key"
                     }
                 }
             },
