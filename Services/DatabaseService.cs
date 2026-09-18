@@ -391,6 +391,18 @@ public static class DatabaseService
             {
                 "idx_eligibility_conditions_owner",
                 "CREATE INDEX IF NOT EXISTS idx_eligibility_conditions_owner ON eligibility_conditions (owner_type, owner_id)"
+            },
+            {
+                "activity_announcement_groups",
+                "CREATE TABLE IF NOT EXISTS activity_announcement_groups (group_id TEXT PRIMARY KEY, name TEXT DEFAULT '', channel_id BIGINT DEFAULT 0, interval_days INTEGER DEFAULT 0, message TEXT DEFAULT '', last_announced_at BIGINT DEFAULT 0, created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "activity_announcement_group_rules",
+                "CREATE TABLE IF NOT EXISTS activity_announcement_group_rules (group_id TEXT, rule_id TEXT, alias TEXT DEFAULT '', PRIMARY KEY (group_id, rule_id))"
+            },
+            {
+                "idx_activity_announcement_group_rules_alias",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_announcement_group_rules_alias ON activity_announcement_group_rules (group_id, alias)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1416,6 +1428,47 @@ public static class DatabaseService
                     {
                         "created_at",
                         "ALTER TABLE eligibility_conditions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "activity_announcement_groups", new Dictionary<string, string>
+                {
+                    { "name", "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS name TEXT DEFAULT ''" },
+                    {
+                        "channel_id",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS channel_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "interval_days",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS interval_days INTEGER DEFAULT 0"
+                    },
+                    {
+                        "message",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS message TEXT DEFAULT ''"
+                    },
+                    {
+                        "last_announced_at",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS last_announced_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_by",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT 0"
+                    },
+                    {
+                        "created_at",
+                        "ALTER TABLE activity_announcement_groups ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "activity_announcement_group_rules", new Dictionary<string, string>
+                {
+                    { "group_id", "ALTER TABLE activity_announcement_group_rules ADD COLUMN IF NOT EXISTS group_id TEXT" },
+                    { "rule_id", "ALTER TABLE activity_announcement_group_rules ADD COLUMN IF NOT EXISTS rule_id TEXT" },
+                    {
+                        "alias",
+                        "ALTER TABLE activity_announcement_group_rules ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT ''"
                     }
                 }
             }

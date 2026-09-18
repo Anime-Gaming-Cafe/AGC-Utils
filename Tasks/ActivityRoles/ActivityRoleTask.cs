@@ -25,6 +25,9 @@ public static class ActivityRoleTask
                 {
                     var rules = await ActivityRoleService.GetRulesAsync();
                     foreach (var rule in rules.Where(r => r.Enabled)) await ActivityRoleService.EvaluateRuleAsync(rule);
+
+                    var groups = await ActivityAnnouncementService.GetGroupsAsync();
+                    foreach (var group in groups) await ActivityAnnouncementService.EvaluateGroupAsync(group);
                 }
             }
             catch (Exception e)

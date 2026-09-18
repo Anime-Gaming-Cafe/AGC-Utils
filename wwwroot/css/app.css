@@ -1492,6 +1492,20 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     color: var(--bs-dropdown-link-hover-color);
 }
 
+/* 28. Rendered-message preview (announcement builder) */
+
+.preview-block {
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-control);
+    color: var(--fg);
+    font-family: var(--font);
+    margin: 0;
+    padding: var(--s-3);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .weekly-chart__label {
     fill: var(--fg-subtle);
     font-size: var(--f-xs);

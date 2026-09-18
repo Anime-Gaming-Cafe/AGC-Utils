@@ -1,0 +1,85 @@
+@page "/konfiguration/activityroles/announcements"
+@using AGC_Management.Entities.ActivityRoles
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Ankündigungsgruppen"
+            Lead="Bündelt mehrere Activity-Regeln (z.B. Chat + Voice) zu einer gemeinsamen Ankündigungs-Nachricht."
+            BackHref="/konfiguration/activityroles" BackText="Activity-Rollen"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading" Title="Gruppen werden geladen" Description="Ankündigungsgruppen werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Gruppen" Lead="Rollen-Vergabe läuft weiterhin unabhängig pro Regel - eine Gruppe steuert nur die gemeinsame Nachricht." Flush="@(groups.Count > 0)">
+        @if (groups.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch keine Gruppe angelegt" Description="Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var group in groups)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@group.Name</p>
+                            <p class="rows__text">@group.Rules.Count Regel(n) verknüpft &middot; Intervall: @(group.IntervalDays > 0 ? $"{group.IntervalDays} Tage" : "deaktiviert")</p>
+                        </div>
+                        <div class="rows__side">
+                            <a class="btn btn-secondary btn-sm" href="/konfiguration/activityroles/announcements/@group.GroupId">Bearbeiten</a>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Neue Gruppe">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="ag-name">Name</label>
+                <input id="ag-name" class="form-control" @bind="newName" placeholder="z.B. Wöchentliches Aktivitäts-Update"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="CreateGroup">Gruppe anlegen</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<ActivityAnnouncementGroup> groups = [];
+    private string newName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        groups = await ActivityAnnouncementService.GetGroupsAsync();
+        loaded = true;
+    }
+
+    private async Task CreateGroup()
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            ToastService.Notify("Bitte einen Namen vergeben.", "bad");
+            return;
+        }
+
+        var group = new ActivityAnnouncementGroup
+        {
+            GroupId = ToolSet.GenerateCaseID(),
+            Name = newName.Trim(),
+            CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        };
+
+        await ActivityAnnouncementService.AddGroupAsync(group);
+        ToastService.Notify("Gruppe angelegt.", "ok");
+        Nav.NavigateTo($"/konfiguration/activityroles/announcements/{group.GroupId}");
+    }
+}

@@ -1,0 +1,316 @@
+@page "/konfiguration/activityroles/announcements/{GroupId}"
+@using AGC_Management.Entities.ActivityRoles
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="@(group?.Name ?? "Ankündigungsgruppe")"
+            Lead="Gemeinsame Ankündigung über mehrere Activity-Regeln hinweg."
+            BackHref="/konfiguration/activityroles/announcements" BackText="Ankündigungsgruppen"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading" Title="Gruppe wird geladen" Description="Einstellungen und verknüpfte Regeln werden abgefragt."/>
+}
+else if (group == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Gruppe nicht gefunden"
+                Description="Diese Gruppe existiert nicht mehr, oder sie wurde gelöscht."
+                ActionText="Zu den Ankündigungsgruppen" ActionHref="/konfiguration/activityroles/announcements"/>
+}
+else
+{
+    <Panel Title="Einstellungen">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="ag-name">Name</label>
+                <input id="ag-name" class="form-control" @bind="name" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ag-channel">Channel</label>
+                <SearchableSelect Id="ag-channel" Items="TextChannelItems" NoneLabel="Kein Channel" Placeholder="Channel suchen..."
+                                  @bind-SelectedId="channelId" @bind-SelectedId:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ag-interval">Intervall (Tage)</label>
+                <input id="ag-interval" type="number" min="0" class="form-control" @bind="intervalDays" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 = deaktiviert.</span>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="ag-message">Nachricht</label>
+                <textarea id="ag-message" class="form-control" rows="10" @bind="message" @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">
+                    Platzhalter je verknüpfter Regel, adressiert über ihren Alias: {alias.rank1}, {alias.rank2}, ... (eine fertig formatierte Zeile, leer wenn dieser Rang gerade
+                    niemand hält) sowie {alias.winners} für alle Ränge dieser Regel auf einmal. Alias und verknüpfte Regeln siehst du unten.
+                </span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@sendingAnnouncement" @onclick="SendAnnouncementNow">Ankündigung jetzt senden</button>
+            <span class="field__hint">Speichert ungespeicherte Änderungen zuerst, sendet dann sofort und setzt das Intervall zurück.</span>
+        </div>
+    </Panel>
+
+    <Panel Title="Verknüpfte Regeln" Lead="Jede Regel liefert ihre eigene Rangliste unter ihrem Alias." Flush="@(links.Count > 0)">
+        @if (links.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch keine Regel verknüpft" Description="Ohne verknüpfte Regel bleibt die Nachricht leer."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var link in links)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@link.Alias</p>
+                            <p class="rows__text">@RuleName(link.RuleId)</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveLink(link.RuleId)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Regel verknüpfen">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label">Regel</label>
+                <SearchableSelect TKey="string" Items="AvailableRuleItems" NoneLabel="Regel wählen" Placeholder="Regel suchen..." @bind-SelectedId="newLinkRuleId"/>
+            </div>
+            <div class="field">
+                <label class="field__label">Alias</label>
+                <input class="form-control" @bind="newLinkAlias" placeholder="z.B. chat, voice"/>
+                <span class="field__hint">Nur Buchstaben/Zahlen/-/_, wird in {alias.rank1} etc. verwendet.</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddLink">Verknüpfen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Vorschau" Lead="Rendert die aktuelle (auch ungespeicherte) Nachricht mit den echten, aktuell berechneten Rangdaten.">
+        <div class="form-foot mb-3">
+            <button type="button" class="btn btn-secondary" disabled="@previewLoading" @onclick="RunPreview">Jetzt berechnen</button>
+        </div>
+        @if (previewLoading)
+        {
+            <StateBlock Inline="true" Kind="StateBlock.StateKind.Loading" Title="Vorschau wird berechnet" Description="Aktivitätsdaten aller verknüpften Regeln werden ausgewertet."/>
+        }
+        else if (previewText == null)
+        {
+            <StateBlock Inline="true" Title="Noch keine Vorschau" Description="Klicke auf 'Jetzt berechnen', um die aktuelle Auswertung zu sehen."/>
+        }
+        else
+        {
+            <pre class="preview-block">@previewText</pre>
+        }
+    </Panel>
+
+    <Panel Title="Gruppe löschen">
+        @if (!confirmingDelete)
+        {
+            <button type="button" class="btn btn-danger" @onclick="() => confirmingDelete = true">Gruppe löschen</button>
+        }
+        else
+        {
+            <ConfirmInline Title="Gruppe wirklich löschen?" ConfirmText="Ja, löschen" Busy="deleting"
+                           OnConfirm="DeleteGroup" OnCancel="() => confirmingDelete = false">
+                <p>Die verknüpften Regeln selbst bleiben bestehen und vergeben weiterhin Rollen wie gewohnt - nur die gemeinsame Ankündigung entfällt.</p>
+            </ConfirmInline>
+        }
+    </Panel>
+}
+
+@code {
+    [Parameter] public string GroupId { get; set; } = "";
+
+    private bool loaded;
+    private ActivityAnnouncementGroup? group;
+
+    private string name = "";
+    private ulong channelId;
+    private int intervalDays;
+    private string message = "";
+
+    private List<ActivityAnnouncementGroupRule> links = [];
+    private List<ActivityRoleRule> allRules = [];
+    private string newLinkRuleId = "";
+    private string newLinkAlias = "";
+
+    private List<DiscordChannel> textChannels = [];
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+
+    private List<(string Id, string Label)> AvailableRuleItems => allRules
+        .Where(r => links.All(l => l.RuleId != r.RuleId))
+        .Select(r => (r.RuleId, r.Name))
+        .ToList();
+
+    private bool previewLoading;
+    private string? previewText;
+
+    private bool sendingAnnouncement;
+    private bool confirmingDelete;
+    private bool deleting;
+
+    private string originalName = "";
+    private ulong originalChannelId;
+    private int originalIntervalDays;
+    private string originalMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        if (group != null)
+        {
+            RebuildSnapshot();
+            Tracker.Register(SaveSettings, DiscardSettings);
+        }
+
+        loaded = true;
+    }
+
+    public void Dispose()
+    {
+        Tracker.Unregister();
+    }
+
+    private void OnFieldChanged()
+    {
+        Tracker.MarkDirty();
+    }
+
+    private async Task Load()
+    {
+        group = await ActivityAnnouncementService.GetGroupAsync(GroupId);
+        if (group == null) return;
+
+        name = group.Name;
+        channelId = group.ChannelId;
+        intervalDays = group.IntervalDays;
+        message = group.Message;
+        links = group.Rules.ToList();
+
+        allRules = await ActivityRoleService.GetRulesAsync();
+
+        var guild = CurrentApplication.TargetGuild;
+        textChannels = guild.Channels.Values.Where(c => c.Type == ChannelType.Text).OrderBy(c => c.Position).ToList();
+    }
+
+    private void RebuildSnapshot()
+    {
+        originalName = name;
+        originalChannelId = channelId;
+        originalIntervalDays = intervalDays;
+        originalMessage = message;
+    }
+
+    private void DiscardSettings()
+    {
+        name = originalName;
+        channelId = originalChannelId;
+        intervalDays = originalIntervalDays;
+        message = originalMessage;
+    }
+
+    private async Task SaveSettings()
+    {
+        if (group == null) return;
+
+        group.Name = name.Trim();
+        group.ChannelId = channelId;
+        group.IntervalDays = Math.Max(intervalDays, 0);
+        group.Message = message;
+
+        await ActivityAnnouncementService.UpdateGroupAsync(group);
+        ToastService.Notify("Einstellungen gespeichert.", "ok");
+        await Load();
+        RebuildSnapshot();
+    }
+
+    private string RuleName(string ruleId)
+    {
+        var rule = allRules.FirstOrDefault(r => r.RuleId == ruleId);
+        return rule?.Name ?? $"Regel gelöscht ({ruleId})";
+    }
+
+    private async Task AddLink()
+    {
+        var alias = newLinkAlias.Trim();
+        if (string.IsNullOrEmpty(newLinkRuleId))
+        {
+            ToastService.Notify("Bitte eine Regel wählen.", "bad");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(alias) || !alias.All(c => char.IsLetterOrDigit(c) || c is '-' or '_'))
+        {
+            ToastService.Notify("Bitte einen Alias aus Buchstaben, Zahlen, - oder _ vergeben.", "bad");
+            return;
+        }
+
+        var added = await ActivityAnnouncementService.AddRuleLinkAsync(GroupId, newLinkRuleId, alias);
+        if (!added)
+        {
+            ToastService.Notify("Dieser Alias oder diese Regel ist in der Gruppe bereits vergeben.", "bad");
+            return;
+        }
+
+        newLinkRuleId = "";
+        newLinkAlias = "";
+        ToastService.Notify("Regel verknüpft.", "ok");
+        await Load();
+    }
+
+    private async Task RemoveLink(string ruleId)
+    {
+        await ActivityAnnouncementService.RemoveRuleLinkAsync(GroupId, ruleId);
+        ToastService.Notify("Entfernt.", "ok");
+        await Load();
+    }
+
+    private async Task RunPreview()
+    {
+        previewLoading = true;
+        previewText = null;
+        StateHasChanged();
+
+        previewText = await ActivityAnnouncementService.PreviewMessageAsync(GroupId, message);
+        if (string.IsNullOrWhiteSpace(previewText)) previewText = "(leer - keine verknüpfte Regel hat aktuell einen Treffer, oder die Nachricht ist leer.)";
+        previewLoading = false;
+    }
+
+    private async Task SendAnnouncementNow()
+    {
+        if (sendingAnnouncement) return;
+        sendingAnnouncement = true;
+
+        if (Tracker.IsDirty) await Tracker.SaveAsync();
+
+        var sent = await ActivityAnnouncementService.TriggerAnnouncementAsync(GroupId);
+        sendingAnnouncement = false;
+
+        ToastService.Notify(
+            sent ? "Ankündigung gesendet." : "Nichts gesendet - kein Channel gesetzt, keine verknüpfte Regel oder aktuell keine Treffer.",
+            sent ? "ok" : "bad");
+        await Load();
+    }
+
+    private async Task DeleteGroup()
+    {
+        if (deleting) return;
+        deleting = true;
+        await ActivityAnnouncementService.DeleteGroupAsync(GroupId);
+        deleting = false;
+        ToastService.Notify("Gruppe gelöscht.", "ok");
+        Nav.NavigateTo("/konfiguration/activityroles/announcements");
+    }
+}

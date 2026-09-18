@@ -8,7 +8,11 @@
 
 <PageHeader Title="Activity-Rollen"
             Lead="Rollen, die automatisch nach Chat- oder Voice-Aktivität vergeben werden."
-            BackHref="/konfiguration" BackText="Administration"/>
+            BackHref="/konfiguration" BackText="Administration">
+    <Actions>
+        <a class="btn btn-secondary" href="/konfiguration/activityroles/announcements">Ankündigungsgruppen</a>
+    </Actions>
+</PageHeader>
 
 @if (!loaded)
 {
