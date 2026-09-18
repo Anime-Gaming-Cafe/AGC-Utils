@@ -53,7 +53,7 @@ public static class ActivityRoleService
                          "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
                          "auto_revoke, announce_channel_id, announce_message, announce_interval_days, last_announced_at, " +
                          "winner_line_blocks, medal_rank1, medal_rank2, medal_rank3, medal_other_template, " +
-                         "count_divisor, count_suffix, count_monospace, created_by, created_at " +
+                         "count_divisor, count_suffix, count_monospace, exclude_left_members, created_by, created_at " +
                          "FROM activity_role_rules ORDER BY name"))
         {
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -118,8 +118,9 @@ public static class ActivityRoleService
             CountDivisor = reader.IsDBNull(25) ? 1 : reader.GetInt64(25),
             CountSuffix = reader.IsDBNull(26) ? "" : reader.GetString(26),
             CountMonospace = reader.IsDBNull(27) || reader.GetBoolean(27),
-            CreatedBy = reader.IsDBNull(28) ? 0 : (ulong)reader.GetInt64(28),
-            CreatedAt = reader.IsDBNull(29) ? 0 : reader.GetInt64(29)
+            ExcludeLeftMembers = reader.IsDBNull(28) || reader.GetBoolean(28),
+            CreatedBy = reader.IsDBNull(29) ? 0 : (ulong)reader.GetInt64(29),
+            CreatedAt = reader.IsDBNull(30) ? 0 : reader.GetInt64(30)
         };
     }
 
@@ -147,11 +148,11 @@ public static class ActivityRoleService
             "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
             "auto_revoke, announce_channel_id, announce_message, announce_interval_days, winner_line_blocks, " +
             "medal_rank1, medal_rank2, medal_rank3, medal_other_template, count_divisor, count_suffix, count_monospace, " +
-            "created_by, created_at) " +
+            "exclude_left_members, created_by, created_at) " +
             "VALUES (@rule_id, @name, @enabled, @metric, @mode, @window_type, @window_days, @scope_ids, @exclude_scope_ids, " +
             "@min_activity, @threshold_role_id, @threshold_value, @threshold_comparator, @auto_revoke, @announce_channel_id, " +
             "@announce_message, @announce_interval_days, @winner_line_blocks, @medal_rank1, @medal_rank2, @medal_rank3, " +
-            "@medal_other_template, @count_divisor, @count_suffix, @count_monospace, @created_by, @created_at)");
+            "@medal_other_template, @count_divisor, @count_suffix, @count_monospace, @exclude_left_members, @created_by, @created_at)");
         BindRuleParameters(cmd, rule);
         cmd.Parameters.AddWithValue("created_by", (long)rule.CreatedBy);
         cmd.Parameters.AddWithValue("created_at", rule.CreatedAt);
@@ -171,7 +172,8 @@ public static class ActivityRoleService
             "announce_interval_days = @announce_interval_days, winner_line_blocks = @winner_line_blocks, " +
             "medal_rank1 = @medal_rank1, medal_rank2 = @medal_rank2, medal_rank3 = @medal_rank3, " +
             "medal_other_template = @medal_other_template, count_divisor = @count_divisor, " +
-            "count_suffix = @count_suffix, count_monospace = @count_monospace " +
+            "count_suffix = @count_suffix, count_monospace = @count_monospace, " +
+            "exclude_left_members = @exclude_left_members " +
             "WHERE rule_id = @rule_id");
         BindRuleParameters(cmd, rule);
         await cmd.ExecuteNonQueryAsync();
@@ -205,6 +207,7 @@ public static class ActivityRoleService
         cmd.Parameters.AddWithValue("count_divisor", rule.CountDivisor <= 0 ? 1 : rule.CountDivisor);
         cmd.Parameters.AddWithValue("count_suffix", rule.CountSuffix);
         cmd.Parameters.AddWithValue("count_monospace", rule.CountMonospace);
+        cmd.Parameters.AddWithValue("exclude_left_members", rule.ExcludeLeftMembers);
     }
 
     public static async Task DeleteRuleAsync(string ruleId)
@@ -395,12 +398,24 @@ public static class ActivityRoleService
             foreach (var candidate in candidates)
             {
                 if (rank >= maxRank) break;
-                if (!guild.Members.TryGetValue(candidate.UserId, out var member) || member.IsBot) continue;
-                if (!await EligibilityService.ConditionsMetAsync(member, conditions)) continue;
+
+                var resolved = guild.Members.TryGetValue(candidate.UserId, out var member);
+                if (!resolved)
+                {
+                    // Left the server: with ExcludeLeftMembers on (default), skip them entirely so the
+                    // next candidate is promoted into the rank; off, their rank stays claimed instead -
+                    // they still never get the role, since granting requires being a member.
+                    if (rule.ExcludeLeftMembers) continue;
+                }
+                else
+                {
+                    if (member!.IsBot) continue;
+                    if (!await EligibilityService.ConditionsMetAsync(member, conditions)) continue;
+                }
 
                 rank++;
                 foreach (var tier in rule.Tiers.Where(t => rank >= t.RankFrom && rank <= t.RankTo && t.RoleId != 0))
-                    desired.Add(new RankedGrant(member.Id, tier.RoleId, rank, candidate.Count));
+                    desired.Add(new RankedGrant(candidate.UserId, tier.RoleId, rank, candidate.Count));
             }
         }
         else
@@ -416,8 +431,16 @@ public static class ActivityRoleService
 
             foreach (var userId in overThreshold)
             {
-                if (!guild.Members.TryGetValue(userId, out var member) || member.IsBot) continue;
-                if (!await EligibilityService.ConditionsMetAsync(member, conditions)) continue;
+                var resolved = guild.Members.TryGetValue(userId, out var member);
+                if (!resolved)
+                {
+                    if (rule.ExcludeLeftMembers) continue;
+                }
+                else
+                {
+                    if (member!.IsBot) continue;
+                    if (!await EligibilityService.ConditionsMetAsync(member, conditions)) continue;
+                }
 
                 desired.Add(new RankedGrant(userId, rule.ThresholdRoleId, 0, 0));
             }

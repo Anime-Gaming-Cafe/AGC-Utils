@@ -52,6 +52,13 @@ public class ActivityRoleRule
     public string CountSuffix { get; set; } = "";
     public bool CountMonospace { get; set; } = true;
 
+    /// <summary>
+    ///     true (default): a candidate who left the server is skipped entirely, so the next eligible
+    ///     candidate is promoted into their rank. false: their rank slot stays claimed (no promotion) -
+    ///     they obviously still never receive the role, since granting requires being a member.
+    /// </summary>
+    public bool ExcludeLeftMembers { get; set; } = true;
+
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }
 

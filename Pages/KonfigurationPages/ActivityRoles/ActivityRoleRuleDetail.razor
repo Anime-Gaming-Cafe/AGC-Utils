@@ -77,6 +77,13 @@ else
                 <input id="ar-min-activity" type="number" min="0" class="form-control" @bind="minActivity" @bind:after="OnFieldChanged"/>
                 <span class="field__hint">Nur bei mindestens so vielen Ereignissen im Fenster wird ein Rang vergeben.</span>
             </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ar-exclude-left" @bind="excludeLeftMembers" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="ar-exclude-left">Ausgeschiedene Mitglieder überspringen</label>
+                </div>
+                <span class="field__hint">An (Standard): wer den Server verlässt, wird übersprungen und der nächste rückt nach. Aus: der Rang bleibt belegt, niemand rückt nach - die Rolle bekommt dadurch trotzdem niemand, da Vergabe eine Mitgliedschaft voraussetzt.</span>
+            </div>
 
             @if (mode == ActivityRoleMode.Threshold)
             {
@@ -541,6 +548,7 @@ else
     private EligibilityComparator thresholdComparator;
     private long thresholdValue;
     private bool autoRevoke = true;
+    private bool excludeLeftMembers = true;
     private ulong announceChannelId;
     private int announceIntervalDays;
     private string announceMessage = "";
@@ -641,6 +649,7 @@ else
         thresholdComparator = rule.ThresholdComparator;
         thresholdValue = rule.ThresholdValue;
         autoRevoke = rule.AutoRevoke;
+        excludeLeftMembers = rule.ExcludeLeftMembers;
         announceChannelId = rule.AnnounceChannelId;
         announceIntervalDays = rule.AnnounceIntervalDays;
         announceMessage = rule.AnnounceMessage;
@@ -670,7 +679,7 @@ else
 
     private long originalMinActivity, originalThresholdValue, originalWindowDays;
     private string originalName = "";
-    private bool originalEnabled, originalAutoRevoke;
+    private bool originalEnabled, originalAutoRevoke, originalExcludeLeftMembers;
     private ActivityRoleMetric originalMetric;
     private ActivityRoleMode originalMode;
     private ActivityRoleWindowType originalWindowType;
@@ -696,6 +705,7 @@ else
         originalThresholdComparator = thresholdComparator;
         originalThresholdValue = thresholdValue;
         originalAutoRevoke = autoRevoke;
+        originalExcludeLeftMembers = excludeLeftMembers;
         originalAnnounceChannelId = announceChannelId;
         originalAnnounceIntervalDays = announceIntervalDays;
         originalAnnounceMessage = announceMessage;
@@ -721,6 +731,7 @@ else
         thresholdComparator = originalThresholdComparator;
         thresholdValue = originalThresholdValue;
         autoRevoke = originalAutoRevoke;
+        excludeLeftMembers = originalExcludeLeftMembers;
         announceChannelId = originalAnnounceChannelId;
         announceIntervalDays = originalAnnounceIntervalDays;
         announceMessage = originalAnnounceMessage;
@@ -748,6 +759,7 @@ else
         rule.ThresholdComparator = thresholdComparator;
         rule.ThresholdValue = Math.Max(thresholdValue, 0);
         rule.AutoRevoke = autoRevoke;
+        rule.ExcludeLeftMembers = excludeLeftMembers;
         rule.AnnounceChannelId = announceChannelId;
         rule.AnnounceIntervalDays = Math.Max(announceIntervalDays, 0);
         rule.AnnounceMessage = announceMessage;
