@@ -393,6 +393,85 @@ else
         </div>
     </Panel>
 
+    <Panel Title="Format der Rangzeile" Lead="Bestimmt, wie {rank1}, {rank2}, ... und {winners} in der Ankündigungs-Nachricht aussehen." Flush="@(winnerLineBlocks.Count > 0)">
+        @if (winnerLineBlocks.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Blöcke" Description="Ohne Blöcke sind {rank1} etc. leer. Füge unten mindestens einen an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @for (var i = 0; i < winnerLineBlocks.Count; i++)
+                {
+                    var index = i;
+                    var block = winnerLineBlocks[index];
+                    <li>
+                        <div class="rows__main"><p class="rows__title">@WinnerLineBlockLabel(block)</p></div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)" @onclick="() => MoveWinnerLineBlock(index, -1)">↑</button>
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == winnerLineBlocks.Count - 1)" @onclick="() => MoveWinnerLineBlock(index, 1)">↓</button>
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveWinnerLineBlock(index)">Entfernen</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Block hinzufügen">
+        <div class="field-grid">
+            <div class="field">
+                <select class="form-select" @bind="newWinnerLineBlock">
+                    @foreach (var block in ActivityRoleService.WinnerLineBlockKeys.Where(b => !winnerLineBlocks.Contains(b.Key)))
+                    {
+                        <option value="@block.Key">@block.Label</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="AddWinnerLineBlock">Hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Medaillen &amp; Zählwert" Lead="Wie die Bausteine 'Medaille' und 'Zählwert' aus der Rangzeile konkret aussehen.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="ar-medal-1">Medaille Rang 1</label>
+                <input id="ar-medal-1" class="form-control" @bind="medalRank1" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-medal-2">Medaille Rang 2</label>
+                <input id="ar-medal-2" class="form-control" @bind="medalRank2" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-medal-3">Medaille Rang 3</label>
+                <input id="ar-medal-3" class="form-control" @bind="medalRank3" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-medal-other">Medaille ab Rang 4</label>
+                <input id="ar-medal-other" class="form-control" @bind="medalOtherTemplate" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Platzhalter: {rank}. Leer lassen für keine Kennzeichnung ab Rang 4.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-count-divisor">Zählwert teilen durch</label>
+                <input id="ar-count-divisor" type="number" min="1" class="form-control" @bind="countDivisor" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Z.B. 60 bei Voice-Minuten, um Stunden anzuzeigen. 1 = unverändert.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="ar-count-suffix">Einheit / Suffix</label>
+                <input id="ar-count-suffix" class="form-control" @bind="countSuffix" @bind:after="OnFieldChanged" placeholder="z.B. h, min, Nachrichten"/>
+            </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ar-count-monospace" @bind="countMonospace" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="ar-count-monospace">Zählwert in Monospace-Schrift</label>
+                </div>
+            </div>
+        </div>
+        <p class="field__hint mt-3">Vorschau mit Beispieldaten: <code>@WinnerLinePreview()</code></p>
+    </Panel>
+
     <Panel Title="Vorschau" Lead="Zeigt die aktuell berechnete Rangliste bzw. Schwellenwert-Treffer, ohne den nächsten Auswertungszyklus abzuwarten.">
         <div class="form-foot mb-3">
             <button type="button" class="btn btn-secondary" disabled="@previewLoading" @onclick="RunPreview">Jetzt berechnen</button>
@@ -481,6 +560,17 @@ else
     private long newAdvancedValue;
     private bool newAdvancedNegate;
 
+    private List<string> winnerLineBlocks = [];
+    private string newWinnerLineBlock = "";
+
+    private string medalRank1 = "🥇";
+    private string medalRank2 = "🥈";
+    private string medalRank3 = "🥉";
+    private string medalOtherTemplate = "`#{rank}`";
+    private long countDivisor = 1;
+    private string countSuffix = "";
+    private bool countMonospace = true;
+
     private List<DiscordChannel> textChannels = [];
     private List<DiscordChannel> scopeCandidates = [];
     private List<DiscordRole> assignableRoles = [];
@@ -551,6 +641,15 @@ else
         scopeIds = rule.ScopeIds.ToList();
         excludeScopeIds = rule.ExcludeScopeIds.ToList();
         tiers = rule.Tiers.ToList();
+        winnerLineBlocks = rule.WinnerLineBlocks.ToList();
+        newWinnerLineBlock = ActivityRoleService.WinnerLineBlockKeys.Select(b => b.Key).FirstOrDefault(k => !winnerLineBlocks.Contains(k)) ?? "";
+        medalRank1 = rule.MedalRank1;
+        medalRank2 = rule.MedalRank2;
+        medalRank3 = rule.MedalRank3;
+        medalOtherTemplate = rule.MedalOtherTemplate;
+        countDivisor = rule.CountDivisor;
+        countSuffix = rule.CountSuffix;
+        countMonospace = rule.CountMonospace;
 
         conditions = await EligibilityService.GetConditionsAsync(ActivityRoleService.OwnerType, RuleId);
 
@@ -573,6 +672,10 @@ else
     private EligibilityComparator originalThresholdComparator;
     private int originalAnnounceIntervalDays;
     private string originalAnnounceMessage = "";
+    private string originalMedalRank1 = "", originalMedalRank2 = "", originalMedalRank3 = "", originalMedalOtherTemplate = "";
+    private long originalCountDivisor;
+    private string originalCountSuffix = "";
+    private bool originalCountMonospace;
 
     private void RebuildSnapshot()
     {
@@ -590,6 +693,13 @@ else
         originalAnnounceChannelId = announceChannelId;
         originalAnnounceIntervalDays = announceIntervalDays;
         originalAnnounceMessage = announceMessage;
+        originalMedalRank1 = medalRank1;
+        originalMedalRank2 = medalRank2;
+        originalMedalRank3 = medalRank3;
+        originalMedalOtherTemplate = medalOtherTemplate;
+        originalCountDivisor = countDivisor;
+        originalCountSuffix = countSuffix;
+        originalCountMonospace = countMonospace;
     }
 
     private void DiscardSettings()
@@ -608,6 +718,13 @@ else
         announceChannelId = originalAnnounceChannelId;
         announceIntervalDays = originalAnnounceIntervalDays;
         announceMessage = originalAnnounceMessage;
+        medalRank1 = originalMedalRank1;
+        medalRank2 = originalMedalRank2;
+        medalRank3 = originalMedalRank3;
+        medalOtherTemplate = originalMedalOtherTemplate;
+        countDivisor = originalCountDivisor;
+        countSuffix = originalCountSuffix;
+        countMonospace = originalCountMonospace;
     }
 
     private async Task SaveSettings()
@@ -628,6 +745,13 @@ else
         rule.AnnounceChannelId = announceChannelId;
         rule.AnnounceIntervalDays = Math.Max(announceIntervalDays, 0);
         rule.AnnounceMessage = announceMessage;
+        rule.MedalRank1 = medalRank1;
+        rule.MedalRank2 = medalRank2;
+        rule.MedalRank3 = medalRank3;
+        rule.MedalOtherTemplate = medalOtherTemplate;
+        rule.CountDivisor = countDivisor <= 0 ? 1 : countDivisor;
+        rule.CountSuffix = countSuffix;
+        rule.CountMonospace = countMonospace;
 
         await ActivityRoleService.UpdateRuleAsync(rule);
         ToastService.Notify("Einstellungen gespeichert.", "ok");
@@ -918,6 +1042,73 @@ else
     {
         var used = conditions.Where(c => c.GroupId != 0).Select(c => c.GroupId).ToList();
         return used.Count == 0 ? 1 : used.Max() + 1;
+    }
+
+    #endregion
+
+    #region Winner line builder
+
+    private static string WinnerLineBlockLabel(string key)
+    {
+        return ActivityRoleService.WinnerLineBlockKeys.FirstOrDefault(b => b.Key == key).Label ?? key;
+    }
+
+    private async Task AddWinnerLineBlock()
+    {
+        if (rule == null || string.IsNullOrEmpty(newWinnerLineBlock) || winnerLineBlocks.Contains(newWinnerLineBlock))
+            return;
+
+        winnerLineBlocks.Add(newWinnerLineBlock);
+        rule.WinnerLineBlocks = winnerLineBlocks;
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify("Block hinzugefügt.", "ok");
+        await Load();
+    }
+
+    private async Task RemoveWinnerLineBlock(int index)
+    {
+        if (rule == null) return;
+
+        winnerLineBlocks.RemoveAt(index);
+        rule.WinnerLineBlocks = winnerLineBlocks;
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        ToastService.Notify("Entfernt.", "ok");
+        await Load();
+    }
+
+    private async Task MoveWinnerLineBlock(int index, int direction)
+    {
+        if (rule == null) return;
+
+        var target = index + direction;
+        if (target < 0 || target >= winnerLineBlocks.Count) return;
+
+        (winnerLineBlocks[index], winnerLineBlocks[target]) = (winnerLineBlocks[target], winnerLineBlocks[index]);
+        rule.WinnerLineBlocks = winnerLineBlocks;
+        await ActivityRoleService.UpdateRuleAsync(rule);
+        await Load();
+    }
+
+    private string WinnerLinePreview()
+    {
+        const ulong sampleUserId = 329205713605754881;
+        var sampleRoleId = tiers.FirstOrDefault()?.RoleId ?? assignableRoles.FirstOrDefault()?.Id ?? 0;
+        var sample = new ActivityRoleService.RankedGrant(sampleUserId, sampleRoleId, 1,
+            metric == ActivityRoleMetric.VoiceMinutes ? 13560 : 3259);
+
+        var previewRule = new ActivityRoleRule
+        {
+            WinnerLineBlocks = winnerLineBlocks,
+            MedalRank1 = medalRank1,
+            MedalRank2 = medalRank2,
+            MedalRank3 = medalRank3,
+            MedalOtherTemplate = medalOtherTemplate,
+            CountDivisor = countDivisor,
+            CountSuffix = countSuffix,
+            CountMonospace = countMonospace
+        };
+
+        return ActivityRoleService.FormatWinnerLine(sample, previewRule);
     }
 
     #endregion

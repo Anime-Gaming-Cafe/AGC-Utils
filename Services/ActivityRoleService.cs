@@ -21,6 +21,18 @@ public static class ActivityRoleService
 {
     public const string OwnerType = "activityrule";
 
+    /// <summary>
+    ///     The pieces a winner-line builder can arrange, in key/German-label form so the WebUI has one
+    ///     place to source both the "add block" picker and existing-block labels from.
+    /// </summary>
+    public static readonly (string Key, string Label)[] WinnerLineBlockKeys =
+    [
+        ("medal", "Medaille / Rang-Badge"),
+        ("mention", "Nutzer-Erwähnung"),
+        ("count", "Zählwert"),
+        ("role", "Rollen-Erwähnung")
+    ];
+
     private static readonly TimeSpan RuleCacheTtl = TimeSpan.FromSeconds(30);
     private static List<ActivityRoleRule>? _ruleCache;
     private static DateTime _ruleCacheExpires = DateTime.MinValue;
@@ -40,7 +52,8 @@ public static class ActivityRoleService
                          "SELECT rule_id, name, enabled, metric, mode, window_type, window_days, window_start, window_end, " +
                          "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
                          "auto_revoke, announce_channel_id, announce_message, announce_interval_days, last_announced_at, " +
-                         "created_by, created_at " +
+                         "winner_line_blocks, medal_rank1, medal_rank2, medal_rank3, medal_other_template, " +
+                         "count_divisor, count_suffix, count_monospace, created_by, created_at " +
                          "FROM activity_role_rules ORDER BY name"))
         {
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -97,8 +110,16 @@ public static class ActivityRoleService
             AnnounceMessage = reader.IsDBNull(17) ? "" : reader.GetString(17),
             AnnounceIntervalDays = reader.IsDBNull(18) ? 0 : reader.GetInt32(18),
             LastAnnouncedAt = reader.IsDBNull(19) ? 0 : reader.GetInt64(19),
-            CreatedBy = reader.IsDBNull(20) ? 0 : (ulong)reader.GetInt64(20),
-            CreatedAt = reader.IsDBNull(21) ? 0 : reader.GetInt64(21)
+            WinnerLineBlocks = ParseWinnerLineBlocks(reader.IsDBNull(20) ? "" : reader.GetString(20)),
+            MedalRank1 = reader.IsDBNull(21) ? "🥇" : reader.GetString(21),
+            MedalRank2 = reader.IsDBNull(22) ? "🥈" : reader.GetString(22),
+            MedalRank3 = reader.IsDBNull(23) ? "🥉" : reader.GetString(23),
+            MedalOtherTemplate = reader.IsDBNull(24) ? "`#{rank}`" : reader.GetString(24),
+            CountDivisor = reader.IsDBNull(25) ? 1 : reader.GetInt64(25),
+            CountSuffix = reader.IsDBNull(26) ? "" : reader.GetString(26),
+            CountMonospace = reader.IsDBNull(27) || reader.GetBoolean(27),
+            CreatedBy = reader.IsDBNull(28) ? 0 : (ulong)reader.GetInt64(28),
+            CreatedAt = reader.IsDBNull(29) ? 0 : reader.GetInt64(29)
         };
     }
 
@@ -107,16 +128,30 @@ public static class ActivityRoleService
         return Enum.TryParse<T>(raw, true, out var parsed) ? parsed : fallback;
     }
 
+    private static List<string> ParseWinnerLineBlocks(string raw)
+    {
+        var knownKeys = WinnerLineBlockKeys.Select(b => b.Key).ToHashSet();
+        var blocks = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(knownKeys.Contains)
+            .Distinct()
+            .ToList();
+
+        return blocks.Count > 0 ? blocks : ["medal", "mention", "count", "role"];
+    }
+
     public static async Task AddRuleAsync(ActivityRoleRule rule)
     {
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand(
             "INSERT INTO activity_role_rules (rule_id, name, enabled, metric, mode, window_type, window_days, " +
             "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
-            "auto_revoke, announce_channel_id, announce_message, announce_interval_days, created_by, created_at) " +
+            "auto_revoke, announce_channel_id, announce_message, announce_interval_days, winner_line_blocks, " +
+            "medal_rank1, medal_rank2, medal_rank3, medal_other_template, count_divisor, count_suffix, count_monospace, " +
+            "created_by, created_at) " +
             "VALUES (@rule_id, @name, @enabled, @metric, @mode, @window_type, @window_days, @scope_ids, @exclude_scope_ids, " +
             "@min_activity, @threshold_role_id, @threshold_value, @threshold_comparator, @auto_revoke, @announce_channel_id, " +
-            "@announce_message, @announce_interval_days, @created_by, @created_at)");
+            "@announce_message, @announce_interval_days, @winner_line_blocks, @medal_rank1, @medal_rank2, @medal_rank3, " +
+            "@medal_other_template, @count_divisor, @count_suffix, @count_monospace, @created_by, @created_at)");
         BindRuleParameters(cmd, rule);
         cmd.Parameters.AddWithValue("created_by", (long)rule.CreatedBy);
         cmd.Parameters.AddWithValue("created_at", rule.CreatedAt);
@@ -133,7 +168,11 @@ public static class ActivityRoleService
             "exclude_scope_ids = @exclude_scope_ids, min_activity = @min_activity, threshold_role_id = @threshold_role_id, " +
             "threshold_value = @threshold_value, threshold_comparator = @threshold_comparator, auto_revoke = @auto_revoke, " +
             "announce_channel_id = @announce_channel_id, announce_message = @announce_message, " +
-            "announce_interval_days = @announce_interval_days WHERE rule_id = @rule_id");
+            "announce_interval_days = @announce_interval_days, winner_line_blocks = @winner_line_blocks, " +
+            "medal_rank1 = @medal_rank1, medal_rank2 = @medal_rank2, medal_rank3 = @medal_rank3, " +
+            "medal_other_template = @medal_other_template, count_divisor = @count_divisor, " +
+            "count_suffix = @count_suffix, count_monospace = @count_monospace " +
+            "WHERE rule_id = @rule_id");
         BindRuleParameters(cmd, rule);
         await cmd.ExecuteNonQueryAsync();
         InvalidateCache();
@@ -158,6 +197,14 @@ public static class ActivityRoleService
         cmd.Parameters.AddWithValue("announce_channel_id", (long)rule.AnnounceChannelId);
         cmd.Parameters.AddWithValue("announce_message", rule.AnnounceMessage);
         cmd.Parameters.AddWithValue("announce_interval_days", rule.AnnounceIntervalDays);
+        cmd.Parameters.AddWithValue("winner_line_blocks", string.Join(',', rule.WinnerLineBlocks));
+        cmd.Parameters.AddWithValue("medal_rank1", rule.MedalRank1);
+        cmd.Parameters.AddWithValue("medal_rank2", rule.MedalRank2);
+        cmd.Parameters.AddWithValue("medal_rank3", rule.MedalRank3);
+        cmd.Parameters.AddWithValue("medal_other_template", rule.MedalOtherTemplate);
+        cmd.Parameters.AddWithValue("count_divisor", rule.CountDivisor <= 0 ? 1 : rule.CountDivisor);
+        cmd.Parameters.AddWithValue("count_suffix", rule.CountSuffix);
+        cmd.Parameters.AddWithValue("count_monospace", rule.CountMonospace);
     }
 
     public static async Task DeleteRuleAsync(string ruleId)
@@ -510,12 +557,12 @@ public static class ActivityRoleService
         var byRank = winners.Where(w => w.Rank > 0).ToDictionary(w => w.Rank);
         var joined = winners
             .OrderBy(w => w.Rank == 0 ? int.MaxValue : w.Rank)
-            .Select(w => FormatWinnerLine(w, rule.Metric));
+            .Select(w => FormatWinnerLine(w, rule));
 
         var template = string.IsNullOrWhiteSpace(rule.AnnounceMessage) ? "{winners}" : rule.AnnounceMessage;
         var message = RankPlaceholder.Replace(template,
             m => byRank.TryGetValue(int.Parse(m.Groups[1].Value), out var winner)
-                ? FormatWinnerLine(winner, rule.Metric)
+                ? FormatWinnerLine(winner, rule)
                 : "");
         message = message.Replace("{winners}", string.Join("\n", joined));
 
@@ -531,24 +578,40 @@ public static class ActivityRoleService
     }
 
     /// <summary>
-    ///     Medal for the top 3, a plain rank badge below that, none for threshold mode (rank 0). Voice
-    ///     minutes render as hours to match how people actually talk about voice activity.
+    ///     Renders one winner as the ordered set of blocks the rule owner picked (see
+    ///     <see cref="WinnerLineBlockKeys" />), with the rule's own medal texts and count formatting.
+    ///     None for threshold mode (rank 0, medal renders empty). Public so the WebUI can render a live
+    ///     builder preview with sample data without duplicating this logic.
     /// </summary>
-    private static string FormatWinnerLine(RankedGrant winner, ActivityRoleMetric metric)
+    public static string FormatWinnerLine(RankedGrant winner, ActivityRoleRule rule)
     {
-        var medal = winner.Rank switch
+        string RenderBlock(string block)
         {
-            1 => "🥇",
-            2 => "🥈",
-            3 => "🥉",
-            > 3 => $"`#{winner.Rank}`",
-            _ => ""
-        };
+            return block switch
+            {
+                "medal" => winner.Rank switch
+                {
+                    1 => rule.MedalRank1,
+                    2 => rule.MedalRank2,
+                    3 => rule.MedalRank3,
+                    > 3 => rule.MedalOtherTemplate.Replace("{rank}", winner.Rank.ToString()),
+                    _ => ""
+                },
+                "mention" => $"<@{winner.UserId}>",
+                "count" => FormatCount(winner.Count, rule),
+                "role" => $"<@&{winner.RoleId}>",
+                _ => ""
+            };
+        }
 
-        var count = metric == ActivityRoleMetric.VoiceMinutes ? $"`{winner.Count / 60}h`" : $"`{winner.Count}`";
+        return string.Join(" ", rule.WinnerLineBlocks.Select(RenderBlock).Where(p => p.Length > 0));
+    }
 
-        return string.Join(" ",
-            new[] { medal, $"<@{winner.UserId}>", count, $"<@&{winner.RoleId}>" }.Where(p => p.Length > 0));
+    private static string FormatCount(long count, ActivityRoleRule rule)
+    {
+        var divisor = rule.CountDivisor <= 0 ? 1 : rule.CountDivisor;
+        var text = $"{count / divisor}{rule.CountSuffix}";
+        return rule.CountMonospace ? $"`{text}`" : text;
     }
 
     #endregion

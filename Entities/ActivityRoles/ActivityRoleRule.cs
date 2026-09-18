@@ -32,6 +32,26 @@ public class ActivityRoleRule
     public int AnnounceIntervalDays { get; set; }
 
     public long LastAnnouncedAt { get; set; }
+
+    /// <summary>
+    ///     Order and presence of the pieces {rank1}/{rank2}/.../{winners} render with, e.g.
+    ///     ["medal", "mention", "count", "role"]. See <see cref="ActivityRoleService.WinnerLineBlockKeys" />.
+    /// </summary>
+    public List<string> WinnerLineBlocks { get; set; } = ["medal", "mention", "count", "role"];
+
+    public string MedalRank1 { get; set; } = "🥇";
+    public string MedalRank2 { get; set; } = "🥈";
+    public string MedalRank3 { get; set; } = "🥉";
+
+    /// <summary>Rendered for rank 4+. Placeholder: {rank}.</summary>
+    public string MedalOtherTemplate { get; set; } = "`#{rank}`";
+
+    /// <summary>The raw metric count is divided by this before display (e.g. 60 to show voice minutes as hours).</summary>
+    public long CountDivisor { get; set; } = 1;
+
+    public string CountSuffix { get; set; } = "";
+    public bool CountMonospace { get; set; } = true;
+
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }
 

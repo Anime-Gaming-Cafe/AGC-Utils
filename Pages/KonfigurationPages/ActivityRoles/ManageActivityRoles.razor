@@ -163,6 +163,8 @@ else
             Mode = newMode,
             WindowType = newWindowType,
             WindowDays = Math.Max(newWindowDays, 1),
+            CountDivisor = newMetric == ActivityRoleMetric.VoiceMinutes ? 60 : 1,
+            CountSuffix = newMetric == ActivityRoleMetric.VoiceMinutes ? "h" : "",
             CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
 
