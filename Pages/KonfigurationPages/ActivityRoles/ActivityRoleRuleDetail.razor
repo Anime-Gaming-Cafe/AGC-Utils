@@ -85,6 +85,22 @@ else
                 <span class="field__hint">An (Standard): wer den Server verlässt, wird übersprungen und der nächste rückt nach. Aus: der Rang bleibt belegt, niemand rückt nach - die Rolle bekommt dadurch trotzdem niemand, da Vergabe eine Mitgliedschaft voraussetzt.</span>
             </div>
 
+            @if (metric is ActivityRoleMetric.VoiceMinutes or ActivityRoleMetric.Combined)
+            {
+                <div class="field">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ar-count-muted" @bind="countMutedVoice" @bind:after="OnFieldChanged"/>
+                        <label class="form-check-label" for="ar-count-muted">Stummgeschaltete Zeit zählt mit</label>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ar-count-deafened" @bind="countDeafenedVoice" @bind:after="OnFieldChanged"/>
+                        <label class="form-check-label" for="ar-count-deafened">Taubgeschaltete Zeit zählt mit</label>
+                    </div>
+                </div>
+            }
+
             @if (mode == ActivityRoleMode.Threshold)
             {
                 <div class="field">
@@ -549,6 +565,8 @@ else
     private long thresholdValue;
     private bool autoRevoke = true;
     private bool excludeLeftMembers = true;
+    private bool countMutedVoice = true;
+    private bool countDeafenedVoice = true;
     private ulong announceChannelId;
     private int announceIntervalDays;
     private string announceMessage = "";
@@ -650,6 +668,8 @@ else
         thresholdValue = rule.ThresholdValue;
         autoRevoke = rule.AutoRevoke;
         excludeLeftMembers = rule.ExcludeLeftMembers;
+        countMutedVoice = rule.CountMutedVoice;
+        countDeafenedVoice = rule.CountDeafenedVoice;
         announceChannelId = rule.AnnounceChannelId;
         announceIntervalDays = rule.AnnounceIntervalDays;
         announceMessage = rule.AnnounceMessage;
@@ -680,6 +700,7 @@ else
     private long originalMinActivity, originalThresholdValue, originalWindowDays;
     private string originalName = "";
     private bool originalEnabled, originalAutoRevoke, originalExcludeLeftMembers;
+    private bool originalCountMutedVoice, originalCountDeafenedVoice;
     private ActivityRoleMetric originalMetric;
     private ActivityRoleMode originalMode;
     private ActivityRoleWindowType originalWindowType;
@@ -706,6 +727,8 @@ else
         originalThresholdValue = thresholdValue;
         originalAutoRevoke = autoRevoke;
         originalExcludeLeftMembers = excludeLeftMembers;
+        originalCountMutedVoice = countMutedVoice;
+        originalCountDeafenedVoice = countDeafenedVoice;
         originalAnnounceChannelId = announceChannelId;
         originalAnnounceIntervalDays = announceIntervalDays;
         originalAnnounceMessage = announceMessage;
@@ -732,6 +755,8 @@ else
         thresholdValue = originalThresholdValue;
         autoRevoke = originalAutoRevoke;
         excludeLeftMembers = originalExcludeLeftMembers;
+        countMutedVoice = originalCountMutedVoice;
+        countDeafenedVoice = originalCountDeafenedVoice;
         announceChannelId = originalAnnounceChannelId;
         announceIntervalDays = originalAnnounceIntervalDays;
         announceMessage = originalAnnounceMessage;
@@ -760,6 +785,8 @@ else
         rule.ThresholdValue = Math.Max(thresholdValue, 0);
         rule.AutoRevoke = autoRevoke;
         rule.ExcludeLeftMembers = excludeLeftMembers;
+        rule.CountMutedVoice = countMutedVoice;
+        rule.CountDeafenedVoice = countDeafenedVoice;
         rule.AnnounceChannelId = announceChannelId;
         rule.AnnounceIntervalDays = Math.Max(announceIntervalDays, 0);
         rule.AnnounceMessage = announceMessage;

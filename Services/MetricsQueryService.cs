@@ -57,6 +57,22 @@ public static class MetricsQueryService
     }
 
     /// <summary>
+    ///     Only metrics_voice rows carry a voicestate, so this is a no-op for metrics_messages - a caller
+    ///     computing a Combined score can pass the same exclusion list into both halves safely.
+    /// </summary>
+    private static void AppendVoiceStateFilter(StringBuilder sql, string table, int[]? excludeVoiceStates)
+    {
+        if (table == "metrics_voice" && excludeVoiceStates is { Length: > 0 })
+            sql.Append(" AND voicestate != ALL(@excludeVoiceStates)");
+    }
+
+    private static void AddVoiceStateParameter(NpgsqlCommand cmd, string table, int[]? excludeVoiceStates)
+    {
+        if (table == "metrics_voice" && excludeVoiceStates is { Length: > 0 })
+            cmd.Parameters.AddWithValue("excludeVoiceStates", excludeVoiceStates);
+    }
+
+    /// <summary>
     ///     Both metric tables are row logs, so a count is the metric: one row per message, and one row per
     ///     user and minute for voice. sinceUnix &lt;= 0 counts everything ever recorded.
     /// </summary>
@@ -88,7 +104,7 @@ public static class MetricsQueryService
     /// </summary>
     public static async Task<List<ActivityRoleCandidate>> GetRankedUsersAsync(string table, long sinceUnix,
         long? untilUnix, long[] includeScope, long[] excludeScope, long minCount, int limit,
-        DiscordGuild? guild = null)
+        DiscordGuild? guild = null, int[]? excludeVoiceStates = null)
     {
         var include = ExpandScope(guild, includeScope);
         var exclude = ExpandScope(guild, excludeScope);
@@ -97,6 +113,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) sql.Append(" AND timestamp >= @since");
         if (untilUnix.HasValue) sql.Append(" AND timestamp < @until");
         AppendScopeFilters(sql, include, exclude);
+        AppendVoiceStateFilter(sql, table, excludeVoiceStates);
         sql.Append(" GROUP BY userid HAVING COUNT(*) >= @minCount ORDER BY cnt DESC LIMIT @limit");
 
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -104,6 +121,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) cmd.Parameters.AddWithValue("since", sinceUnix);
         if (untilUnix.HasValue) cmd.Parameters.AddWithValue("until", untilUnix.Value);
         AddScopeParameters(cmd, include, exclude);
+        AddVoiceStateParameter(cmd, table, excludeVoiceStates);
         cmd.Parameters.AddWithValue("minCount", minCount);
         cmd.Parameters.AddWithValue("limit", limit);
 
@@ -120,7 +138,8 @@ public static class MetricsQueryService
     ///     row can appear (COUNT is over existing rows), same limitation the old per-condition query had.
     /// </summary>
     public static async Task<List<ulong>> GetUsersOverThresholdAsync(string table, long sinceUnix, long? untilUnix,
-        long[] includeScope, long[] excludeScope, bool lte, long value, DiscordGuild? guild = null)
+        long[] includeScope, long[] excludeScope, bool lte, long value, DiscordGuild? guild = null,
+        int[]? excludeVoiceStates = null)
     {
         var include = ExpandScope(guild, includeScope);
         var exclude = ExpandScope(guild, excludeScope);
@@ -129,6 +148,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) sql.Append(" AND timestamp >= @since");
         if (untilUnix.HasValue) sql.Append(" AND timestamp < @until");
         AppendScopeFilters(sql, include, exclude);
+        AppendVoiceStateFilter(sql, table, excludeVoiceStates);
         sql.Append(lte ? " GROUP BY userid HAVING COUNT(*) <= @value" : " GROUP BY userid HAVING COUNT(*) >= @value");
 
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -136,6 +156,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) cmd.Parameters.AddWithValue("since", sinceUnix);
         if (untilUnix.HasValue) cmd.Parameters.AddWithValue("until", untilUnix.Value);
         AddScopeParameters(cmd, include, exclude);
+        AddVoiceStateParameter(cmd, table, excludeVoiceStates);
         cmd.Parameters.AddWithValue("value", value);
 
         var userIds = new List<ulong>();
@@ -146,7 +167,8 @@ public static class MetricsQueryService
     }
 
     private static async Task<Dictionary<ulong, long>> GetPerUserCountsAsync(string table, long sinceUnix,
-        long? untilUnix, long[] includeScope, long[] excludeScope, DiscordGuild? guild)
+        long? untilUnix, long[] includeScope, long[] excludeScope, DiscordGuild? guild,
+        int[]? excludeVoiceStates = null)
     {
         var include = ExpandScope(guild, includeScope);
         var exclude = ExpandScope(guild, excludeScope);
@@ -155,6 +177,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) sql.Append(" AND timestamp >= @since");
         if (untilUnix.HasValue) sql.Append(" AND timestamp < @until");
         AppendScopeFilters(sql, include, exclude);
+        AppendVoiceStateFilter(sql, table, excludeVoiceStates);
         sql.Append(" GROUP BY userid");
 
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -162,6 +185,7 @@ public static class MetricsQueryService
         if (sinceUnix > 0) cmd.Parameters.AddWithValue("since", sinceUnix);
         if (untilUnix.HasValue) cmd.Parameters.AddWithValue("until", untilUnix.Value);
         AddScopeParameters(cmd, include, exclude);
+        AddVoiceStateParameter(cmd, table, excludeVoiceStates);
 
         var counts = new Dictionary<ulong, long>();
         await using var reader = await cmd.ExecuteReaderAsync();
@@ -176,12 +200,12 @@ public static class MetricsQueryService
     ///     which works because a text-channel id simply never matches a voice-log row and vice versa.
     /// </summary>
     private static async Task<Dictionary<ulong, long>> GetCombinedCountsAsync(long sinceUnix, long? untilUnix,
-        long[] includeScope, long[] excludeScope, DiscordGuild? guild)
+        long[] includeScope, long[] excludeScope, DiscordGuild? guild, int[]? excludeVoiceStates = null)
     {
         var messages = await GetPerUserCountsAsync("metrics_messages", sinceUnix, untilUnix, includeScope,
             excludeScope, guild);
         var voice = await GetPerUserCountsAsync("metrics_voice", sinceUnix, untilUnix, includeScope, excludeScope,
-            guild);
+            guild, excludeVoiceStates);
 
         var combined = new Dictionary<ulong, long>(messages);
         foreach (var (userId, count) in voice)
@@ -192,9 +216,10 @@ public static class MetricsQueryService
 
     public static async Task<List<ActivityRoleCandidate>> GetRankedUsersCombinedAsync(long sinceUnix,
         long? untilUnix, long[] includeScope, long[] excludeScope, long minCount, int limit,
-        DiscordGuild? guild = null)
+        DiscordGuild? guild = null, int[]? excludeVoiceStates = null)
     {
-        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild);
+        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild,
+            excludeVoiceStates);
         return combined
             .Where(kv => kv.Value >= minCount)
             .OrderByDescending(kv => kv.Value)
@@ -204,9 +229,11 @@ public static class MetricsQueryService
     }
 
     public static async Task<List<ulong>> GetUsersOverThresholdCombinedAsync(long sinceUnix, long? untilUnix,
-        long[] includeScope, long[] excludeScope, bool lte, long value, DiscordGuild? guild = null)
+        long[] includeScope, long[] excludeScope, bool lte, long value, DiscordGuild? guild = null,
+        int[]? excludeVoiceStates = null)
     {
-        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild);
+        var combined = await GetCombinedCountsAsync(sinceUnix, untilUnix, includeScope, excludeScope, guild,
+            excludeVoiceStates);
         return combined
             .Where(kv => lte ? kv.Value <= value : kv.Value >= value)
             .Select(kv => kv.Key)

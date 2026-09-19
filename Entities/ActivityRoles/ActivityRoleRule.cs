@@ -59,6 +59,9 @@ public class ActivityRoleRule
     /// </summary>
     public bool ExcludeLeftMembers { get; set; } = true;
 
+    public bool CountMutedVoice { get; set; } = true;
+    public bool CountDeafenedVoice { get; set; } = true;
+
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }
 

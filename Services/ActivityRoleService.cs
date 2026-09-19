@@ -2,6 +2,7 @@
 
 using System.Text.RegularExpressions;
 using AGC_Management.Entities.ActivityRoles;
+using AGC_Management.Enums;
 using AGC_Management.Enums.ActivityRoles;
 using AGC_Management.Enums.Conditions;
 using DisCatSharp.Exceptions;
@@ -53,7 +54,7 @@ public static class ActivityRoleService
                          "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
                          "auto_revoke, announce_channel_id, announce_message, announce_interval_days, last_announced_at, " +
                          "winner_line_blocks, medal_rank1, medal_rank2, medal_rank3, medal_other_template, " +
-                         "count_divisor, count_suffix, count_monospace, exclude_left_members, created_by, created_at " +
+                         "count_divisor, count_suffix, count_monospace, exclude_left_members, count_muted_voice, count_deafened_voice, created_by, created_at " +
                          "FROM activity_role_rules ORDER BY name"))
         {
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -119,8 +120,10 @@ public static class ActivityRoleService
             CountSuffix = reader.IsDBNull(26) ? "" : reader.GetString(26),
             CountMonospace = reader.IsDBNull(27) || reader.GetBoolean(27),
             ExcludeLeftMembers = reader.IsDBNull(28) || reader.GetBoolean(28),
-            CreatedBy = reader.IsDBNull(29) ? 0 : (ulong)reader.GetInt64(29),
-            CreatedAt = reader.IsDBNull(30) ? 0 : reader.GetInt64(30)
+            CountMutedVoice = reader.IsDBNull(29) || reader.GetBoolean(29),
+            CountDeafenedVoice = reader.IsDBNull(30) || reader.GetBoolean(30),
+            CreatedBy = reader.IsDBNull(31) ? 0 : (ulong)reader.GetInt64(31),
+            CreatedAt = reader.IsDBNull(32) ? 0 : reader.GetInt64(32)
         };
     }
 
@@ -148,11 +151,11 @@ public static class ActivityRoleService
             "scope_ids, exclude_scope_ids, min_activity, threshold_role_id, threshold_value, threshold_comparator, " +
             "auto_revoke, announce_channel_id, announce_message, announce_interval_days, winner_line_blocks, " +
             "medal_rank1, medal_rank2, medal_rank3, medal_other_template, count_divisor, count_suffix, count_monospace, " +
-            "exclude_left_members, created_by, created_at) " +
+            "exclude_left_members, count_muted_voice, count_deafened_voice, created_by, created_at) " +
             "VALUES (@rule_id, @name, @enabled, @metric, @mode, @window_type, @window_days, @scope_ids, @exclude_scope_ids, " +
             "@min_activity, @threshold_role_id, @threshold_value, @threshold_comparator, @auto_revoke, @announce_channel_id, " +
             "@announce_message, @announce_interval_days, @winner_line_blocks, @medal_rank1, @medal_rank2, @medal_rank3, " +
-            "@medal_other_template, @count_divisor, @count_suffix, @count_monospace, @exclude_left_members, @created_by, @created_at)");
+            "@medal_other_template, @count_divisor, @count_suffix, @count_monospace, @exclude_left_members, @count_muted_voice, @count_deafened_voice, @created_by, @created_at)");
         BindRuleParameters(cmd, rule);
         cmd.Parameters.AddWithValue("created_by", (long)rule.CreatedBy);
         cmd.Parameters.AddWithValue("created_at", rule.CreatedAt);
@@ -173,7 +176,8 @@ public static class ActivityRoleService
             "medal_rank1 = @medal_rank1, medal_rank2 = @medal_rank2, medal_rank3 = @medal_rank3, " +
             "medal_other_template = @medal_other_template, count_divisor = @count_divisor, " +
             "count_suffix = @count_suffix, count_monospace = @count_monospace, " +
-            "exclude_left_members = @exclude_left_members " +
+            "exclude_left_members = @exclude_left_members, count_muted_voice = @count_muted_voice, " +
+            "count_deafened_voice = @count_deafened_voice " +
             "WHERE rule_id = @rule_id");
         BindRuleParameters(cmd, rule);
         await cmd.ExecuteNonQueryAsync();
@@ -208,6 +212,8 @@ public static class ActivityRoleService
         cmd.Parameters.AddWithValue("count_suffix", rule.CountSuffix);
         cmd.Parameters.AddWithValue("count_monospace", rule.CountMonospace);
         cmd.Parameters.AddWithValue("exclude_left_members", rule.ExcludeLeftMembers);
+        cmd.Parameters.AddWithValue("count_muted_voice", rule.CountMutedVoice);
+        cmd.Parameters.AddWithValue("count_deafened_voice", rule.CountDeafenedVoice);
     }
 
     public static async Task DeleteRuleAsync(string ruleId)
@@ -373,12 +379,25 @@ public static class ActivityRoleService
     #region Evaluation
 
     /// <summary>
+    ///     Which voicestate values a voice-bearing metric should skip, per the rule's Count*Voice flags.
+    ///     Null when nothing is excluded, so callers can pass it straight through without an extra check.
+    /// </summary>
+    private static int[]? BuildVoiceStateExclusions(ActivityRoleRule rule)
+    {
+        var excluded = new List<int>();
+        if (!rule.CountMutedVoice) excluded.Add((int)StatsVoiceStates.Muted);
+        if (!rule.CountDeafenedVoice) excluded.Add((int)StatsVoiceStates.Deafened);
+        return excluded.Count > 0 ? excluded.ToArray() : null;
+    }
+
+    /// <summary>
     ///     Pure computation, no side effects - shared by the real evaluation and the WebUI preview.
     /// </summary>
     public static async Task<List<RankedGrant>> ComputeDesiredGrantsAsync(ActivityRoleRule rule, DiscordGuild guild)
     {
         var sinceUnix = ResolveWindow(rule, DateTimeOffset.UtcNow);
         var conditions = await EligibilityService.GetConditionsAsync(OwnerType, rule.RuleId);
+        var excludeVoiceStates = rule.Metric == ActivityRoleMetric.Messages ? null : BuildVoiceStateExclusions(rule);
         var desired = new List<RankedGrant>();
 
         if (rule.Mode == ActivityRoleMode.TopN)
@@ -390,9 +409,9 @@ public static class ActivityRoleService
             var minCount = Math.Max(rule.MinActivity, 1);
             var candidates = rule.Metric == ActivityRoleMetric.Combined
                 ? await MetricsQueryService.GetRankedUsersCombinedAsync(sinceUnix, null, rule.ScopeIds,
-                    rule.ExcludeScopeIds, minCount, fetchLimit, guild)
+                    rule.ExcludeScopeIds, minCount, fetchLimit, guild, excludeVoiceStates)
                 : await MetricsQueryService.GetRankedUsersAsync(MetricsQueryService.MetricTableFor(rule.Metric),
-                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, minCount, fetchLimit, guild);
+                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, minCount, fetchLimit, guild, excludeVoiceStates);
 
             var rank = 0;
             foreach (var candidate in candidates)
@@ -425,9 +444,9 @@ public static class ActivityRoleService
             var lte = rule.ThresholdComparator == EligibilityComparator.Lte;
             var overThreshold = rule.Metric == ActivityRoleMetric.Combined
                 ? await MetricsQueryService.GetUsersOverThresholdCombinedAsync(sinceUnix, null, rule.ScopeIds,
-                    rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild)
+                    rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild, excludeVoiceStates)
                 : await MetricsQueryService.GetUsersOverThresholdAsync(MetricsQueryService.MetricTableFor(rule.Metric),
-                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild);
+                    sinceUnix, null, rule.ScopeIds, rule.ExcludeScopeIds, lte, rule.ThresholdValue, guild, excludeVoiceStates);
 
             foreach (var userId in overThreshold)
             {
