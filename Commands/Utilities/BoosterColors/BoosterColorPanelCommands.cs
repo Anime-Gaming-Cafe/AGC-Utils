@@ -94,6 +94,10 @@ public sealed class BoosterColorPanelCommands : BaseCommandModule
         var title = await BoosterColorService.GetEmbedTitleAsync();
         var description = await BoosterColorService.GetEmbedDescriptionAsync();
 
+        var colorRoles = BoosterColorService.GetColorRoles(guild);
+        description = description.Replace("{colors}",
+            colorRoles.Count > 0 ? string.Join("\n", colorRoles.Select(r => r.Name)) : "");
+
         var emb = new DiscordEmbedBuilder()
             .WithTitle(title)
             .WithColor(BotConfig.GetEmbedColor())
@@ -109,7 +113,6 @@ public sealed class BoosterColorPanelCommands : BaseCommandModule
             return msgb.AddEmbed(emb);
         }
 
-        var colorRoles = BoosterColorService.GetColorRoles(guild);
         var emojiLookup = await BoosterColorService.EnsureEmojisAsync(colorRoles);
         await BoosterColorService.EnsureRoleIconsAsync(colorRoles);
 
