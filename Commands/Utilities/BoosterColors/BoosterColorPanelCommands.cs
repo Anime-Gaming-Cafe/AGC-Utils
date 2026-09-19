@@ -96,7 +96,7 @@ public sealed class BoosterColorPanelCommands : BaseCommandModule
 
         var colorRoles = BoosterColorService.GetColorRoles(guild);
         description = description.Replace("{colors}",
-            colorRoles.Count > 0 ? string.Join("\n", colorRoles.Select(r => r.Name)) : "");
+            colorRoles.Count > 0 ? string.Join("\n", colorRoles.Select(r => r.Mention)) : "");
 
         var emb = new DiscordEmbedBuilder()
             .WithTitle(title)
