@@ -8,6 +8,13 @@ namespace AGC_Management.Services;
 
 public static class DatabaseService
 {
+    /// <summary>
+    ///     Schema work is not a query: building an index over a grown metrics table takes minutes and
+    ///     must not die on Npgsql's 30 second default. A client-side timeout does not stop the server
+    ///     either, so every restart would stack another index build on top of the running one.
+    /// </summary>
+    private const int SchemaCommandTimeoutSeconds = 900;
+
     public static string GetConnectionString()
     {
         var dbConfigSection = GlobalProperties.DebugMode ? "DatabaseCfgDBG" : "DatabaseCfg";
@@ -423,6 +430,7 @@ public static class DatabaseService
             var createTableCommand = kvp.Value;
 
             await using var cmdCreate = conn.CreateCommand(createTableCommand);
+            cmdCreate.CommandTimeout = SchemaCommandTimeoutSeconds;
             await cmdCreate.ExecuteNonQueryAsync();
             progressBar.Increment();
             await Task.Delay(10);
@@ -1540,6 +1548,7 @@ public static class DatabaseService
                 var alterColumnCommand = columnKvp.Value;
 
                 await using var cmdAlter = conn.CreateCommand(alterColumnCommand);
+                cmdAlter.CommandTimeout = SchemaCommandTimeoutSeconds;
                 await cmdAlter.ExecuteNonQueryAsync();
                 progressBar.Increment();
                 await Task.Delay(10);
