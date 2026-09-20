@@ -390,6 +390,10 @@ public static class DatabaseService
                 "CREATE TABLE IF NOT EXISTS banrequest_stages (stage_id TEXT PRIMARY KEY, position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true, delay_minutes INTEGER DEFAULT 0, target TEXT DEFAULT 'role', role_id BIGINT DEFAULT 0)"
             },
             {
+                "member_lastseen",
+                "CREATE TABLE IF NOT EXISTS member_lastseen (userid BIGINT PRIMARY KEY, last_seen BIGINT DEFAULT 0, signal TEXT DEFAULT 'message')"
+            },
+            {
                 "idx_activity_role_tiers_rule",
                 "CREATE INDEX IF NOT EXISTS idx_activity_role_tiers_rule ON activity_role_tiers (rule_id)"
             },
@@ -1411,6 +1415,19 @@ public static class DatabaseService
                     {
                         "roleid",
                         "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS roleid BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "member_lastseen", new Dictionary<string, string>
+                {
+                    {
+                        "last_seen",
+                        "ALTER TABLE member_lastseen ADD COLUMN IF NOT EXISTS last_seen BIGINT DEFAULT 0"
+                    },
+                    {
+                        "signal",
+                        "ALTER TABLE member_lastseen ADD COLUMN IF NOT EXISTS signal TEXT DEFAULT 'message'"
                     }
                 }
             },

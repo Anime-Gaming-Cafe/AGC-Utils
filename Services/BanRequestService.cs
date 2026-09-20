@@ -167,7 +167,7 @@ public static class BanRequestService
                 if (waitTask.IsCompleted) break;
             }
 
-            var mention = BuildMention(stage, banPermittedStaff, window);
+            var mention = await BuildMentionAsync(stage, banPermittedStaff, window);
             if (!string.IsNullOrWhiteSpace(mention)) await PingAsync(requestMessage, mention);
         }
 
@@ -175,7 +175,8 @@ public static class BanRequestService
         return await waitTask;
     }
 
-    private static string BuildMention(BanRequestStage stage, List<DiscordMember> banPermittedStaff, TimeSpan window)
+    private static async Task<string> BuildMentionAsync(BanRequestStage stage,
+        List<DiscordMember> banPermittedStaff, TimeSpan window)
     {
         switch (stage.Target)
         {
@@ -184,7 +185,7 @@ public static class BanRequestService
             case BanRequestStageTarget.All:
                 return JoinMentions(banPermittedStaff);
             case BanRequestStageTarget.Estimated:
-                return JoinMentions(AvailabilityService.FilterAvailable(banPermittedStaff, window));
+                return JoinMentions(await AvailabilityService.FilterAvailableAsync(banPermittedStaff, window));
             default:
                 return "";
         }
