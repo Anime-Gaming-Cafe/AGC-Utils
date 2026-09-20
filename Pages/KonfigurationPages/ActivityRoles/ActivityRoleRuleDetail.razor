@@ -99,6 +99,13 @@ else
                         <label class="form-check-label" for="ar-count-deafened">Taubgeschaltete Zeit zählt mit</label>
                     </div>
                 </div>
+                <div class="field">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ar-count-solo" @bind="countSoloVoice" @bind:after="OnFieldChanged"/>
+                        <label class="form-check-label" for="ar-count-solo">Zeit allein im Voice zählt mit</label>
+                    </div>
+                    <span class="field__hint">Aus: Minuten, in denen sonst niemand im selben Channel war, fließen nicht in die Wertung. Bots zählen dabei nicht als Gesellschaft.</span>
+                </div>
             }
 
             @if (mode == ActivityRoleMode.Threshold)
@@ -567,6 +574,7 @@ else
     private bool excludeLeftMembers = true;
     private bool countMutedVoice = true;
     private bool countDeafenedVoice = true;
+    private bool countSoloVoice = true;
     private ulong announceChannelId;
     private int announceIntervalDays;
     private string announceMessage = "";
@@ -670,6 +678,7 @@ else
         excludeLeftMembers = rule.ExcludeLeftMembers;
         countMutedVoice = rule.CountMutedVoice;
         countDeafenedVoice = rule.CountDeafenedVoice;
+        countSoloVoice = rule.CountSoloVoice;
         announceChannelId = rule.AnnounceChannelId;
         announceIntervalDays = rule.AnnounceIntervalDays;
         announceMessage = rule.AnnounceMessage;
@@ -700,7 +709,7 @@ else
     private long originalMinActivity, originalThresholdValue, originalWindowDays;
     private string originalName = "";
     private bool originalEnabled, originalAutoRevoke, originalExcludeLeftMembers;
-    private bool originalCountMutedVoice, originalCountDeafenedVoice;
+    private bool originalCountMutedVoice, originalCountDeafenedVoice, originalCountSoloVoice;
     private ActivityRoleMetric originalMetric;
     private ActivityRoleMode originalMode;
     private ActivityRoleWindowType originalWindowType;
@@ -729,6 +738,7 @@ else
         originalExcludeLeftMembers = excludeLeftMembers;
         originalCountMutedVoice = countMutedVoice;
         originalCountDeafenedVoice = countDeafenedVoice;
+        originalCountSoloVoice = countSoloVoice;
         originalAnnounceChannelId = announceChannelId;
         originalAnnounceIntervalDays = announceIntervalDays;
         originalAnnounceMessage = announceMessage;
@@ -757,6 +767,7 @@ else
         excludeLeftMembers = originalExcludeLeftMembers;
         countMutedVoice = originalCountMutedVoice;
         countDeafenedVoice = originalCountDeafenedVoice;
+        countSoloVoice = originalCountSoloVoice;
         announceChannelId = originalAnnounceChannelId;
         announceIntervalDays = originalAnnounceIntervalDays;
         announceMessage = originalAnnounceMessage;
@@ -787,6 +798,7 @@ else
         rule.ExcludeLeftMembers = excludeLeftMembers;
         rule.CountMutedVoice = countMutedVoice;
         rule.CountDeafenedVoice = countDeafenedVoice;
+        rule.CountSoloVoice = countSoloVoice;
         rule.AnnounceChannelId = announceChannelId;
         rule.AnnounceIntervalDays = Math.Max(announceIntervalDays, 0);
         rule.AnnounceMessage = announceMessage;

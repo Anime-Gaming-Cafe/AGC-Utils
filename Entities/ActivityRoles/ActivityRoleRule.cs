@@ -61,6 +61,7 @@ public class ActivityRoleRule
 
     public bool CountMutedVoice { get; set; } = true;
     public bool CountDeafenedVoice { get; set; } = true;
+    public bool CountSoloVoice { get; set; } = true;
 
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }

@@ -181,6 +181,10 @@ public static class DatabaseService
                 "idx_metrics_voice_timestamp",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_voice_timestamp ON metrics_voice (timestamp)"
             },
+            {
+                "idx_metrics_voice_company",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_voice_company ON metrics_voice (channelid, timestamp, userid)"
+            },
 
             {
                 "pollsystem",
@@ -366,7 +370,7 @@ public static class DatabaseService
             },
             {
                 "activity_role_rules",
-                "CREATE TABLE IF NOT EXISTS activity_role_rules (rule_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT true, metric TEXT DEFAULT 'messages', mode TEXT DEFAULT 'topn', window_type TEXT DEFAULT 'rolling', window_days INTEGER DEFAULT 7, window_start BIGINT, window_end BIGINT, scope_ids BIGINT[] DEFAULT '{}', exclude_scope_ids BIGINT[] DEFAULT '{}', min_activity BIGINT DEFAULT 0, threshold_role_id BIGINT DEFAULT 0, threshold_value BIGINT DEFAULT 0, threshold_comparator TEXT DEFAULT 'gte', auto_revoke BOOLEAN DEFAULT true, announce_channel_id BIGINT DEFAULT 0, announce_message TEXT DEFAULT '', announce_interval_days INTEGER DEFAULT 0, last_announced_at BIGINT DEFAULT 0, winner_line_blocks TEXT DEFAULT 'medal,mention,count,role', medal_rank1 TEXT DEFAULT '🥇', medal_rank2 TEXT DEFAULT '🥈', medal_rank3 TEXT DEFAULT '🥉', medal_other_template TEXT DEFAULT '`#{rank}`', count_divisor BIGINT DEFAULT 1, count_suffix TEXT DEFAULT '', count_monospace BOOLEAN DEFAULT true, exclude_left_members BOOLEAN DEFAULT true, count_muted_voice BOOLEAN DEFAULT true, count_deafened_voice BOOLEAN DEFAULT true, created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS activity_role_rules (rule_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT true, metric TEXT DEFAULT 'messages', mode TEXT DEFAULT 'topn', window_type TEXT DEFAULT 'rolling', window_days INTEGER DEFAULT 7, window_start BIGINT, window_end BIGINT, scope_ids BIGINT[] DEFAULT '{}', exclude_scope_ids BIGINT[] DEFAULT '{}', min_activity BIGINT DEFAULT 0, threshold_role_id BIGINT DEFAULT 0, threshold_value BIGINT DEFAULT 0, threshold_comparator TEXT DEFAULT 'gte', auto_revoke BOOLEAN DEFAULT true, announce_channel_id BIGINT DEFAULT 0, announce_message TEXT DEFAULT '', announce_interval_days INTEGER DEFAULT 0, last_announced_at BIGINT DEFAULT 0, winner_line_blocks TEXT DEFAULT 'medal,mention,count,role', medal_rank1 TEXT DEFAULT '🥇', medal_rank2 TEXT DEFAULT '🥈', medal_rank3 TEXT DEFAULT '🥉', medal_other_template TEXT DEFAULT '`#{rank}`', count_divisor BIGINT DEFAULT 1, count_suffix TEXT DEFAULT '', count_monospace BOOLEAN DEFAULT true, exclude_left_members BOOLEAN DEFAULT true, count_muted_voice BOOLEAN DEFAULT true, count_deafened_voice BOOLEAN DEFAULT true, count_solo_voice BOOLEAN DEFAULT true, created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
             },
             {
                 "activity_role_tiers",
@@ -1356,6 +1360,10 @@ public static class DatabaseService
                     {
                         "count_deafened_voice",
                         "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS count_deafened_voice BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "count_solo_voice",
+                        "ALTER TABLE activity_role_rules ADD COLUMN IF NOT EXISTS count_solo_voice BOOLEAN DEFAULT true"
                     },
                     {
                         "created_by",
