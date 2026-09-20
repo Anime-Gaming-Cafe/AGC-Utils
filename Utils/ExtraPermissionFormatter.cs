@@ -97,6 +97,22 @@ public static class ExtraPermissionFormatter
             $"läuft ab {Formatter.Timestamp(DateTimeOffset.FromUnixTimeSeconds(state.ExpiresAt), TimestampFormat.RelativeTime)}";
     }
 
+    /// <summary>
+    ///     Spells a duration out in German for places that cannot render a Discord timestamp, e.g. the
+    ///     description of an auto-generated flag.
+    /// </summary>
+    public static string DescribeDuration(TimeSpan duration)
+    {
+        var parts = new List<string>();
+        var days = (int)duration.TotalDays;
+        if (days > 0) parts.Add(days == 1 ? "1 Tag" : $"{days} Tage");
+        if (duration.Hours > 0) parts.Add(duration.Hours == 1 ? "1 Stunde" : $"{duration.Hours} Stunden");
+        if (duration.Minutes > 0) parts.Add(duration.Minutes == 1 ? "1 Minute" : $"{duration.Minutes} Minuten");
+        if (parts.Count == 0) return "weniger als 1 Minute";
+
+        return string.Join(" ", parts);
+    }
+
     public static string DescribeStatus(ExtraPermissionStatus status)
     {
         var state = status.MemberState.EffectiveState;
@@ -143,7 +159,7 @@ public static class ExtraPermissionFormatter
             var expiry = s.MemberState.ExpiresAt > 0 ? $" - {DescribeExpiry(s.MemberState)}" : "";
             var icon = s.HasRole ? "✅" : "❌";
 
-            return $"{icon} **{s.Permission.DisplayName}** ``{s.Permission.PermName}``{manual}{expiry}";
+            return $"{icon} **{s.Permission.DisplayName}**{manual}{expiry}";
         });
 
         return string.Join("\n", lines) + "\n";

@@ -56,6 +56,25 @@ public static class ModerationHelper
         await DatabaseService.InsertDataIntoTable("flags", data);
     }
 
+    /// <summary>
+    ///     Records a manual Extra-Permission override as a normal flag, same shape as
+    ///     <see cref="KickFlag" />. Returns the case id so the caller can name it in its response.
+    /// </summary>
+    public static async Task<string> PermissionFlag(DiscordUser user, DiscordUser mod, string description)
+    {
+        var caseid = "PERM-" + ToolSet.GenerateCaseID();
+        Dictionary<string, object> data = new()
+        {
+            { "userid", (long)user.Id },
+            { "punisherid", (long)mod.Id },
+            { "datum", DateTimeOffset.Now.ToUnixTimeSeconds() },
+            { "description", description },
+            { "caseid", caseid }
+        };
+        await DatabaseService.InsertDataIntoTable("flags", data);
+        return caseid;
+    }
+
     public static async Task<(int, int)> GetWarnKickValues()
     {
         int WarnsToKick;

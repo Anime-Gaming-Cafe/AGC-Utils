@@ -22,10 +22,10 @@ public partial class Perms
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die Permission", true)]
         string permName,
-        [Option("duration", "Optionale Dauer, z.B. 7d, 12h oder 1d12h")]
-        string? duration = null,
         [Option("reason", "Grund für die Vergabe")]
-        string reason = "")
+        string reason,
+        [Option("duration", "Optionale Dauer, z.B. 7d, 12h oder 1d12h")]
+        string? duration = null)
     {
         return SetOverrideAsync(ctx, user, permName, duration, reason, ExtraPermissionState.Granted);
     }
@@ -37,10 +37,10 @@ public partial class Perms
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die Permission", true)]
         string permName,
-        [Option("duration", "Optionale Dauer, z.B. 7d, 12h oder 1d12h")]
-        string? duration = null,
         [Option("reason", "Grund für den Entzug")]
-        string reason = "")
+        string reason,
+        [Option("duration", "Optionale Dauer, z.B. 7d, 12h oder 1d12h")]
+        string? duration = null)
     {
         return SetOverrideAsync(ctx, user, permName, duration, reason, ExtraPermissionState.Revoked);
     }
@@ -52,6 +52,8 @@ public partial class Perms
         [Autocomplete(typeof(ExtraPermissionAutocompleteProvider))]
         [Option("permission", "Die Permission", true)]
         string permName,
+        [Option("reason", "Grund für das Zurücksetzen")]
+        string reason,
         [Option("rearm-trigger", "Einen bereits ausgelösten Once-Trigger erneut scharf schalten")]
         bool rearmTrigger = false)
     {
@@ -62,19 +64,30 @@ public partial class Perms
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            await RespondErrorAsync(ctx, "Bitte gib einen Grund an.");
+            return;
+        }
+
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
                 .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt..."));
+
+        reason = await ReasonTemplateResolver.Resolve(reason);
 
         await ExtraPermissionService.ResetOverrideAsync(user.Id, permName, rearmTrigger);
 
         var member = await TryGetMemberAsync(ctx, user.Id);
         if (member != null) await ExtraPermissionService.EvaluateAsync(member, permission);
 
+        var flagNote = await WritePermissionFlagAsync(ctx, user,
+            $"[AUTO] Extra Permission \"{permission.DisplayName}\" auf Automatik zurückgesetzt - Grund: {reason}");
+
         var rearmText = rearmTrigger ? " Der Trigger wurde erneut scharf geschaltet." : "";
         await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
             $"<:success:1085333481820790944> **Erfolgreich!** {user.Mention} folgt für ``{permName}`` " +
-            $"wieder dem Automatismus.{rearmText}"));
+            $"wieder dem Automatismus.{rearmText}{flagNote}"));
     }
 
     private static async Task SetOverrideAsync(InteractionContext ctx, DiscordUser user, string permName,
@@ -87,7 +100,14 @@ public partial class Perms
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            await RespondErrorAsync(ctx, "Bitte gib einen Grund an.");
+            return;
+        }
+
         long expiresAt = 0;
+        var durationText = "unbefristet";
         if (!string.IsNullOrWhiteSpace(duration))
         {
             var parsed = ToolSet.ParseDuration(duration);
@@ -99,11 +119,14 @@ public partial class Perms
             }
 
             expiresAt = DateTimeOffset.UtcNow.Add(parsed.Value).ToUnixTimeSeconds();
+            durationText = ExtraPermissionFormatter.DescribeDuration(parsed.Value);
         }
 
         await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
             new DiscordInteractionResponseBuilder()
                 .WithContent("<a:loading_agc:1084157150747697203> Aktion wird ausgeführt..."));
+
+        reason = await ReasonTemplateResolver.Resolve(reason);
 
         await ExtraPermissionService.SetOverrideAsync(user.Id, permName, state, expiresAt, ctx.User.Id, reason);
 
@@ -116,6 +139,10 @@ public partial class Perms
                     : ExtraPermissionDecision.Revoke);
 
         var verb = state == ExtraPermissionState.Granted ? "erteilt" : "entzogen";
+
+        var flagNote = await WritePermissionFlagAsync(ctx, user,
+            $"[AUTO] Extra Permission \"{permission.DisplayName}\" {verb} ({durationText}) - Grund: {reason}");
+
         var expiryText = expiresAt > 0
             ? $" Läuft ab {Formatter.Timestamp(DateTimeOffset.FromUnixTimeSeconds(expiresAt), TimestampFormat.RelativeTime)}."
             : "";
@@ -128,7 +155,26 @@ public partial class Perms
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
             $"<:success:1085333481820790944> **Erfolgreich!** ``{permName}`` wurde {user.Mention} {verb}." +
-            $"{expiryText}{memberNote}"));
+            $"{expiryText}{memberNote}{flagNote}"));
+    }
+
+    /// <summary>
+    ///     The override is already persisted when this runs, so a failing flag must not turn the whole
+    ///     action into an error - it is reported in the success message instead.
+    /// </summary>
+    private static async Task<string> WritePermissionFlagAsync(InteractionContext ctx, DiscordUser user,
+        string description)
+    {
+        try
+        {
+            var caseId = await ModerationHelper.PermissionFlag(user, ctx.User, description);
+            return $" Flag ``{caseId}`` wurde angelegt.";
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Failed to write extra permission flag for {UserId}", user.Id);
+            return " Der Auto-Flag konnte nicht geschrieben werden.";
+        }
     }
 
     private static async Task<DiscordMember?> TryGetMemberAsync(InteractionContext ctx, ulong userId)
