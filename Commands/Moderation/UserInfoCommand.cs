@@ -39,6 +39,10 @@ public sealed class UserInfoCommand : BaseCommandModule
 
         var bot_indicator = user.IsBot ? "<:bot:1012035481573265458>" : "";
         var showPresence = ctx.Client.Intents.HasIntent(DiscordIntents.GuildPresences);
+        var lastSeen = await AvailabilityService.GetLastSeenAsync(user.Id, member);
+        var lastSeenText = lastSeen.LastSeenUnix > 0
+            ? $"{Formatter.Timestamp(Converter.ConvertUnixTimestamp(lastSeen.LastSeenUnix), TimestampFormat.RelativeTime)} · {AvailabilityService.DescribeSignal(lastSeen.Signal)}"
+            : "Keine Aktivität aufgezeichnet";
         var user_status = member?.Presence?.Status.ToString() ?? "Offline";
         var status_indicator = user_status switch
         {
@@ -250,6 +254,8 @@ public sealed class UserInfoCommand : BaseCommandModule
                 userinfostring += $"{status_indicator} | {platform}\n\n";
             }
 
+            userinfostring += "**Zuletzt gesehen**\n";
+            userinfostring += $"{lastSeenText}\n\n";
             userinfostring += "**Kommunikations-Timeout**\n";
             userinfostring +=
                 $"{(member.IsCommunicationDisabled ? $"Nutzer getimeouted bis: {member.CommunicationDisabledUntil.Value.Timestamp()}" : "Nutzer nicht getimeouted")}\n\n";
@@ -432,6 +438,8 @@ public sealed class UserInfoCommand : BaseCommandModule
                 userinfostring += $"{status_indicator} | Nicht ermittelbar - User ist nicht auf dem Server\n\n";
             }
 
+            userinfostring += "**Zuletzt gesehen**\n";
+            userinfostring += $"{lastSeenText}\n\n";
             userinfostring += "**Anzahl Tickets**\n";
             userinfostring +=
                 $"{ticketcount}\n\n";

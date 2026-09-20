@@ -1,5 +1,7 @@
 ﻿#region
 
+using AGC_Management.Utils;
+
 #endregion
 
 namespace AGC_Management.Services;
@@ -375,6 +377,10 @@ public static class DatabaseService
             {
                 "activity_role_tiers",
                 "CREATE TABLE IF NOT EXISTS activity_role_tiers (tier_id TEXT PRIMARY KEY, rule_id TEXT, rank_from INTEGER DEFAULT 1, rank_to INTEGER DEFAULT 1, roleid BIGINT DEFAULT 0)"
+            },
+            {
+                "banrequest_stages",
+                "CREATE TABLE IF NOT EXISTS banrequest_stages (stage_id TEXT PRIMARY KEY, position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true, delay_minutes INTEGER DEFAULT 0, target TEXT DEFAULT 'role', role_id BIGINT DEFAULT 0)"
             },
             {
                 "idx_activity_role_tiers_rule",
@@ -1401,6 +1407,28 @@ public static class DatabaseService
                 }
             },
             {
+                "banrequest_stages", new Dictionary<string, string>
+                {
+                    {
+                        "position",
+                        "ALTER TABLE banrequest_stages ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 0"
+                    },
+                    {
+                        "enabled",
+                        "ALTER TABLE banrequest_stages ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "delay_minutes",
+                        "ALTER TABLE banrequest_stages ADD COLUMN IF NOT EXISTS delay_minutes INTEGER DEFAULT 0"
+                    },
+                    { "target", "ALTER TABLE banrequest_stages ADD COLUMN IF NOT EXISTS target TEXT DEFAULT 'role'" },
+                    {
+                        "role_id",
+                        "ALTER TABLE banrequest_stages ADD COLUMN IF NOT EXISTS role_id BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
                 "activity_role_grants", new Dictionary<string, string>
                 {
                     { "rule_id", "ALTER TABLE activity_role_grants ADD COLUMN IF NOT EXISTS rule_id TEXT" },
@@ -1520,6 +1548,7 @@ public static class DatabaseService
 
         await InitLeveling();
         await InitBotSettings();
+        await InitBanRequestStages();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -1554,7 +1583,10 @@ public static class DatabaseService
             ("TeamApplications", "DmGrantTitle", "Du darfst dich erneut bewerben"),
             ("TeamApplications", "DmGrantText",
                 "Hey {user}, du darfst dich für die Position **{position}** sofort erneut bewerben."),
-            ("TeamApplications", "NotifyNewApplicationText", "Neue Bewerbung eingegangen.")
+            ("TeamApplications", "NotifyNewApplicationText", "Neue Bewerbung eingegangen."),
+            ("BanRequests", "PingLifetimeSeconds", "0"),
+            ("BanRequests", "RequestTimeoutHours", "6"),
+            ("BanRequests", "EstimateWindowMinutes", "15")
         };
 
         foreach (var (section, key, value) in defaults)
@@ -1564,6 +1596,49 @@ public static class DatabaseService
             cmd.Parameters.AddWithValue("section", section);
             cmd.Parameters.AddWithValue("key", key);
             cmd.Parameters.AddWithValue("value", value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Seeds the escalation ladder once, so a fresh install pings sensibly before anyone touches the
+    ///     dashboard. Role stages are skipped when their config key is missing.
+    /// </summary>
+    private static async Task InitBanRequestStages()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+
+        await using (var probe = con.CreateCommand("SELECT COUNT(*) FROM banrequest_stages"))
+        {
+            if (await probe.ExecuteScalarAsync() is long existing && existing > 0) return;
+        }
+
+        var defaults = new List<(int position, int delay, string target, long roleId)>
+        {
+            (0, 0, "estimated", 0)
+        };
+
+        foreach (var (position, delay, configKey) in new[] { (1, 10, "ModRoleId"), (2, 30, "AdminRoleId") })
+            try
+            {
+                var roleId = long.Parse(BotConfig.GetConfig()["ServerConfig"][configKey]);
+                if (roleId > 0) defaults.Add((position, delay, "role", roleId));
+            }
+            catch (Exception)
+            {
+                // no role configured, that rung simply does not exist
+            }
+
+        foreach (var (position, delay, target, roleId) in defaults)
+        {
+            await using var cmd = con.CreateCommand(
+                "INSERT INTO banrequest_stages (stage_id, position, enabled, delay_minutes, target, role_id) " +
+                "VALUES (@stage_id, @position, true, @delay_minutes, @target, @role_id)");
+            cmd.Parameters.AddWithValue("stage_id", ToolSet.GenerateCaseID());
+            cmd.Parameters.AddWithValue("position", position);
+            cmd.Parameters.AddWithValue("delay_minutes", delay);
+            cmd.Parameters.AddWithValue("target", target);
+            cmd.Parameters.AddWithValue("role_id", roleId);
             await cmd.ExecuteNonQueryAsync();
         }
     }

@@ -1,0 +1,300 @@
+@page "/konfiguration/banrequests"
+@using AGC_Management.Entities.BanRequests
+@using AGC_Management.Enums.BanRequests
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="Bannanfragen"
+            Lead="Wer bei einer offenen Bannanfrage gepingt wird und wie der Kreis wächst, solange niemand reagiert."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Einstellungen werden geladen"
+                Description="Eskalationsstufen und Verhalten werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Eskalationsstufen"
+           Lead="Die Minuten zählen ab dem Absenden der Anfrage. Wird eine Stufe niemanden erreichen, wird sie übersprungen und die nächste greift zu ihrer eigenen Zeit."
+           Flush="@(stages.Count > 0)">
+        @if (stages.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Stufen"
+                        Description="Ohne Stufen wird bei jeder Anfrage einmalig die Admin- und die Mod-Rolle gepingt."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var stage in stages)
+                {
+                    var index = stages.IndexOf(stage);
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@StageTitle(stage)</p>
+                            <p class="rows__text">@(stage.Enabled ? "Aktiv" : "Deaktiviert")</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                    @onclick="() => Move(stage, -1)">Hoch
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == stages.Count - 1)"
+                                    @onclick="() => Move(stage, 1)">Runter
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => Remove(stage)">Entfernen</button>
+                        </div>
+                        <div class="rows__detail">
+                            <div class="field-grid">
+                                <div class="field">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                               id="br-enabled-@stage.StageId" @bind="stage.Enabled" @bind:after="OnFieldChanged"/>
+                                        <label class="form-check-label" for="br-enabled-@stage.StageId">Stufe aktiv</label>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="br-delay-@stage.StageId">Ab Minute</label>
+                                    <input id="br-delay-@stage.StageId" type="number" min="0" class="form-control"
+                                           @bind="stage.DelayMinutes" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="br-target-@stage.StageId">Ziel</label>
+                                    <select id="br-target-@stage.StageId" class="form-select" @bind="stage.Target" @bind:after="OnFieldChanged">
+                                        <option value="@BanRequestStageTarget.Estimated">Geschätzt Erreichbare</option>
+                                        <option value="@BanRequestStageTarget.Role">Rolle</option>
+                                        <option value="@BanRequestStageTarget.All">Alle mit Bannrechten</option>
+                                    </select>
+                                </div>
+                                @if (stage.Target == BanRequestStageTarget.Role)
+                                {
+                                    <div class="field">
+                                        <label class="field__label">Rolle</label>
+                                        <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                                          @bind-SelectedId="stage.RoleId" @bind-SelectedId:after="OnFieldChanged"/>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Stufe hinzufügen">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="br-new-delay">Ab Minute</label>
+                <input id="br-new-delay" type="number" min="0" class="form-control" @bind="newDelayMinutes"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="br-new-target">Ziel</label>
+                <select id="br-new-target" class="form-select" @bind="newTarget">
+                    <option value="@BanRequestStageTarget.Estimated">Geschätzt Erreichbare</option>
+                    <option value="@BanRequestStageTarget.Role">Rolle</option>
+                    <option value="@BanRequestStageTarget.All">Alle mit Bannrechten</option>
+                </select>
+            </div>
+            @if (newTarget == BanRequestStageTarget.Role)
+            {
+                <div class="field">
+                    <label class="field__label">Rolle</label>
+                    <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                      @bind-SelectedId="newRoleId"/>
+                </div>
+            }
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="Add">Stufe hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Verhalten">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="br-ping-lifetime">Ping-Nachricht bleibt (Sekunden)</label>
+                <input id="br-ping-lifetime" type="number" min="0" max="3600" class="form-control"
+                       @bind="pingLifetimeSeconds" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Ein Edit der Anfrage löst keine Benachrichtigung aus, deshalb wird pro Stufe zusätzlich eine kurze Nachricht mit der Erwähnung gesendet. 0 löscht sie sofort wieder - die Benachrichtigung ist dann raus, der Mention-Marker im Client verschwindet aber mit.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="br-timeout">Anfrage läuft ab nach (Stunden)</label>
+                <input id="br-timeout" type="number" min="1" max="24" class="form-control"
+                       @bind="requestTimeoutHours" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="br-window">Schätzfenster (Minuten)</label>
+                <input id="br-window" type="number" min="1" max="1440" class="form-control"
+                       @bind="estimateWindowMinutes" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">So lange nach der letzten Nachricht oder dem letzten Tippen gilt jemand als erreichbar. Wer gerade in einem Sprachkanal sitzt, zählt unabhängig davon.</span>
+            </div>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+
+    private List<BanRequestStage> stages = new();
+    private List<DiscordRole> assignableRoles = new();
+    private List<(ulong Id, string Label)> RoleItems => assignableRoles.Select(r => (r.Id, r.Name)).ToList();
+
+    private int newDelayMinutes;
+    private BanRequestStageTarget newTarget = BanRequestStageTarget.Role;
+    private ulong newRoleId;
+
+    private int pingLifetimeSeconds;
+    private int requestTimeoutHours = 6;
+    private int estimateWindowMinutes = 15;
+
+    private List<BanRequestStage> originalStages = new();
+    private int originalPingLifetimeSeconds;
+    private int originalRequestTimeoutHours;
+    private int originalEstimateWindowMinutes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadRoles();
+        await LoadAsync();
+        Tracker.Register(SaveAsync, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private void LoadRoles()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (guild is null) return;
+
+        assignableRoles = guild.Roles.Values
+            .Where(r => r.Id != guild.Id)
+            .OrderByDescending(r => r.Position)
+            .ToList();
+    }
+
+    private async Task LoadAsync()
+    {
+        stages = await BanRequestService.GetStagesAsync();
+        pingLifetimeSeconds = await BanRequestService.GetPingLifetimeSecondsAsync();
+        requestTimeoutHours = await BanRequestService.GetRequestTimeoutHoursAsync();
+        estimateWindowMinutes = await BanRequestService.GetEstimateWindowMinutesAsync();
+        RebuildSnapshot();
+    }
+
+    private void RebuildSnapshot()
+    {
+        originalStages = stages.Select(Clone).ToList();
+        originalPingLifetimeSeconds = pingLifetimeSeconds;
+        originalRequestTimeoutHours = requestTimeoutHours;
+        originalEstimateWindowMinutes = estimateWindowMinutes;
+    }
+
+    private static BanRequestStage Clone(BanRequestStage stage)
+    {
+        return new BanRequestStage
+        {
+            StageId = stage.StageId,
+            Position = stage.Position,
+            Enabled = stage.Enabled,
+            DelayMinutes = stage.DelayMinutes,
+            Target = stage.Target,
+            RoleId = stage.RoleId
+        };
+    }
+
+    private string StageTitle(BanRequestStage stage)
+    {
+        var when = stage.DelayMinutes == 0 ? "Sofort" : $"Ab Minute {stage.DelayMinutes}";
+        var who = stage.Target switch
+        {
+            BanRequestStageTarget.Estimated => "geschätzt Erreichbare",
+            BanRequestStageTarget.All => "alle mit Bannrechten",
+            _ => RoleName(stage.RoleId)
+        };
+
+        return $"{when} · {who}";
+    }
+
+    private string RoleName(ulong roleId)
+    {
+        if (roleId == 0) return "keine Rolle gewählt";
+
+        return assignableRoles.FirstOrDefault(r => r.Id == roleId)?.Name ?? roleId.ToString();
+    }
+
+    private void Add()
+    {
+        if (newTarget == BanRequestStageTarget.Role && newRoleId == 0)
+        {
+            ToastService.Notify("Bitte eine Rolle wählen.", "bad");
+            return;
+        }
+
+        stages.Add(new BanRequestStage
+        {
+            StageId = "",
+            DelayMinutes = Math.Max(newDelayMinutes, 0),
+            Target = newTarget,
+            RoleId = newTarget == BanRequestStageTarget.Role ? newRoleId : 0,
+            Enabled = true
+        });
+
+        newDelayMinutes = 0;
+        newRoleId = 0;
+        Tracker.MarkDirty();
+    }
+
+    private void Remove(BanRequestStage stage)
+    {
+        stages.Remove(stage);
+        Tracker.MarkDirty();
+    }
+
+    private void Move(BanRequestStage stage, int offset)
+    {
+        var from = stages.IndexOf(stage);
+        var to = from + offset;
+        if (to < 0 || to >= stages.Count) return;
+
+        (stages[from], stages[to]) = (stages[to], stages[from]);
+        Tracker.MarkDirty();
+    }
+
+    private async Task SaveAsync()
+    {
+        pingLifetimeSeconds = Math.Clamp(pingLifetimeSeconds, 0, 3600);
+        requestTimeoutHours = Math.Clamp(requestTimeoutHours, 1, 24);
+        estimateWindowMinutes = Math.Clamp(estimateWindowMinutes, 1, 1440);
+
+        await BanRequestService.SaveStagesAsync(stages);
+        await BanRequestService.SetPingLifetimeSecondsAsync(pingLifetimeSeconds);
+        await BanRequestService.SetRequestTimeoutHoursAsync(requestTimeoutHours);
+        await BanRequestService.SetEstimateWindowMinutesAsync(estimateWindowMinutes);
+
+        stages = await BanRequestService.GetStagesAsync();
+        RebuildSnapshot();
+
+        // A role stage without a role is skipped at runtime, so this is a hint and not a reason to
+        // refuse the save - refusing would leave the unsaved-changes bar in a lying state.
+        if (stages.Any(s => s.Enabled && s.Target == BanRequestStageTarget.Role && s.RoleId == 0))
+            ToastService.Notify("Gespeichert. Eine aktive Rollen-Stufe hat keine Rolle und wird übersprungen.", "warn");
+        else
+            ToastService.Notify("Einstellungen gespeichert.", "ok");
+    }
+
+    private void Discard()
+    {
+        stages = originalStages.Select(Clone).ToList();
+        pingLifetimeSeconds = originalPingLifetimeSeconds;
+        requestTimeoutHours = originalRequestTimeoutHours;
+        estimateWindowMinutes = originalEstimateWindowMinutes;
+    }
+}

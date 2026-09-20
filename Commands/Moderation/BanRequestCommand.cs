@@ -1,6 +1,7 @@
 ﻿#region
 
 using AGC_Management.Attributes;
+using AGC_Management.Services;
 using AGC_Management.Utils;
 using DisCatSharp.Exceptions;
 using DisCatSharp.Interactivity.Extensions;
@@ -29,8 +30,6 @@ public sealed class BanRequestCommand : BaseCommandModule
             .Select(x => x.Value)
             .ToList();
         var staffWithBanPerms = staffmembers.Where(x => x.Permissions.HasPermission(Permissions.BanMembers)).ToList();
-        var onlineStaffWithBanPerms = staffWithBanPerms
-            .Where(member => ctx.Guild.Presences.TryGetValue(member.Id, out var p) && p.Status != UserStatus.Offline).ToList();
         var embedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Bannanfrage")
             .WithDescription($"Ban-Anfrage für Benutzer: ``{user.GetFormattedUserName()}`` ``({user.Id})``\n" +
@@ -85,25 +84,6 @@ public sealed class BanRequestCommand : BaseCommandModule
         if (interaction.Result.Id == $"br_accept_{caseid}")
         {
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
-            string staffMentionString;
-            if (onlineStaffWithBanPerms.Count > 0)
-            {
-                if (!GlobalProperties.DebugMode)
-                    staffMentionString = string.Join(" ", onlineStaffWithBanPerms
-                        .Where(member => member.Id != 441192596325531648)
-                        .Select(member => member.Mention));
-                else
-                    staffMentionString = "DEBUG MODE AKTIV | Kein Ping wird ausgeführt";
-            }
-            else
-            {
-                if (!GlobalProperties.DebugMode)
-                    staffMentionString =
-                        $"Kein Moderator online | <@&{BotConfig.GetConfig()["ServerConfig"]["AdminRoleId"]}> | <@&{BotConfig.GetConfig()["ServerConfig"]["ModRoleId"]}>";
-                else
-                    staffMentionString = "Kein Moderator online | DEBUG MODE AKTIV";
-            }
-
             var embed = embedBuilder.Build();
             List<DiscordButtonComponent> buttons = new(2)
             {
@@ -115,23 +95,12 @@ public sealed class BanRequestCommand : BaseCommandModule
             var builder = new DiscordMessageBuilder()
                 .AddEmbed(embed)
                 .AddComponents(buttons)
-                .WithContent(staffMentionString)
                 .WithReply(ctx.Message.Id);
 
-            var interactivity = ctx.Client.GetInteractivity();
             var message = await confirm.ModifyAsync(builder);
-            try
-            {
-                var pmsg = await ctx.RespondAsync(staffMentionString);
-                await pmsg.DeleteAsync();
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
 
             buttons.ForEach(x => x.Disable());
-            var result = await interactivity.WaitForButtonAsync(message, interaction =>
+            var result = await BanRequestService.WaitWithEscalationAsync(message, interaction =>
             {
                 if (interaction.Id == $"banrequest_cancel_{caseid}")
                 {
@@ -147,7 +116,7 @@ public sealed class BanRequestCommand : BaseCommandModule
                     return guildUser.Permissions.HasPermission(Permissions.BanMembers);
 
                 return false;
-            }, TimeSpan.FromHours(6));
+            }, staffWithBanPerms);
 
             if (result.TimedOut)
             {

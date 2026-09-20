@@ -1,6 +1,7 @@
 ﻿#region
 
 using AGC_Management.Attributes;
+using AGC_Management.Services;
 using AGC_Management.Utils;
 using DisCatSharp.Exceptions;
 using DisCatSharp.Interactivity.Extensions;
@@ -118,10 +119,6 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 .ToList();
             var staffWithBanPerms =
                 staffmembers.Where(x => x.Permissions.HasPermission(Permissions.BanMembers)).ToList();
-            var onlineStaffWithBanPerms = staffWithBanPerms
-                .Where(member => ctx.Guild.Presences.TryGetValue(member.Id, out var p) && p.Status != UserStatus.Offline)
-                .Where(member => member.Id != 441192596325531648)
-                .ToList();
             var embedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Bannanfrage")
                 .WithDescription($"Ban-Anfrage für mehrere Benutzer: {busers_formatted}\n" +
@@ -129,25 +126,6 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                                  $"Bitte warte, während diese Anfrage von jemandem mit Bannberechtigung bestätigt wird <a:loading_agc:1084157150747697203>")
                 .WithColor(BotConfig.GetEmbedColor())
                 .WithFooter($"{ctx.User.GetFormattedUserName()}");
-
-            string staffMentionString;
-            if (onlineStaffWithBanPerms.Count > 0)
-            {
-                if (!GlobalProperties.DebugMode)
-                    staffMentionString = string.Join(" ", onlineStaffWithBanPerms
-                        .Where(member => member.Id != 441192596325531648)
-                        .Select(member => member.Mention));
-                else
-                    staffMentionString = "DEBUG MODE AKTIV | Kein Ping wird ausgeführt";
-            }
-            else
-            {
-                if (!GlobalProperties.DebugMode)
-                    staffMentionString =
-                        $"Kein Moderator online | <@&{BotConfig.GetConfig()["ServerConfig"]["AdminRoleId"]}> | <@&{BotConfig.GetConfig()["ServerConfig"]["ModRoleId"]}>";
-                else
-                    staffMentionString = "Kein Moderator online | DEBUG MODE AKTIV";
-            }
 
             var embed_ = embedBuilder.Build();
             List<DiscordButtonComponent> staffbuttons = new(2)
@@ -161,16 +139,11 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             var builder = new DiscordMessageBuilder()
                 .AddEmbed(embed_)
                 .AddComponents(staffbuttons)
-                .WithContent(staffMentionString)
                 .WithReply(ctx.Message.Id);
 
-            var interactivity = ctx.Client.GetInteractivity();
             await message.ModifyAsync(builder);
 
-            var pingmsg = await ctx.Channel.SendMessageAsync(staffMentionString);
-            await pingmsg.DeleteAsync();
-
-            var staffresult = await interactivity.WaitForButtonAsync(message, interaction =>
+            var staffresult = await BanRequestService.WaitWithEscalationAsync(message, interaction =>
             {
                 if (interaction.Id == $"modbanrequest_cancel_{caseid}")
                 {
@@ -186,14 +159,14 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     return guildUser.Permissions.HasPermission(Permissions.BanMembers);
 
                 return false;
-            }, TimeSpan.FromHours(6));
+            }, staffWithBanPerms);
             staffbuttons.ForEach(x => x.Disable());
             if (staffresult.TimedOut)
             {
                 var denyEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Anfrage abgebrochen")
                     .WithDescription(
-                        "Deine Anfrage wurde abgebrochen, da sie nicht innerhalb von 6 Stunden bestätigt wurde.")
+                        $"Deine Anfrage wurde abgebrochen, da sie nicht innerhalb von {await BanRequestService.GetRequestTimeoutHoursAsync()} Stunden bestätigt wurde.")
                     .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(DiscordColor.Red);
                 var denyEmbed = denyEmbedBuilder.Build();
