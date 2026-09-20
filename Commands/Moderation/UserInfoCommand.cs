@@ -38,6 +38,7 @@ public sealed class UserInfoCommand : BaseCommandModule
 
 
         var bot_indicator = user.IsBot ? "<:bot:1012035481573265458>" : "";
+        var showPresence = ctx.Client.Intents.HasIntent(DiscordIntents.GuildPresences);
         var user_status = member?.Presence?.Status.ToString() ?? "Offline";
         var status_indicator = user_status switch
         {
@@ -243,8 +244,12 @@ public sealed class UserInfoCommand : BaseCommandModule
             userinfostring += $"**Beitritt:** {member.JoinedAt.Timestamp()}\n";
             userinfostring +=
                 $"**Infobadges:**  {booster_icon} {teamler_ico} {bot_indicator}{vc_icon} {timeout_icon} {bs_icon}\n\n";
-            userinfostring += "**Der Online-Status und die Plattform**\n";
-            userinfostring += $"{status_indicator} | {platform}\n\n";
+            if (showPresence)
+            {
+                userinfostring += "**Der Online-Status und die Plattform**\n";
+                userinfostring += $"{status_indicator} | {platform}\n\n";
+            }
+
             userinfostring += "**Kommunikations-Timeout**\n";
             userinfostring +=
                 $"{(member.IsCommunicationDisabled ? $"Nutzer getimeouted bis: {member.CommunicationDisabledUntil.Value.Timestamp()}" : "Nutzer nicht getimeouted")}\n\n";
@@ -421,8 +426,12 @@ public sealed class UserInfoCommand : BaseCommandModule
             userinfostring += $"**Erstellt:** {user.CreationTimestamp.Timestamp()}\n";
             userinfostring += "**Beitritt:** *User nicht auf dem Server*\n";
             userinfostring += $"**Infobadges:**  {bot_indicator} {bs_icon} {banicon}\n\n";
-            userinfostring += "**Der Online-Status und die Plattform**\n";
-            userinfostring += $"{status_indicator} | Nicht ermittelbar - User ist nicht auf dem Server\n\n";
+            if (showPresence)
+            {
+                userinfostring += "**Der Online-Status und die Plattform**\n";
+                userinfostring += $"{status_indicator} | Nicht ermittelbar - User ist nicht auf dem Server\n\n";
+            }
+
             userinfostring += "**Anzahl Tickets**\n";
             userinfostring +=
                 $"{ticketcount}\n\n";
