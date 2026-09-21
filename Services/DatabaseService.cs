@@ -22,7 +22,7 @@ public static class DatabaseService
         var DbUser = BotConfig.GetConfig()[dbConfigSection]["Database_User"];
         var DbPass = BotConfig.GetConfig()[dbConfigSection]["Database_Password"];
         var DbName = BotConfig.GetConfig()[dbConfigSection]["Database"];
-        return $"Host={DbHost};Username={DbUser};Password={DbPass};Database={DbName};Maximum Pool Size=10;";
+        return $"Host={DbHost};Username={DbUser};Password={DbPass};Database={DbName};Maximum Pool Size=25;Keepalive=30;";
     }
 
 

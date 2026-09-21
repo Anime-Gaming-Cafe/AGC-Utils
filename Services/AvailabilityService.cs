@@ -153,31 +153,41 @@ public static class AvailabilityService
         // raises no voice state event while the minute poll keeps writing - so all three are read at
         // once and the newest wins.
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var cmd = con.CreateCommand(
-            "SELECT (SELECT last_seen FROM member_lastseen WHERE userid = @userid), " +
-            "(SELECT signal FROM member_lastseen WHERE userid = @userid), " +
-            "(SELECT MAX(timestamp) FROM metrics_messages WHERE userid = @userid), " +
-            "(SELECT MAX(timestamp) FROM metrics_voice WHERE userid = @userid)");
-        cmd.Parameters.AddWithValue("userid", (long)userId);
+        try
+        {
+            await using var cmd = con.CreateCommand(
+                "SELECT (SELECT last_seen FROM member_lastseen WHERE userid = @userid), " +
+                "(SELECT signal FROM member_lastseen WHERE userid = @userid), " +
+                "(SELECT MAX(timestamp) FROM metrics_messages WHERE userid = @userid), " +
+                "(SELECT MAX(timestamp) FROM metrics_voice WHERE userid = @userid)");
+            cmd.CommandTimeout = 10;
+            cmd.Parameters.AddWithValue("userid", (long)userId);
 
-        await using var reader = await cmd.ExecuteReaderAsync();
-        if (!await reader.ReadAsync()) return AvailabilityEstimate.None(userId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return AvailabilityEstimate.None(userId);
 
-        var stored = reader.IsDBNull(0) ? 0 : reader.GetInt64(0);
-        var storedSignal = reader.IsDBNull(1) || !Enum.TryParse<AvailabilitySignal>(reader.GetString(1), true,
-            out var parsed)
-            ? AvailabilitySignal.Message
-            : parsed;
-        var lastMessage = reader.IsDBNull(2) ? 0 : reader.GetInt64(2);
-        var lastVoice = reader.IsDBNull(3) ? 0 : reader.GetInt64(3);
+            var stored = reader.IsDBNull(0) ? 0 : reader.GetInt64(0);
+            var storedSignal = reader.IsDBNull(1) || !Enum.TryParse<AvailabilitySignal>(reader.GetString(1), true,
+                out var parsed)
+                ? AvailabilitySignal.Message
+                : parsed;
+            var lastMessage = reader.IsDBNull(2) ? 0 : reader.GetInt64(2);
+            var lastVoice = reader.IsDBNull(3) ? 0 : reader.GetInt64(3);
 
-        var best = AvailabilityEstimate.None(userId);
-        if (stored > best.LastSeenUnix) best = new AvailabilityEstimate(userId, storedSignal, stored);
-        if (lastMessage > best.LastSeenUnix)
-            best = new AvailabilityEstimate(userId, AvailabilitySignal.Message, lastMessage);
-        if (lastVoice > best.LastSeenUnix) best = new AvailabilityEstimate(userId, AvailabilitySignal.Voice, lastVoice);
+            var best = AvailabilityEstimate.None(userId);
+            if (stored > best.LastSeenUnix) best = new AvailabilityEstimate(userId, storedSignal, stored);
+            if (lastMessage > best.LastSeenUnix)
+                best = new AvailabilityEstimate(userId, AvailabilitySignal.Message, lastMessage);
+            if (lastVoice > best.LastSeenUnix)
+                best = new AvailabilityEstimate(userId, AvailabilitySignal.Voice, lastVoice);
 
-        return best;
+            return best;
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Failed to read last seen for {UserId}", userId);
+            return AvailabilityEstimate.None(userId);
+        }
     }
 
     public static string DescribeSignal(AvailabilitySignal signal)
