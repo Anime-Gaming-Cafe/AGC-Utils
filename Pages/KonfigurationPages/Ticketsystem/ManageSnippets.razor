@@ -1,6 +1,7 @@
 @page "/konfiguration/ticketsystem/snippets"
 @using AGC_Management.Helper
 @using AGC_Management.Services
+@using AGC_Management.Utils
 @inject ToastService ToastService
 @attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
 
@@ -16,6 +17,22 @@
 }
 else
 {
+    <Panel Title="Platzhalter"
+           Lead="Beim Senden ersetzt der Bot diese Bausteine durch die echten Werte aus dem Ticket."
+           Flush="true">
+        <ul class="rows">
+            @foreach (var (token, description) in SnippetTemplateResolver.BuiltIn)
+            {
+                <li>
+                    <div class="rows__main">
+                        <p class="rows__title mono">@token</p>
+                        <p class="rows__text">@description</p>
+                    </div>
+                </li>
+            }
+        </ul>
+    </Panel>
+
     <Panel Title="Neues Snippet">
         <div class="field-grid">
             <div class="field">
@@ -27,7 +44,7 @@ else
             <div class="field field--wide">
                 <label class="field__label" for="sn-new-text">Text</label>
                 <textarea id="sn-new-text" class="form-control" rows="4" @bind="newText"></textarea>
-                <span class="field__hint">@VariableHint</span>
+                <span class="field__hint">Platzhalter siehe oben.</span>
             </div>
         </div>
         <div class="form-foot">
@@ -100,7 +117,7 @@ else
                                             <label class="field__label" for="sn-text-@snippet.Id">Text</label>
                                             <textarea id="sn-text-@snippet.Id" class="form-control" rows="6"
                                                       @bind="editText"></textarea>
-                                            <span class="field__hint">@VariableHint</span>
+                                            <span class="field__hint">Platzhalter siehe oben.</span>
                                         </div>
                                     </div>
                                     <div class="form-foot">
@@ -119,9 +136,6 @@ else
 }
 
 @code {
-    private const string VariableHint =
-        "{unixtimestamp} wird beim Senden durch die aktuelle Zeit ersetzt, {unixtimestamp+3600} durch die Zeit in einer Stunde. In Discord daraus einen Zeitstempel machen: <t:{unixtimestamp+3600}:R>";
-
     private record Snippet(string Id, string Text);
 
     private bool loaded;

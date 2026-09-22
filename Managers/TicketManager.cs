@@ -201,21 +201,8 @@ public class TicketManager
             return null;
         }
 
-        var blocking = await FindBlockingTicketAsync(discordMember.Id, category);
-        if (blocking is not null)
-        {
-            var eb = new DiscordEmbedBuilder
-            {
-                Title = "Fehler | Bereits ein Ticket geöffnet!",
-                Description = $"Der User hat bereits ein geöffnetes Ticket! -> <#{blocking}>",
-                Color = DiscordColor.Red
-            };
-            var link = new DiscordLinkButtonComponent(
-                $"https://discord.com/channels/{context.Guild.Id}/{blocking}", "Zum Ticket");
-            await context.RespondAsync(new DiscordMessageBuilder().AddComponents(link).AddEmbed(eb));
-            return null;
-        }
-
+        // No limit check here on purpose. The limit exists to stop a user from opening ticket after
+        // ticket through the panel; a team member reaching out deliberately is not that.
         var (ticketId, channel) = await CreateTicketAsync(context.Guild, category, discordMember,
             $"Ticket erstellt von {context.User.GetFormattedUserName()} zu {discordMember.GetFormattedUserName()}");
 
@@ -378,6 +365,14 @@ public class TicketManager
         await TicketCategoryService.LogEventAsync(ticketId, "closed", closedBy.Id, reason);
 
         var ticketUsers = await TicketManagerHelper.GetTicketUserIdsAsync(ticketChannel);
+        await using (var roster = Db.CreateCommand(
+                         "UPDATE ticketcache SET closed_users = @users WHERE ticket_id = @ticket"))
+        {
+            roster.Parameters.AddWithValue("users", ticketUsers.Select(id => (long)id).ToArray());
+            roster.Parameters.AddWithValue("ticket", ticketId);
+            await roster.ExecuteNonQueryAsync();
+        }
+
         var ticketName = ticketChannel.Name;
         await ticketChannel.ModifyAsync(x => x.Name = $"closed-{ticketChannel.Name}");
 
@@ -393,10 +388,12 @@ public class TicketManager
         }.Build();
 
         var deleteButton = new DiscordButtonComponent(ButtonStyle.Danger, "ticket_delete", "Ticket löschen ❌");
+        var reopenButton =
+            new DiscordButtonComponent(ButtonStyle.Secondary, TicketComponents.ReopenButtonId, "Wieder öffnen");
         var mb = new DiscordMessageBuilder();
         mb.WithContent(closedBy.Mention);
         mb.AddEmbed(closedEmbed);
-        mb.AddComponents(deleteButton);
+        mb.AddComponents(deleteButton, reopenButton);
         await ticketChannel.SendMessageAsync(mb);
 
         foreach (var userId in ticketUsers)
@@ -414,6 +411,204 @@ public class TicketManager
             await TicketManagerHelper.RemoveUserFromTicketAsync(ticketChannel, userId, member);
             if (member is not null)
                 await TicketManagerHelper.SendTranscriptsToUser(member, transcriptUrl, RemoveType.Closed, ticketName);
+        }
+    }
+
+    /// <summary>
+    ///     Undoes a close: the ticket counts as open again, gets its name back and everyone who was in it
+    ///     regains access. The limit on open tickets is deliberately not checked, this is a team action.
+    /// </summary>
+    public static async Task ReopenTicketAsync(ComponentInteractionCreateEventArgs args)
+    {
+        var interaction = args.Interaction;
+        var channel = interaction.Channel;
+        var member = await interaction.User.ConvertToMember(interaction.Guild);
+
+        if (!await TicketAccess.MayHandleAsync(member, channel))
+        {
+            await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().WithContent("Du bist kein Teammitglied!").AsEphemeral());
+            return;
+        }
+
+        var ticketId = await TicketManagerHelper.GetTicketIdFromChannel(channel);
+        if (string.IsNullOrEmpty(ticketId))
+        {
+            await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .AddEmbed(EmbedGenerator.GetErrorEmbed("Zu diesem Channel gibt es kein Ticket mehr."))
+                    .AsEphemeral());
+            return;
+        }
+
+        // A ticket can carry more than one close message, so an older one must not reopen twice.
+        if (await TicketManagerHelper.IsOpenTicket(channel))
+        {
+            await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("Dieses Ticket ist bereits wieder offen.").AsEphemeral());
+            return;
+        }
+
+        await interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
+
+        var ownerId = (ulong)await TicketManagerHelper.GetTicketOwnerFromChannel(channel);
+        var roster = await LoadClosedRosterAsync(ticketId);
+        if (roster.Count == 0 && ownerId > 0) roster.Add(ownerId);
+
+        await using (var cmd = Db.CreateCommand(
+                         "UPDATE ticketstore SET closed = false, closed_at = 0 WHERE ticket_id = @ticket"))
+        {
+            cmd.Parameters.AddWithValue("ticket", ticketId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Without this the auto close task would see a ticket that has been idle since it was closed.
+        await using (var cmd = Db.CreateCommand(
+                         "UPDATE ticketcache SET last_activity = @now, reminder_sent_at = 0, closed_users = '{}' " +
+                         "WHERE ticket_id = @ticket"))
+        {
+            cmd.Parameters.AddWithValue("now", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            cmd.Parameters.AddWithValue("ticket", ticketId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        if (channel.Name.StartsWith("closed-", StringComparison.OrdinalIgnoreCase))
+            try
+            {
+                await channel.ModifyAsync(model =>
+                {
+                    model.Name = channel.Name["closed-".Length..];
+                    model.AuditLogReason = $"Ticket wieder geöffnet von {interaction.User.GetFormattedUserName()}";
+                });
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.Logger.Warning(e, "Could not rename ticket channel {Channel} while reopening",
+                    channel.Id);
+            }
+
+        var restored = 0;
+        foreach (var userId in roster)
+        {
+            DiscordMember? ticketMember;
+            try
+            {
+                ticketMember = await interaction.Guild.GetMemberAsync(userId);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            await TicketManagerHelper.AddUserToTicket(interaction, channel, ticketMember);
+            restored++;
+        }
+
+        await RestoreHeaderAsync(channel, ticketId);
+        await DisableClosedMessageAsync(args);
+        await TicketCategoryService.LogEventAsync(ticketId, "reopened", interaction.User.Id, null);
+
+        var description = $"Das Ticket wurde von {interaction.User.Mention} wieder geöffnet.\n" +
+                          $"{restored} von {roster.Count} Beteiligten haben wieder Zugriff.";
+
+        var category = await TicketCategoryService.GetForChannelAsync(channel.Id);
+        if (category is not null && ownerId > 0 && await FindBlockingTicketAsync(ownerId, category) is not null)
+            description += "\nHinweis: Der Nutzer liegt damit über dem eingestellten Limit für offene Tickets.";
+
+        var eb = new DiscordEmbedBuilder()
+            .WithTitle("Ticket wieder geöffnet")
+            .WithDescription(description)
+            .WithColor(DiscordColor.Green)
+            .WithFooter($"Ticket-ID: {ticketId}");
+
+        var mb = new DiscordMessageBuilder().AddEmbed(eb);
+        if (ownerId > 0) mb.WithContent($"<@{ownerId}>");
+        await channel.SendMessageAsync(mb);
+
+        await LogReopenAsync(channel, ticketId, interaction.User);
+    }
+
+    private static async Task<List<ulong>> LoadClosedRosterAsync(string ticketId)
+    {
+        await using var cmd = Db.CreateCommand("SELECT closed_users FROM ticketcache WHERE ticket_id = @ticket");
+        cmd.Parameters.AddWithValue("ticket", ticketId);
+        var result = await cmd.ExecuteScalarAsync();
+        if (result is not long[] ids) return [];
+
+        return [.. ids.Where(id => id > 0).Select(id => (ulong)id)];
+    }
+
+    private static async Task RestoreHeaderAsync(DiscordChannel channel, string ticketId)
+    {
+        var header = await TicketManagerHelper.GetHeaderMessageAsync(channel);
+        if (header is null || header.Embeds.Count == 0) return;
+
+        var claimed = false;
+        await using (var cmd = Db.CreateCommand("SELECT claimed FROM ticketcache WHERE ticket_id = @ticket"))
+        {
+            cmd.Parameters.AddWithValue("ticket", ticketId);
+            claimed = await cmd.ExecuteScalarAsync() is true;
+        }
+
+        try
+        {
+            var mb = new DiscordMessageBuilder();
+            mb.WithContent(header.Content);
+            mb.AddEmbed(header.Embeds[0]);
+            List<DiscordActionRowComponent> row =
+            [
+                new DiscordActionRowComponent(claimed
+                    ? TicketComponents.GetTicketClaimedActionRow()
+                    : TicketComponents.GetTicketActionRow())
+            ];
+            mb.AddComponents(row);
+            await header.ModifyAsync(mb);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not restore the ticket header while reopening");
+        }
+    }
+
+    /// <summary>Nobody should delete a live ticket through the buttons of an outdated close message.</summary>
+    private static async Task DisableClosedMessageAsync(ComponentInteractionCreateEventArgs args)
+    {
+        try
+        {
+            var mb = new DiscordMessageBuilder();
+            mb.WithContent(args.Message.Content);
+            if (args.Message.Embeds.Count > 0) mb.AddEmbed(args.Message.Embeds[0]);
+            mb.AddComponents(
+                new DiscordButtonComponent(ButtonStyle.Danger, "ticket_delete", "Ticket löschen ❌", true),
+                new DiscordButtonComponent(ButtonStyle.Secondary, TicketComponents.ReopenButtonId, "Wieder öffnen",
+                    true));
+            await args.Message.ModifyAsync(mb);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not disable the close message after reopening");
+        }
+    }
+
+    private static async Task LogReopenAsync(DiscordChannel channel, string ticketId, DiscordUser actor)
+    {
+        try
+        {
+            var logChannelId = ulong.Parse(BotConfig.GetConfig()["TicketConfig"]["LogChannelId"]);
+            var logChannel = channel.Guild.GetChannel(logChannelId);
+
+            var eb = new DiscordEmbedBuilder()
+                .WithTitle("Ticket wieder geöffnet")
+                .AddField(new DiscordEmbedField("Ticket", $"{channel.Mention} ``{ticketId}``", true))
+                .AddField(new DiscordEmbedField("Durch", $"{actor.Mention} ``{actor.Id}``", true))
+                .WithColor(DiscordColor.Green)
+                .WithTimestamp(DateTime.Now);
+            await logChannel.SendMessageAsync(eb);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not write the ticket reopen to the log channel");
         }
     }
 }

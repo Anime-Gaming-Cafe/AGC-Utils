@@ -16,8 +16,14 @@ public class TicketManagerEventHandler : BaseCommandModule
         _ = Task.Run(async () =>
         {
             var cid = e.Interaction.Data.CustomId;
-            if (cid == "ticket_claim")
+            if (cid == TicketComponents.ClaimButtonId)
                 await TicketManagerHelper.ClaimTicket(e);
+            else if (cid == TicketComponents.ClaimReleaseId)
+                await TicketManagerHelper.ReleaseClaimAsync(e);
+            else if (cid == TicketComponents.ClaimTakeId)
+                await TicketManagerHelper.TakeClaimAsync(e);
+            else if (cid == TicketComponents.ReopenButtonId)
+                await TicketManager.ReopenTicketAsync(e);
             else if (cid == "ticket_close")
                 await TicketManager.CloseTicket(e, e.Channel);
             else if (cid == "ticket_delete")

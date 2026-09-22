@@ -2,6 +2,7 @@
 
 using System.Text.RegularExpressions;
 using AGC_Management.Managers;
+using AGC_Management.Utils;
 
 #endregion
 
@@ -92,7 +93,7 @@ public class SnippetManagerHelper
         var snippet = await GetSnippetAsync(snipId);
         if (string.IsNullOrEmpty(snippet)) return;
 
-        snippet = FormatStringWithVariables(snippet);
+        snippet = await SnippetTemplateResolver.ResolveAsync(snippet, e.Channel, e.User);
         var eb = new DiscordEmbedBuilder()
             .WithDescription(snippet)
             .WithColor(DiscordColor.Gold)

@@ -434,7 +434,7 @@ public static class DatabaseService
             },
             {
                 "ticketcache",
-                "CREATE TABLE IF NOT EXISTS ticketcache (ticket_id TEXT, ticket_owner BIGINT, tchannel_id BIGINT, claimed BOOLEAN DEFAULT false, claimed_from BIGINT, ticket_users BIGINT[] DEFAULT '{}', last_activity BIGINT DEFAULT 0, reminder_sent_at BIGINT DEFAULT 0, header_message_id BIGINT DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS ticketcache (ticket_id TEXT, ticket_owner BIGINT, tchannel_id BIGINT, claimed BOOLEAN DEFAULT false, claimed_from BIGINT, ticket_users BIGINT[] DEFAULT '{}', closed_users BIGINT[] DEFAULT '{}', last_activity BIGINT DEFAULT 0, reminder_sent_at BIGINT DEFAULT 0, header_message_id BIGINT DEFAULT 0)"
             },
             {
                 "ticketcategories",
@@ -1317,6 +1317,11 @@ public static class DatabaseService
                     {
                         "header_message_id",
                         "ALTER TABLE IF EXISTS ticketcache ADD COLUMN IF NOT EXISTS header_message_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        // Closing empties ticket_users, so the roster is kept here to make reopening possible.
+                        "closed_users",
+                        "ALTER TABLE IF EXISTS ticketcache ADD COLUMN IF NOT EXISTS closed_users BIGINT[] DEFAULT '{}'"
                     },
                     {
                         // Tickets that were already open when this shipped have no recorded activity.

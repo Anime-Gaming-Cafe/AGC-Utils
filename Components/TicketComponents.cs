@@ -10,13 +10,17 @@ public class TicketComponents
 {
     public const string ManageUsersButtonId = "ticket_manage_users";
     public const string TransferButtonId = "ticket_transfer";
+    public const string ClaimButtonId = "ticket_claim";
+    public const string ClaimReleaseId = "ticket_claim_release";
+    public const string ClaimTakeId = "ticket_claim_take";
+    public const string ReopenButtonId = "ticket_reopen";
 
     public static List<DiscordButtonComponent> GetTicketActionRow()
     {
         List<DiscordButtonComponent> buttons =
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌"),
-            new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋"),
+            new DiscordButtonComponent(ButtonStyle.Primary, ClaimButtonId, "(Team) Ticket Claimen 👋"),
             new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥"),
             new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben"),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
@@ -29,7 +33,7 @@ public class TicketComponents
         List<DiscordButtonComponent> buttons =
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌"),
-            new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋", true),
+            new DiscordButtonComponent(ButtonStyle.Primary, ClaimButtonId, "(Team) Claim verwalten 👋"),
             new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥"),
             new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben"),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
@@ -42,7 +46,7 @@ public class TicketComponents
         List<DiscordButtonComponent> buttons =
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌", true),
-            new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋", true),
+            new DiscordButtonComponent(ButtonStyle.Primary, ClaimButtonId, "(Team) Ticket Claimen 👋", true),
             new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥", true),
             new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben", true),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
@@ -84,7 +88,12 @@ public class TicketComponents
             new(ButtonStyle.Success, "manage_notification", "Benachr. verwalten")
         };
 
-        var responseBuilder = new DiscordInteractionResponseBuilder().AddComponents(buttons).AsEphemeral();
+        // Second row, because five is the per row limit. Claim management also lives here so it stays
+        // reachable on tickets whose header still carries the old, disabled claim button.
+        var responseBuilder = new DiscordInteractionResponseBuilder()
+            .AddComponents(buttons)
+            .AddComponents(new DiscordButtonComponent(ButtonStyle.Primary, ClaimButtonId, "Claim verwalten"))
+            .AsEphemeral();
         await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, responseBuilder);
     }
 

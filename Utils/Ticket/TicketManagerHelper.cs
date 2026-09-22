@@ -120,20 +120,47 @@ public class TicketManagerHelper
         return result is long channelId ? channelId : 0;
     }
 
-    public static async Task Claim_UpdateHeaderComponents(ComponentInteractionCreateEventArgs interaction)
+    /// <summary>
+    ///     Puts the right button row back on the ticket header. It works off the stored header message
+    ///     rather than the message the button sat on, because claim management is also reachable from the
+    ///     ephemeral "Mehr..." menu.
+    /// </summary>
+    public static async Task SetHeaderClaimStateAsync(DiscordChannel channel, bool claimed)
     {
-        await interaction.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
-        var message = await interaction.Channel.GetMessageAsync(interaction.Message.Id);
-        var mb = new DiscordMessageBuilder();
-        mb.WithContent(message.Content);
-        mb.AddEmbed(message.Embeds[0]);
-        var components = TicketComponents.GetTicketClaimedActionRow();
-        List<DiscordActionRowComponent> row =
-		[
-			new DiscordActionRowComponent(components)
-        ];
-        mb.AddComponents(row);
-        await message.ModifyAsync(mb);
+        var header = await GetHeaderMessageAsync(channel);
+        if (header is null || header.Embeds.Count == 0) return;
+
+        try
+        {
+            var mb = new DiscordMessageBuilder();
+            mb.WithContent(header.Content);
+            mb.AddEmbed(header.Embeds[0]);
+            List<DiscordActionRowComponent> row =
+            [
+                new DiscordActionRowComponent(claimed
+                    ? TicketComponents.GetTicketClaimedActionRow()
+                    : TicketComponents.GetTicketActionRow())
+            ];
+            mb.AddComponents(row);
+            await header.ModifyAsync(mb);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not update the ticket header for the claim state");
+        }
+    }
+
+    public static async Task<(string TicketId, bool Claimed, ulong ClaimedFrom)> ReadClaimStateAsync(ulong channelId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(
+            "SELECT ticket_id, coalesce(claimed, false), coalesce(claimed_from, 0) FROM ticketcache " +
+            "WHERE tchannel_id = @channel LIMIT 1");
+        cmd.Parameters.AddWithValue("channel", (long)channelId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return ("", false, 0);
+
+        return (reader.GetString(0), reader.GetBoolean(1), (ulong)reader.GetInt64(2));
     }
 
     public static async Task<string> GetTicketIdFromChannel(DiscordChannel channel)
@@ -332,28 +359,40 @@ public class TicketManagerHelper
         await DeleteCache(channel);
     }
 
+    /// <summary>
+    ///     One button, two jobs. An unclaimed ticket is claimed straight away. A claimed one opens a small
+    ///     menu instead, because the header is a shared message and cannot offer "abgeben" to one person
+    ///     and "übernehmen" to everyone else at the same time.
+    /// </summary>
     public static async Task ClaimTicket(ComponentInteractionCreateEventArgs interaction)
     {
-        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
-            interaction.Channel);
-        if (!teamler)
+        var member = await interaction.User.ConvertToMember(interaction.Guild);
+        if (!await TicketAccess.MayHandleAsync(member, interaction.Channel))
         {
             await interaction.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder().WithContent("Du bist kein Teammitglied!").AsEphemeral());
             return;
         }
 
-        await Claim_UpdateHeaderComponents(interaction);
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query =
-            $"SELECT ticket_id FROM ticketcache where claimed = False AND tchannel_id = '{(long)interaction.Interaction.ChannelId}'";
+        var state = await ReadClaimStateAsync(interaction.Channel.Id);
+        if (string.IsNullOrEmpty(state.TicketId))
+        {
+            await interaction.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .WithContent("Zu diesem Channel gibt es kein Ticket mehr.").AsEphemeral());
+            return;
+        }
 
-        await using var cmd = con.CreateCommand(query);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        var ticket_id = "";
-        while (await reader.ReadAsync()) ticket_id = reader.GetString(0);
+        if (state.Claimed)
+        {
+            await RenderClaimMenuAsync(interaction, state);
+            return;
+        }
 
-        await reader.CloseAsync();
+        await interaction.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
+        await SetClaimAsync(state.TicketId, interaction.User.Id);
+        await SetHeaderClaimStateAsync(interaction.Channel, true);
+        await TicketCategoryService.LogEventAsync(state.TicketId, "claimed", interaction.User.Id);
 
         var claimembed = new DiscordEmbedBuilder
         {
@@ -362,17 +401,132 @@ public class TicketManagerHelper
             Color = DiscordColor.Green
         };
         claimembed.WithFooter(
-            $"{interaction.User.GetFormattedUserName()} wird sich um dein Anliegen kümmern | {ticket_id}");
+            $"{interaction.User.GetFormattedUserName()} wird sich um dein Anliegen kümmern | {state.TicketId}");
+        await interaction.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(claimembed));
+    }
 
-        await using var cmd2 =
-            con.CreateCommand($"UPDATE ticketcache SET claimed = True WHERE ticket_id = '{ticket_id}'");
-        await cmd2.ExecuteNonQueryAsync();
+    private static async Task RenderClaimMenuAsync(ComponentInteractionCreateEventArgs interaction,
+        (string TicketId, bool Claimed, ulong ClaimedFrom) state)
+    {
+        var mine = state.ClaimedFrom == interaction.User.Id;
+        var holder = state.ClaimedFrom == 0 ? "niemandem" : $"<@{state.ClaimedFrom}>";
 
-        await using var cmd3 =
-            con.CreateCommand(
-                $"UPDATE ticketcache SET claimed_from = '{(long)interaction.User.Id}' WHERE tchannel_id = '{(long)interaction.Interaction.ChannelId}'");
-        await cmd3.ExecuteNonQueryAsync();
-        await interaction.Interaction.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(claimembed));
+        var eb = new DiscordEmbedBuilder()
+            .WithTitle("Claim verwalten")
+            .WithDescription($"Dieses Ticket wird aktuell von {holder} bearbeitet.")
+            .WithColor(DiscordColor.Blurple)
+            .WithFooter($"Ticket-ID: {state.TicketId}");
+
+        var button = mine
+            ? new DiscordButtonComponent(ButtonStyle.Danger, TicketComponents.ClaimReleaseId, "Claim abgeben")
+            : new DiscordButtonComponent(ButtonStyle.Primary, TicketComponents.ClaimTakeId, "Claim übernehmen");
+
+        await interaction.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AddEmbed(eb).AddComponents(button).AsEphemeral());
+    }
+
+    public static async Task ReleaseClaimAsync(ComponentInteractionCreateEventArgs interaction)
+    {
+        var member = await interaction.User.ConvertToMember(interaction.Guild);
+        if (!await TicketAccess.MayHandleAsync(member, interaction.Channel))
+        {
+            await RespondToClaimMenuAsync(interaction, "Du bist kein Teammitglied!");
+            return;
+        }
+
+        var state = await ReadClaimStateAsync(interaction.Channel.Id);
+        if (string.IsNullOrEmpty(state.TicketId) || !state.Claimed)
+        {
+            await RespondToClaimMenuAsync(interaction, "Dieses Ticket ist gar nicht geclaimed.");
+            return;
+        }
+
+        if (state.ClaimedFrom != interaction.User.Id)
+        {
+            await RespondToClaimMenuAsync(interaction,
+                "Das Ticket gehört inzwischen jemand anderem. Nutze stattdessen Claim übernehmen.");
+            return;
+        }
+
+        await ClearClaimAsync(state.TicketId);
+        await SetHeaderClaimStateAsync(interaction.Channel, false);
+        await TicketCategoryService.LogEventAsync(state.TicketId, "unclaimed", interaction.User.Id);
+        await RespondToClaimMenuAsync(interaction, "Claim abgegeben.");
+
+        var eb = new DiscordEmbedBuilder()
+            .WithTitle("Claim abgegeben")
+            .WithDescription($"{interaction.User.Mention} bearbeitet dieses Ticket nicht mehr. " +
+                             "Es wartet wieder auf jemanden aus dem Team.")
+            .WithColor(DiscordColor.Yellow)
+            .WithFooter($"Ticket-ID: {state.TicketId}");
+        await interaction.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(eb));
+    }
+
+    public static async Task TakeClaimAsync(ComponentInteractionCreateEventArgs interaction)
+    {
+        var member = await interaction.User.ConvertToMember(interaction.Guild);
+        if (!await TicketAccess.MayHandleAsync(member, interaction.Channel))
+        {
+            await RespondToClaimMenuAsync(interaction, "Du bist kein Teammitglied!");
+            return;
+        }
+
+        var state = await ReadClaimStateAsync(interaction.Channel.Id);
+        if (string.IsNullOrEmpty(state.TicketId))
+        {
+            await RespondToClaimMenuAsync(interaction, "Zu diesem Channel gibt es kein Ticket mehr.");
+            return;
+        }
+
+        if (state.ClaimedFrom == interaction.User.Id)
+        {
+            await RespondToClaimMenuAsync(interaction, "Du bearbeitest dieses Ticket bereits.");
+            return;
+        }
+
+        var previous = state.ClaimedFrom;
+        await SetClaimAsync(state.TicketId, interaction.User.Id);
+        await SetHeaderClaimStateAsync(interaction.Channel, true);
+        await TicketCategoryService.LogEventAsync(state.TicketId, "claimed", interaction.User.Id,
+            previous > 0 ? previous.ToString() : null);
+        await RespondToClaimMenuAsync(interaction, "Claim übernommen.");
+
+        var description = previous > 0
+            ? $"{interaction.User.Mention} hat das Ticket von <@{previous}> übernommen."
+            : $"{interaction.User.Mention} bearbeitet dieses Ticket ab jetzt.";
+
+        var eb = new DiscordEmbedBuilder()
+            .WithTitle("Ticket übernommen")
+            .WithDescription(description)
+            .WithColor(DiscordColor.Green)
+            .WithFooter($"{interaction.User.GetFormattedUserName()} wird sich um dein Anliegen kümmern | {state.TicketId}");
+        await interaction.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(eb));
+    }
+
+    /// <summary>Replaces the ephemeral menu with its outcome, so the button cannot be pressed twice.</summary>
+    private static async Task RespondToClaimMenuAsync(ComponentInteractionCreateEventArgs interaction, string text)
+    {
+        await interaction.Interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage,
+            new DiscordInteractionResponseBuilder().WithContent(text).AsEphemeral());
+    }
+
+    private static async Task SetClaimAsync(string ticketId, ulong userId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(
+            "UPDATE ticketcache SET claimed = true, claimed_from = @user WHERE ticket_id = @ticket");
+        cmd.Parameters.AddWithValue("user", (long)userId);
+        cmd.Parameters.AddWithValue("ticket", ticketId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ClearClaimAsync(string ticketId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(
+            "UPDATE ticketcache SET claimed = false, claimed_from = 0 WHERE ticket_id = @ticket");
+        cmd.Parameters.AddWithValue("ticket", ticketId);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     public static async Task AddUserToTicket(CommandContext ctx, DiscordChannel ticket_channel, DiscordUser user,
