@@ -45,10 +45,18 @@ public static class InfoPanelComponents
     {
         return panel.BannerMode switch
         {
-            InfoPanel.ModeGuild => CurrentApplication.TargetGuild?.BannerUrl ?? "",
+            // Unlike DiscordGuild.IconUrl, BannerUrl comes back with no ?size= at all, so Discord
+            // has no declared dimensions to lay the image out with and renders it small.
+            InfoPanel.ModeGuild => WithSize(CurrentApplication.TargetGuild?.BannerUrl, 1024),
             InfoPanel.ModeUrl => panel.BannerUrl ?? "",
             _ => ""
         };
+    }
+
+    private static string WithSize(string? url, int size)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "";
+        return url.Contains('?') ? $"{url}&size={size}" : $"{url}?size={size}";
     }
 
     public static string ResolveAuthorIconUrl(InfoPanel panel)
