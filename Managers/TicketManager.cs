@@ -374,7 +374,15 @@ public class TicketManager
         }
 
         var ticketName = ticketChannel.Name;
-        await ticketChannel.ModifyAsync(x => x.Name = $"closed-{ticketChannel.Name}");
+        try
+        {
+            await ticketChannel.ModifyAsync(x => x.Name = $"closed-{ticketChannel.Name}");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not rename ticket channel {Channel} while closing",
+                ticketChannel.Id);
+        }
 
         var description = $"Das Ticket wurde erfolgreich geschlossen!\n Geschlossen von " +
                           $"{closedBy.GetFormattedUserName()} ``{closedBy.Id}``";

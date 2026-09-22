@@ -106,13 +106,22 @@ public static class TicketTransferManager
             .Where(builder => roleOverwrites.All(role => role.Target != builder.Target))
             .ToList();
 
-        await channel.ModifyAsync(model =>
+        try
         {
-            model.Name = $"{target.ChannelPrefix}-{number}";
-            if (parent is not null) model.Parent = parent;
-            if (roleOverwrites.Count > 0) model.PermissionOverwrites = [.. roleOverwrites, .. memberOverwrites];
-            model.AuditLogReason = $"Ticket an {target.Label} übergeben von {interaction.User.GetFormattedUserName()}";
-        });
+            await channel.ModifyAsync(model =>
+            {
+                model.Name = $"{target.ChannelPrefix}-{number}";
+                if (parent is not null) model.Parent = parent;
+                if (roleOverwrites.Count > 0) model.PermissionOverwrites = [.. roleOverwrites, .. memberOverwrites];
+                model.AuditLogReason =
+                    $"Ticket an {target.Label} übergeben von {interaction.User.GetFormattedUserName()}";
+            });
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "Could not update ticket channel {Channel} while transferring",
+                channel.Id);
+        }
 
         await using (var cmd = Db.CreateCommand("UPDATE ticketstore SET tickettype = @category WHERE ticket_id = @ticket"))
         {
