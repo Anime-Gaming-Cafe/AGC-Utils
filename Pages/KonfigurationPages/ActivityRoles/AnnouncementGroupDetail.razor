@@ -219,6 +219,7 @@ else
         channelId = originalChannelId;
         intervalDays = originalIntervalDays;
         message = originalMessage;
+        StateHasChanged();
     }
 
     private async Task SaveSettings()

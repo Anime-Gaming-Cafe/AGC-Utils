@@ -585,6 +585,7 @@ else
         panel = Clone(snapshot);
         panel.Groups = snapshot.Groups.Select(CloneGroup).ToList();
         headerPreview = panel.HeaderText.ConvertMarkdownToHtml();
+        StateHasChanged();
     }
 
     private async Task SendPanel()

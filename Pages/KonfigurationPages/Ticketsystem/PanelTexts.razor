@@ -255,6 +255,7 @@ else
         maxOpenPerUserTotal = originalMaxOpenPerUserTotal;
         autoCloseEnabled = originalAutoCloseEnabled;
         globalRoleIds = [.. originalGlobalRoleIds];
+        StateHasChanged();
     }
 
     private async Task RefreshPanel()

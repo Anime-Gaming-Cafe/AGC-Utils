@@ -103,7 +103,10 @@ public static class InfoPanelComponents
             header.WithAuthor(panel.AuthorName.Truncate(DiscordLimits.EmbedAuthorName),
                 iconUrl: ResolveAuthorIconUrl(panel));
 
-        if (!string.IsNullOrWhiteSpace(panel.SpacerUrl)) header.WithImageUrl(panel.SpacerUrl);
+        // Only needed as a width-forcing hack when there's no banner; with a banner, a second
+        // embed image in the same message makes Discord shrink both into small gallery tiles.
+        if (string.IsNullOrWhiteSpace(bannerUrl) && !string.IsNullOrWhiteSpace(panel.SpacerUrl))
+            header.WithImageUrl(panel.SpacerUrl);
 
         builder.AddEmbed(header);
 

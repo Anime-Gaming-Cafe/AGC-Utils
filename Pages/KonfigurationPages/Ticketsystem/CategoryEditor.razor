@@ -502,5 +502,6 @@ else
     {
         category = snapshot is null ? null : Clone(snapshot);
         questions = snapshotQuestions.Select(Clone).ToList();
+        StateHasChanged();
     }
 }
