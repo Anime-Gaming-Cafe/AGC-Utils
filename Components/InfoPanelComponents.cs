@@ -91,13 +91,28 @@ public static class InfoPanelComponents
         var color = panel.DiscordColor;
 
         var bannerUrl = ResolveBannerUrl(panel);
+
+        // Discord only renders an image-only embed at full width when the client can tell it
+        // belongs to the embed below it, which it does by giving both the same (otherwise
+        // invisible) url. Without this, a lone image embed renders as a small thumbnail.
+        var vanityCode = CurrentApplication.TargetGuild?.VanityUrlCode;
+        var groupUrl = !string.IsNullOrWhiteSpace(bannerUrl) && !string.IsNullOrWhiteSpace(vanityCode)
+            ? $"https://discord.gg/{vanityCode}"
+            : null;
+
         if (!string.IsNullOrWhiteSpace(bannerUrl))
-            builder.AddEmbed(new DiscordEmbedBuilder().WithColor(color).WithImageUrl(bannerUrl));
+        {
+            var banner = new DiscordEmbedBuilder().WithColor(color).WithImageUrl(bannerUrl);
+            if (groupUrl is not null) banner.WithUrl(groupUrl);
+            builder.AddEmbed(banner);
+        }
 
         var header = new DiscordEmbedBuilder()
             .WithTitle(panel.HeaderTitle.Truncate(DiscordLimits.EmbedTitle))
             .WithDescription(BuildHeaderDescription(panel))
             .WithColor(color);
+
+        if (groupUrl is not null) header.WithUrl(groupUrl);
 
         if (!string.IsNullOrWhiteSpace(panel.AuthorName))
             header.WithAuthor(panel.AuthorName.Truncate(DiscordLimits.EmbedAuthorName),
