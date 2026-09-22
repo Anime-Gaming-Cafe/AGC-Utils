@@ -26,7 +26,7 @@ else
                 <table class="table">
                     <thead>
                     <tr>
-                        <th>Typ</th>
+                        <th>Kategorie</th>
                         <th>Geschlossen</th>
                         <th>Ø Dauer</th>
                         <th>Median-Dauer</th>
@@ -36,7 +36,7 @@ else
                     @foreach (var stat in resolutionStats)
                     {
                         <tr>
-                            <td>@FormatTicketType(stat.TicketType)</td>
+                            <td>@stat.Label</td>
                             <td class="tnum">@stat.ClosedCount.ToString("N0")</td>
                             <td class="tnum">@FormatHours(stat.AvgHours)</td>
                             <td class="tnum">@FormatHours(stat.MedianHours)</td>
@@ -60,9 +60,6 @@ else
         resolutionStats = await AnalyticsService.GetTicketResolutionStats();
         loaded = true;
     }
-
-    private static string FormatTicketType(string ticketType) =>
-        string.IsNullOrEmpty(ticketType) ? ticketType : char.ToUpper(ticketType[0]) + ticketType[1..];
 
     private static string FormatHours(double hours) => $"{hours:N1} h";
 }

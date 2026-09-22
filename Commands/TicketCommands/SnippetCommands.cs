@@ -42,15 +42,7 @@ public class SnippetManagerCommands : BaseCommandModule
     [TicketRequireStaffRole]
     public async Task AddSnippet(CommandContext ctx, string name, [RemainingText] string content)
     {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-
-        await using var checkCmd =
-            con.CreateCommand("SELECT EXISTS (SELECT 1 FROM snippets WHERE snip_id = @name)");
-        checkCmd.Parameters.AddWithValue("name", name);
-        var exists = (bool)await checkCmd.ExecuteScalarAsync();
-
-        if (exists)
+        if (!await SnippetManagerHelper.CreateAsync(name, content))
         {
             var ebe = new DiscordEmbedBuilder()
                 .WithDescription($"Snippet `{name}` existiert bereits!")
@@ -59,11 +51,6 @@ public class SnippetManagerCommands : BaseCommandModule
             return;
         }
 
-        await using var cmd =
-            con.CreateCommand("INSERT INTO snippets (snip_id, snipped_text) VALUES (@name, @content)");
-        cmd.Parameters.AddWithValue("name", name);
-        cmd.Parameters.AddWithValue("content", content);
-        await cmd.ExecuteNonQueryAsync();
         var eb = new DiscordEmbedBuilder()
             .WithDescription($"Snippet `{name}` wurde hinzugfügt!")
             .WithFooter("AGC Support-System", ctx.Guild.IconUrl)
@@ -76,14 +63,10 @@ public class SnippetManagerCommands : BaseCommandModule
     [TicketRequireStaffRole]
     public async Task RemoveSnippet(CommandContext ctx, string name)
     {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-
-        await using var cmd = con.CreateCommand("DELETE FROM snippets WHERE snip_id = @name");
-        cmd.Parameters.AddWithValue("name", name);
-        var rowsAffected = await cmd.ExecuteNonQueryAsync();
+        var removed = await SnippetManagerHelper.DeleteAsync(name);
         var eb = new DiscordEmbedBuilder();
 
-        if (rowsAffected > 0)
+        if (removed)
             eb.WithDescription($"Snippet `{name}` wurde erfolgreich entfernt!")
                 .WithColor(DiscordColor.Green);
         else

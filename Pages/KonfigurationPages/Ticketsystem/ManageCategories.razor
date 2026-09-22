@@ -1,0 +1,220 @@
+@page "/konfiguration/ticketsystem"
+@using AGC_Management.Entities.Ticket
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Ticketsystem"
+            Lead="Welche Anliegen im Support-Panel stehen, wer sie bearbeitet und wo ihre Channel landen."
+            BackHref="/konfiguration" BackText="Administration">
+    <Actions>
+        <a class="btn btn-secondary btn-sm" href="/konfiguration/ticketsystem/snippets">Snippets</a>
+        <a class="btn btn-secondary btn-sm" href="/konfiguration/ticketsystem/panel">Panel und Texte</a>
+    </Actions>
+</PageHeader>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Kategorien werden geladen"
+                Description="Die Ticket-Kategorien und ihre offenen Tickets werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Kategorien"
+           Lead="Die Reihenfolge ist die Reihenfolge im Auswahlmenü. Deaktivierte Kategorien sind nicht mehr wählbar, ihre laufenden Tickets bleiben offen."
+           Flush="@(categories.Count > 0)">
+        @if (categories.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Kategorien"
+                        Description="Ohne Kategorie kann niemand ein Ticket öffnen. Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var category in categories)
+                {
+                    var index = categories.IndexOf(category);
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@category.Label</p>
+                            <p class="rows__text">
+                                <code>@category.CustomId</code> · @OpenCount(category.CustomId) offene Tickets
+                                @if (category.IntakeEnabled && category.Questions.Count > 0)
+                                {
+                                    <text> · Formular mit @category.Questions.Count Feldern</text>
+                                }
+                                @if (category.AutoCloseEnabled && category.AutoCloseHours > 0)
+                                {
+                                    <text> · Auto-Close nach @category.AutoCloseHours h</text>
+                                }
+                            </p>
+                        </div>
+                        <div class="rows__side">
+                            <StatusPill Text="@(category.Enabled ? "Aktiv" : "Deaktiviert")"
+                                        Tone="@(category.Enabled ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                    @onclick="() => Move(category, -1)">Hoch
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(index == categories.Count - 1)"
+                                    @onclick="() => Move(category, 1)">Runter
+                            </button>
+                            <a class="btn btn-secondary btn-sm"
+                               href="@($"/konfiguration/ticketsystem/{category.CustomId}")">Bearbeiten</a>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    @onclick="() => pendingDelete = category.CustomId">Löschen
+                            </button>
+                        </div>
+                        @if (pendingDelete == category.CustomId)
+                        {
+                            <div class="rows__detail">
+                                <ConfirmInline Title="@($"Kategorie {category.Label} löschen?")"
+                                               ConfirmText="Endgültig löschen"
+                                               Busy="busy"
+                                               OnConfirm="() => Delete(category)"
+                                               OnCancel="() => pendingDelete = null">
+                                    @if (OpenCount(category.CustomId) > 0)
+                                    {
+                                        <p>
+                                            Es sind noch @OpenCount(category.CustomId) Tickets dieser Kategorie offen.
+                                            Schließe sie zuerst oder übergib sie an ein anderes Team.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <p>
+                                            Geschlossene Tickets dieser Kategorie verlieren ihre Bezeichnung in
+                                            Statistik und Übersicht. Deaktivieren statt löschen behält sie.
+                                        </p>
+                                    }
+                                </ConfirmInline>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Kategorie anlegen"
+           Lead="Die Kennung steht im Channelnamen und in der Datenbank. Sie lässt sich später nicht mehr ändern.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="tc-new-id">Kennung</label>
+                <input id="tc-new-id" class="form-control" maxlength="32" placeholder="event" @bind="newCustomId"/>
+                <span class="field__hint">Kleinbuchstaben, Ziffern und Bindestriche.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="tc-new-label">Bezeichnung</label>
+                <input id="tc-new-label" class="form-control" maxlength="100" placeholder="Eventteam-Anliegen"
+                       @bind="newLabel"/>
+                <span class="field__hint">So steht es im Auswahlmenü.</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="Create">Anlegen und bearbeiten</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private bool busy;
+
+    private List<TicketCategory> categories = [];
+    private Dictionary<string, int> openCounts = new(StringComparer.OrdinalIgnoreCase);
+    private string? pendingDelete;
+
+    private string newCustomId = "";
+    private string newLabel = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        TicketCategoryService.Invalidate();
+        categories = await TicketCategoryService.GetAllAsync(true);
+        openCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var category in categories)
+            openCounts[category.CustomId] = await TicketCategoryService.CountOpenTicketsAsync(category.CustomId);
+    }
+
+    private int OpenCount(string customId) => openCounts.TryGetValue(customId, out var count) ? count : 0;
+
+    private async Task Move(TicketCategory category, int offset)
+    {
+        var from = categories.IndexOf(category);
+        var to = from + offset;
+        if (to < 0 || to >= categories.Count) return;
+
+        (categories[from], categories[to]) = (categories[to], categories[from]);
+
+        for (var i = 0; i < categories.Count; i++)
+        {
+            categories[i].SortOrder = i;
+            await TicketCategoryService.UpsertAsync(categories[i]);
+        }
+
+        ToastService.Notify("Reihenfolge gespeichert.", "ok");
+    }
+
+    private async Task Delete(TicketCategory category)
+    {
+        if (OpenCount(category.CustomId) > 0)
+        {
+            ToastService.Notify("Kategorie hat noch offene Tickets und wurde nicht gelöscht.", "bad");
+            pendingDelete = null;
+            return;
+        }
+
+        busy = true;
+        await TicketCategoryService.DeleteAsync(category.CustomId);
+        pendingDelete = null;
+        await LoadAsync();
+        busy = false;
+        ToastService.Notify($"Kategorie {category.Label} gelöscht.", "ok");
+    }
+
+    private async Task Create()
+    {
+        var customId = (newCustomId ?? "").Trim().ToLowerInvariant();
+        var label = (newLabel ?? "").Trim();
+
+        if (customId.Length == 0 || label.Length == 0)
+        {
+            ToastService.Notify("Kennung und Bezeichnung werden beide gebraucht.", "bad");
+            return;
+        }
+
+        if (!customId.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+        {
+            ToastService.Notify("Die Kennung darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.", "bad");
+            return;
+        }
+
+        if (await TicketCategoryService.ExistsAsync(customId))
+        {
+            ToastService.Notify("Diese Kennung gibt es bereits.", "bad");
+            return;
+        }
+
+        busy = true;
+        await TicketCategoryService.UpsertAsync(new TicketCategory
+        {
+            CustomId = customId,
+            Label = label,
+            ChannelPrefix = customId,
+            SortOrder = categories.Count,
+            Enabled = false
+        });
+        busy = false;
+
+        Nav.NavigateTo($"/konfiguration/ticketsystem/{customId}");
+    }
+}

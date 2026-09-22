@@ -1,5 +1,6 @@
 ﻿#region
 
+using AGC_Management.Services;
 using AGC_Management.Utils;
 
 #endregion
@@ -13,9 +14,6 @@ public class SnippetManager
 [EventHandler]
 public class SnippetListener
 {
-    private readonly long catid = long.Parse(BotConfig.GetConfig()["TicketConfig"]["SupportCategoryId"]);
-    private readonly long teamroleid = long.Parse(BotConfig.GetConfig()["TicketConfig"]["TeamRoleId"]);
-
     [Event]
     public async Task MessageCreated(DiscordClient client, MessageCreateEventArgs e)
     {
@@ -27,12 +25,14 @@ public class SnippetListener
 
             if (e.Message.Channel.Parent == null) return;
 
-            if ((long)e.Message.Channel.Parent.Id != catid) return;
+            var ticketParents = await TicketCategoryService.GetTicketParentIdsAsync();
+            if (!ticketParents.Contains(e.Message.Channel.Parent.Id)) return;
 
             var openticket = await TicketManagerHelper.IsOpenTicket(e.Message.Channel);
             if (!openticket) return;
 
-            var sup = TeamChecker.IsSupporter(await e.Message.Author.ConvertToMember(e.Message.Guild));
+            var sup = await TicketAccess.MayHandleAsync(await e.Message.Author.ConvertToMember(e.Message.Guild),
+                e.Message.Channel);
             if (!sup) return;
 
             var string_to_search = e.Message.Content;

@@ -1,4 +1,4 @@
-#region
+﻿#region
 
 using AGC_Management.Entities.Ticket;
 
@@ -26,6 +26,7 @@ public static class UserTicketService
         cmd.Parameters.AddWithValue("uid", userId.ToString());
 
         var guildId = SupportGuildId();
+        var categories = await TicketCategoryService.GetAllAsync(true);
         var tickets = new List<UserTicket>();
 
         await using var reader = await cmd.ExecuteReaderAsync();
@@ -42,6 +43,10 @@ public static class UserTicketService
                     ? null
                     : reader.GetString(3)
             };
+
+            ticket.CategoryLabel = categories
+                .FirstOrDefault(c => string.Equals(c.CustomId, ticket.Type, StringComparison.OrdinalIgnoreCase))
+                ?.Label;
 
             if (ticket.IsOpen && guildId is not null && !reader.IsDBNull(4) &&
                 ulong.TryParse(reader.GetString(4), out var channelId))

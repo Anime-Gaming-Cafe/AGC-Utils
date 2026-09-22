@@ -1,0 +1,272 @@
+@page "/konfiguration/ticketsystem/panel"
+@using AGC_Management.Components
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="Panel und Texte"
+            Lead="Was im Support-Panel steht, wer überall Zugriff hat und ob Tickets von selbst zugehen."
+            BackHref="/konfiguration/ticketsystem" BackText="Ticketsystem"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Einstellungen werden geladen"
+                Description="Panel-Texte und globale Ticket-Einstellungen werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Support-Panel"
+           Lead="Die feste Nachricht im Support-Channel mit dem Knopf zum Ticket öffnen.">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="tp-title">Überschrift</label>
+                <input id="tp-title" class="form-control" maxlength="256" @bind="panelTitle"
+                       @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="tp-description">Text</label>
+                <textarea id="tp-description" class="form-control" rows="8" @bind="panelDescription"
+                          @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">Discord-Markdown funktioniert hier.</span>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="tp-footer">Fußzeile</label>
+                <input id="tp-footer" class="form-control" maxlength="256" @bind="panelFooter"
+                       @bind:after="OnFieldChanged"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="RefreshPanel">
+                Panel-Nachricht aktualisieren
+            </button>
+        </div>
+    </Panel>
+
+    <Panel Title="Kategorie-Auswahl"
+           Lead="Die Nachricht, die nach dem Klick auf den Knopf erscheint. Die Liste der Kategorien darunter erzeugt der Bot selbst.">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="tp-picker-title">Überschrift</label>
+                <input id="tp-picker-title" class="form-control" maxlength="256" @bind="pickerTitle"
+                       @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="tp-picker-description">Text</label>
+                <textarea id="tp-picker-description" class="form-control" rows="4" @bind="pickerDescription"
+                          @bind:after="OnFieldChanged"></textarea>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Zugriff über alle Kategorien"
+           Lead="Diese Rollen sehen und bearbeiten jedes Ticket, unabhängig von der Kategorie.">
+        <div class="field">
+            @if (globalRoleIds.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Keine übergreifende Rolle"
+                            Description="Jede Kategorie entscheidet allein, wer ihre Tickets sieht. Ohne Rolle in einer Kategorie greift die allgemeine Ticket-Team-Rolle aus der config.ini."/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var roleId in globalRoleIds.ToList())
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">@RoleName(roleId)</p>
+                            </div>
+                            <div class="rows__side">
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        @onclick="() => RemoveGlobalRole(roleId)">Entfernen
+                                </button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label">Rolle hinzufügen</label>
+                <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                  @bind-SelectedId="newGlobalRoleId"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="AddGlobalRole">Rolle hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Grenzen und Automatik">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="tp-maxtotal">Offene Tickets pro Nutzer insgesamt</label>
+                <input id="tp-maxtotal" type="number" min="0" max="20" class="form-control"
+                       @bind="maxOpenPerUserTotal" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">
+                    Gilt über alle Kategorien hinweg. 1 ist das Verhalten von früher: ein offenes Ticket pro
+                    Person. 0 hebt die Grenze auf, dann zählt nur noch das Limit der jeweiligen Kategorie.
+                </span>
+            </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="tp-autoclose"
+                           @bind="autoCloseEnabled" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="tp-autoclose">Auto-Close global aktiv</label>
+                </div>
+                <span class="field__hint">
+                    Hauptschalter. Erinnerung und automatisches Schließen laufen nur, wenn zusätzlich die
+                    jeweilige Kategorie es eingeschaltet hat.
+                </span>
+            </div>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private bool busy;
+
+    private string panelTitle = "";
+    private string panelDescription = "";
+    private string panelFooter = "";
+    private string pickerTitle = "";
+    private string pickerDescription = "";
+    private int maxOpenPerUserTotal = 1;
+    private bool autoCloseEnabled;
+    private List<ulong> globalRoleIds = [];
+
+    private List<DiscordRole> assignableRoles = [];
+    private List<(ulong Id, string Label)> RoleItems => assignableRoles.Select(r => (r.Id, r.Name)).ToList();
+    private ulong newGlobalRoleId;
+
+    private string originalPanelTitle = "";
+    private string originalPanelDescription = "";
+    private string originalPanelFooter = "";
+    private string originalPickerTitle = "";
+    private string originalPickerDescription = "";
+    private int originalMaxOpenPerUserTotal;
+    private bool originalAutoCloseEnabled;
+    private List<ulong> originalGlobalRoleIds = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadRoles();
+        await LoadAsync();
+        Tracker.Register(SaveAsync, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private void LoadRoles()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (guild is null) return;
+
+        assignableRoles = guild.Roles.Values
+            .Where(r => r.Id != guild.Id)
+            .OrderByDescending(r => r.Position)
+            .ToList();
+    }
+
+    private async Task LoadAsync()
+    {
+        panelTitle = await Get("PanelTitle");
+        panelDescription = await Get("PanelDescription");
+        panelFooter = await Get("PanelFooter");
+        pickerTitle = await Get("PickerTitle");
+        pickerDescription = await Get("PickerDescription");
+        maxOpenPerUserTotal =
+            await RuntimeSettings.GetIntAsync(TicketCategoryService.SettingsSection, "MaxOpenPerUserTotal", 1);
+        autoCloseEnabled =
+            await RuntimeSettings.GetBoolAsync(TicketCategoryService.SettingsSection, "AutoCloseEnabled", false);
+        globalRoleIds = [.. await Utils.TicketAccess.GlobalAccessRoleIdsAsync()];
+
+        RebuildSnapshot();
+    }
+
+    private static async Task<string> Get(string key) =>
+        await RuntimeSettings.GetAsync(TicketCategoryService.SettingsSection, key) ?? "";
+
+    private void RebuildSnapshot()
+    {
+        originalPanelTitle = panelTitle;
+        originalPanelDescription = panelDescription;
+        originalPanelFooter = panelFooter;
+        originalPickerTitle = pickerTitle;
+        originalPickerDescription = pickerDescription;
+        originalMaxOpenPerUserTotal = maxOpenPerUserTotal;
+        originalAutoCloseEnabled = autoCloseEnabled;
+        originalGlobalRoleIds = [.. globalRoleIds];
+    }
+
+    private string RoleName(ulong roleId) =>
+        assignableRoles.FirstOrDefault(r => r.Id == roleId)?.Name ?? roleId.ToString();
+
+    private void AddGlobalRole()
+    {
+        if (newGlobalRoleId == 0 || globalRoleIds.Contains(newGlobalRoleId)) return;
+
+        globalRoleIds.Add(newGlobalRoleId);
+        newGlobalRoleId = 0;
+        Tracker.MarkDirty();
+    }
+
+    private void RemoveGlobalRole(ulong roleId)
+    {
+        globalRoleIds.Remove(roleId);
+        Tracker.MarkDirty();
+    }
+
+    private async Task SaveAsync()
+    {
+        maxOpenPerUserTotal = Math.Clamp(maxOpenPerUserTotal, 0, 20);
+
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "PanelTitle", panelTitle);
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "PanelDescription", panelDescription);
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "PanelFooter", panelFooter);
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "PickerTitle", pickerTitle);
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "PickerDescription", pickerDescription);
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "MaxOpenPerUserTotal",
+            maxOpenPerUserTotal.ToString());
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "AutoCloseEnabled",
+            autoCloseEnabled.ToString().ToLowerInvariant());
+        await RuntimeSettings.SetAsync(TicketCategoryService.SettingsSection, "GlobalAccessRoleIds",
+            string.Join(",", globalRoleIds));
+
+        RebuildSnapshot();
+        ToastService.Notify("Einstellungen gespeichert. Die Panel-Nachricht aktualisierst du mit dem Knopf oben.",
+            "ok");
+    }
+
+    private void Discard()
+    {
+        panelTitle = originalPanelTitle;
+        panelDescription = originalPanelDescription;
+        panelFooter = originalPanelFooter;
+        pickerTitle = originalPickerTitle;
+        pickerDescription = originalPickerDescription;
+        maxOpenPerUserTotal = originalMaxOpenPerUserTotal;
+        autoCloseEnabled = originalAutoCloseEnabled;
+        globalRoleIds = [.. originalGlobalRoleIds];
+    }
+
+    private async Task RefreshPanel()
+    {
+        busy = true;
+        var refreshed = await SupportComponents.RefreshPanelAsync();
+        busy = false;
+
+        if (refreshed)
+            ToastService.Notify("Panel-Nachricht aktualisiert.", "ok");
+        else
+            ToastService.Notify(
+                "Panel-Nachricht nicht gefunden. Setze sie im Support-Channel mit !initsupportpanel neu.", "bad");
+    }
+}

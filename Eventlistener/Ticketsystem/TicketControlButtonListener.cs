@@ -32,6 +32,10 @@ public class TicketManagerEventHandler : BaseCommandModule
                 await TicketManagerHelper.RemoveUserFromTicketSelector(e.Interaction);
             else if (cid == "ticket_more")
                 await TicketComponents.RenderMore(e);
+            else if (cid == TicketComponents.TransferButtonId)
+                await TicketTransferManager.RenderSelectorAsync(e.Interaction);
+            else if (cid == TicketTransferManager.SelectId)
+                await TicketTransferManager.TransferAsync(e);
             else if (cid == "ticket_userinfo")
                 await TicketManagerHelper.UserInfo(e.Interaction);
             else if (cid == "userinfo_selector")

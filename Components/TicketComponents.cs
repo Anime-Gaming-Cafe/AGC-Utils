@@ -1,5 +1,6 @@
 ﻿#region
 
+using AGC_Management.Services;
 using AGC_Management.Utils;
 
 #endregion
@@ -59,14 +60,16 @@ public class TicketComponents
         return buttons;
     }
 
+    public const string TransferButtonId = "ticket_transfer";
+
     public static async Task RenderMore(InteractionCreateEventArgs interactionCreateEvent)
     {
-        var user = await interactionCreateEvent.Interaction.User.ConvertToMember(interactionCreateEvent.Interaction
-            .Guild);
+        var interaction = interactionCreateEvent.Interaction;
+        var user = await interaction.User.ConvertToMember(interaction.Guild);
 
-        if (!TeamChecker.IsSupporter(user))
+        if (!await TicketAccess.MayHandleAsync(user, interaction.Channel))
         {
-            await interactionCreateEvent.Interaction.CreateResponseAsync(
+            await interaction.CreateResponseAsync(
                 InteractionResponseType.ChannelMessageWithSource,
                 new DiscordInteractionResponseBuilder().WithContent("Du bist kein Teammitglied!").AsEphemeral());
             return;
@@ -82,8 +85,16 @@ public class TicketComponents
         };
 
         var responseBuilder = new DiscordInteractionResponseBuilder().AddComponents(buttons).AsEphemeral();
-        await interactionCreateEvent.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-            responseBuilder);
+
+        // A second row: five buttons is the per row limit, and handing a ticket to another team only
+        // makes sense when there is another team to hand it to.
+        var transferable = await TicketAccess.VisibleCategoriesAsync(user, false);
+        var current = await TicketCategoryService.GetForChannelAsync(interaction.Channel.Id);
+        if (transferable.Any(category => category.CustomId != current?.CustomId))
+            responseBuilder.AddComponents(new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId,
+                "Ticket übergeben"));
+
+        await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, responseBuilder);
     }
 
     public static List<DiscordActionRowComponent> GetNotificationManagerButtons()

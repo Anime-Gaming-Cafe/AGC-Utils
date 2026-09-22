@@ -1,0 +1,135 @@
+@page "/teamarea/tickets"
+@using AGC_Management.Controller
+@using AGC_Management.Entities.Ticket
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@inject UserService UserService
+@attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
+
+<PageHeader Title="Offene Tickets"
+            Lead="Die Tickets der Kategorien, für die du zuständig bist. Älteste zuerst."
+            BackHref="/teamarea" BackText="Teambereich"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Tickets werden geladen"
+                Description="Offene Tickets deiner Kategorien werden abgefragt."/>
+}
+else if (failed)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Tickets konnten nicht geladen werden"
+                Description="Die Abfrage ist fehlgeschlagen. Versuch es in einem Moment erneut."
+                ActionText="Erneut versuchen"
+                OnAction="Load"/>
+}
+else if (categories.Count == 0)
+{
+    <StateBlock Title="Keine Kategorie zugewiesen"
+                Description="Deine Rollen sind bei keiner Ticket-Kategorie als zuständig eingetragen. Ein Administrator kann das unter Ticketsystem ändern."/>
+}
+else if (rows.Count == 0)
+{
+    <StateBlock Title="Nichts offen"
+                Description="@($"In {CategoryNames} ist gerade kein Ticket offen. Neue Tickets erscheinen hier, sobald jemand eines eröffnet.")"/>
+}
+else
+{
+    <Panel Title="@($"{rows.Count} offen")" Flush="true">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Kategorie</th>
+                    <th>Channel</th>
+                    <th>Eröffnet von</th>
+                    <th>Offen seit</th>
+                    <th>Letzte Nachricht</th>
+                    <th>Bearbeitet von</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr>
+                        <td>@row.CategoryLabel</td>
+                        <td>@(row.ChannelName is null ? "-" : $"#{row.ChannelName}")</td>
+                        <td>@row.OwnerName</td>
+                        <td class="tnum">@Age(row.OpenedAt)</td>
+                        <td class="tnum">@Age(row.LastActivity)</td>
+                        <td>
+                            @if (row.Claimed && row.ClaimedByName is not null)
+                            {
+                                @row.ClaimedByName
+                            }
+                            else
+                            {
+                                <StatusPill Text="Offen" Tone="StatusPill.PillTone.Warn"/>
+                            }
+                        </td>
+                        <td>
+                            @if (row.ChannelUrl is not null)
+                            {
+                                <a class="btn btn-secondary btn-sm" href="@row.ChannelUrl" target="_blank"
+                                   rel="noopener">Öffnen</a>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </Panel>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool loaded;
+    private bool failed;
+
+    private List<TicketCategory> categories = [];
+    private List<TeamTicketRow> rows = [];
+
+    private string CategoryNames => string.Join(", ", categories.Select(c => c.Label));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        failed = false;
+        try
+        {
+            var principal = AuthState is null ? null : (await AuthState).User;
+            var userId = UserService.GetUserId(principal) ?? 0;
+
+            categories = await TicketAccess.VisibleCategoriesAsync(userId);
+            rows = await TeamTicketService.GetOpenTicketsAsync(categories);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Offene Tickets für den Teambereich konnten nicht geladen werden");
+            failed = true;
+        }
+
+        loaded = true;
+    }
+
+    /// <summary>How long ago, at the resolution a queue is actually read at.</summary>
+    private static string Age(long unixSeconds)
+    {
+        if (unixSeconds <= 0) return "unbekannt";
+
+        var span = DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+        if (span.TotalMinutes < 1) return "gerade eben";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} Min.";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} Std.";
+
+        return $"{(int)span.TotalDays} Tage";
+    }
+}

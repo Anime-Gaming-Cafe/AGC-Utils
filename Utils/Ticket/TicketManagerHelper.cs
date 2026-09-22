@@ -3,7 +3,9 @@
 using System.Diagnostics;
 using System.Text;
 using AGC_Management.Components;
+using AGC_Management.Entities.Ticket;
 using AGC_Management.Enums;
+using AGC_Management.Services;
 using AGC_Management.Utils;
 using DisCatSharp.Interactivity.Extensions;
 
@@ -21,6 +23,20 @@ public class TicketManagerHelper
         _client = client;
     }
 
+    /// <summary>
+    ///     Answers a component callback that did not come from someone allowed to work this ticket. The
+    ///     button that produced the menu is gated, but a custom id can be sent without ever pressing it.
+    /// </summary>
+    public static async Task<bool> EnsureTeamAsync(DiscordInteraction interaction)
+    {
+        var member = await interaction.User.ConvertToMember(interaction.Guild);
+        if (await TicketAccess.MayHandleAsync(member, interaction.Channel)) return true;
+
+        await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().WithContent("Du bist kein Teammitglied!").AsEphemeral());
+        return false;
+    }
+
     public static async Task<long> GetTicketOwnerFromChannel(DiscordChannel channel)
     {
         var newcon = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
@@ -32,15 +48,6 @@ public class TicketManagerHelper
 
         await reader.CloseAsync();
         return ticket_owner;
-    }
-
-    public static async Task<int> GetPreviousTicketCount(TicketType ticketType)
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query = $"SELECT COUNT(*) FROM ticketstore where tickettype = '{ticketType.ToString().ToLower()}'";
-        await using var cmd = con.CreateCommand(query);
-        var rowCount = Convert.ToInt32(cmd.ExecuteScalar());
-        return rowCount;
     }
 
     public static async Task<int> GetTicketCountFromThisUser(long user_id)
@@ -58,16 +65,17 @@ public class TicketManagerHelper
         return new string([.. Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)])]);
     }
 
-    public static async Task<bool> CheckForOpenTicket(long user_id)
+    /// <summary>Open tickets of a user, either overall or within one category.</summary>
+    public static async Task<int> CountOpenTicketsAsync(ulong userId, string? categoryId = null)
     {
-        var isTicketOpen = false;
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query = $"SELECT COUNT(*) FROM ticketstore where ticket_owner = '{user_id}' AND closed = False";
-        await using var cmd = con.CreateCommand(query);
-        var rowCount = Convert.ToInt32(cmd.ExecuteScalar());
-        if (rowCount > 0) isTicketOpen = true;
+        var sql = "SELECT COUNT(*) FROM ticketstore WHERE ticket_owner = @owner AND closed = false";
+        if (categoryId is not null) sql += " AND tickettype = @category";
 
-        return isTicketOpen;
+        await using var cmd = con.CreateCommand(sql);
+        cmd.Parameters.AddWithValue("owner", (long)userId);
+        if (categoryId is not null) cmd.Parameters.AddWithValue("category", categoryId);
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync());
     }
 
     public static async Task<bool> IsOpenTicket(DiscordChannel ch)
@@ -93,17 +101,23 @@ public class TicketManagerHelper
         return isTicketOpen;
     }
 
-    public static async Task<long> GetOpenTicketChannel(long user_id)
+    /// <summary>
+    ///     Channel of a user's open ticket. The cache table also holds closed-but-not-yet-deleted tickets,
+    ///     so the join against ticketstore is what makes this answer "open".
+    /// </summary>
+    public static async Task<long> GetOpenTicketChannel(long user_id, string? categoryId = null)
     {
-        long channel_id = 0;
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query = $"SELECT tchannel_id FROM ticketcache where ticket_owner = '{user_id}'";
-        await using var cmd = con.CreateCommand(query);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (reader.Read()) channel_id = reader.GetInt64(0);
+        var sql = "SELECT c.tchannel_id FROM ticketcache c JOIN ticketstore s ON s.ticket_id = c.ticket_id " +
+                  "WHERE c.ticket_owner = @owner AND s.closed = false";
+        if (categoryId is not null) sql += " AND s.tickettype = @category";
+        sql += " ORDER BY s.opened_at DESC LIMIT 1";
 
-        await reader.CloseAsync();
-        return channel_id;
+        await using var cmd = con.CreateCommand(sql);
+        cmd.Parameters.AddWithValue("owner", user_id);
+        if (categoryId is not null) cmd.Parameters.AddWithValue("category", categoryId);
+        var result = await cmd.ExecuteScalarAsync();
+        return result is long channelId ? channelId : 0;
     }
 
     public static async Task Claim_UpdateHeaderComponents(ComponentInteractionCreateEventArgs interaction)
@@ -136,85 +150,91 @@ public class TicketManagerHelper
         return ticket_id;
     }
 
-    public static async Task InsertHeaderIntoTicket(CommandContext ctx, DiscordChannel tchannel, DiscordMember member)
+    /// <summary>
+    ///     Posts the ticket header and remembers its message id, so closing the ticket later edits the
+    ///     right message instead of guessing at the oldest one in the channel.
+    /// </summary>
+    public static async Task<DiscordMessage> InsertHeaderIntoTicket(DiscordChannel ticketChannel, string ticketId,
+        TicketCategory category, DiscordUser owner, string pingContent,
+        IReadOnlyList<TicketIntakeAnswer>? answers = null)
     {
-        var pingstring = $"{member.Mention} | {ctx.User.Mention}";
-        var ticket_channel = tchannel;
-        var prev_tickets = await GetTicketCountFromThisUser((long)ctx.User.Id);
         var eb = new DiscordEmbedBuilder()
-            .WithAuthor(member.GetFormattedUserName(), ctx.User.AvatarUrl)
+            .WithAuthor(owner.GetFormattedUserName(), owner.AvatarUrl)
             .WithColor(DiscordColor.Blurple)
-            .WithFooter(
-                $"Nutzer-ID: {member.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
-            .WithDescription("**Ticket-Typ: Support-Ticket**");
-        var mb = new DiscordMessageBuilder();
-        mb.WithContent(pingstring);
-        mb.AddEmbed(eb.Build());
-        var rowComponents = TicketComponents.GetTicketActionRow();
-        List<DiscordActionRowComponent> row =
-		[
-			new DiscordActionRowComponent(rowComponents)
-        ];
+            .WithFooter($"Nutzer-ID: {owner.Id} • Ticket-ID: {ticketId}")
+            .WithDescription($"**Ticket-Typ: {category.Label}**");
 
+        if (answers is not null)
+            foreach (var answer in answers)
+                eb.AddField(new DiscordEmbedField(answer.QuestionLabel.Truncate(256),
+                    string.IsNullOrWhiteSpace(answer.Answer) ? "-" : answer.Answer.Truncate(1024)));
+
+        var mb = new DiscordMessageBuilder();
+        mb.WithContent(pingContent);
+        mb.AddEmbed(eb.Build());
+        List<DiscordActionRowComponent> row =
+        [
+            new DiscordActionRowComponent(TicketComponents.GetTicketActionRow())
+        ];
         mb.AddComponents(row);
-        await ticket_channel.SendMessageAsync(mb);
+
+        var message = await ticketChannel.SendMessageAsync(mb);
+        await SetHeaderMessageAsync(ticketId, message.Id);
+        return message;
     }
 
-    public static async Task InsertHeaderIntoTicket(DiscordInteraction interaction, DiscordChannel tchannel,
-        TicketCreator ticketCreator, TicketType ticketType)
+    public static async Task SetHeaderMessageAsync(string ticketId, ulong messageId)
     {
-        var pingstring = $"{interaction.User.Mention} | <@&{BotConfig.GetConfig()["TicketConfig"]["TeamRoleId"]}>";
-        if (ticketType == TicketType.Report)
-        {
-            if (ticketCreator == TicketCreator.User)
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            con.CreateCommand("UPDATE ticketcache SET header_message_id = @message WHERE ticket_id = @ticket");
+        cmd.Parameters.AddWithValue("message", (long)messageId);
+        cmd.Parameters.AddWithValue("ticket", ticketId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    ///     The header message of a ticket. Tickets that were opened before the id was recorded fall back to
+    ///     the old guess, the oldest message in the most recent page.
+    /// </summary>
+    public static async Task<DiscordMessage?> GetHeaderMessageAsync(DiscordChannel channel)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            con.CreateCommand("SELECT header_message_id FROM ticketcache WHERE tchannel_id = @channel LIMIT 1");
+        cmd.Parameters.AddWithValue("channel", (long)channel.Id);
+        var stored = await cmd.ExecuteScalarAsync();
+
+        if (stored is long messageId && messageId > 0)
+            try
             {
-                var ticket_channel = tchannel;
-                var prev_tickets = await GetTicketCountFromThisUser((long)interaction.User.Id);
-                var eb = new DiscordEmbedBuilder()
-                    .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
-                    .WithColor(DiscordColor.Blurple)
-                    .WithFooter(
-                        $"Nutzer-ID: {interaction.User.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
-                    .WithDescription("**Ticket-Typ: Report-Ticket**");
-                var mb = new DiscordMessageBuilder();
-                mb.WithContent(pingstring);
-                mb.AddEmbed(eb.Build());
-                var rowComponents = TicketComponents.GetTicketActionRow();
-                List<DiscordActionRowComponent> row =
-				[
-					new DiscordActionRowComponent(rowComponents)
-                ];
-
-                mb.AddComponents(row);
-                await ticket_channel.SendMessageAsync(mb);
+                return await channel.GetMessageAsync((ulong)messageId);
             }
-        }
-        else if (ticketType == TicketType.Support)
-        {
-            if (ticketCreator == TicketCreator.User)
+            catch (Exception)
             {
-                var ticket_channel = tchannel;
-                var prev_tickets = await GetTicketCountFromThisUser((long)interaction.User.Id);
-
-                var eb = new DiscordEmbedBuilder()
-                    .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
-                    .WithColor(DiscordColor.Blurple)
-                    .WithFooter(
-                        $"Nutzer-ID: {interaction.User.Id} • Ticket-ID: {await GetTicketIdFromChannel(tchannel)}")
-                    .WithDescription("**Ticket-Typ: Support-Ticket**");
-                var mb = new DiscordMessageBuilder();
-                mb.WithContent(pingstring);
-                mb.AddEmbed(eb.Build());
-                var rowComponents = TicketComponents.GetTicketActionRow();
-                List<DiscordActionRowComponent> row =
-				[
-					new DiscordActionRowComponent(rowComponents)
-                ];
-
-                mb.AddComponents(row);
-                await ticket_channel.SendMessageAsync(mb);
+                // deleted or unreachable, fall through to the guess
             }
+
+        try
+        {
+            var messages = await channel.GetMessagesAsync();
+            return messages.LastOrDefault();
         }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Records that a human wrote in the ticket. Basis for the inactivity auto-close.</summary>
+    public static async Task TouchActivityAsync(ulong channelId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(
+            "UPDATE ticketcache SET last_activity = @now, reminder_sent_at = 0 WHERE tchannel_id = @channel");
+        cmd.Parameters.AddWithValue("now", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        cmd.Parameters.AddWithValue("channel", (long)channelId);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     private static string GenerateAdditionalNotes()
@@ -244,35 +264,23 @@ public class TicketManagerHelper
         await ticket_channel.SendMessageAsync(eb);
     }
 
-    public static async Task SendUserNotice(DiscordInteraction interaction, DiscordChannel ticket_channel,
-        TicketType ticketType)
+    public static async Task SendUserNotice(DiscordChannel ticketChannel, DiscordUser user, TicketCategory category)
     {
-        if (ticketType == TicketType.Report)
-        {
-            var eb = new DiscordEmbedBuilder()
-                .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
-                .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
-                .WithDescription(
-                    $"Hey! Danke fürs öffnen eines Report-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit.\n" +
-                    $"1. Um wen geht es (User-ID oder User-Name)\n" +
-                    $"2. Was ist vorgefallen (Bitte versuche die Situation so ausführlich wie möglich zu beschreiben)\n " +
-                    $"3. Hast du eventuelle Beweise? {GenerateAdditionalNotes()}");
-            await ticket_channel.SendMessageAsync(eb);
-        }
-        else if (ticketType == TicketType.Support)
-        {
-            var eb = new DiscordEmbedBuilder()
-                .WithAuthor(interaction.User.GetFormattedUserName(), interaction.User.AvatarUrl)
-                .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
-                .WithDescription(
-                    $"Hey! Danke fürs öffnen eines Support-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit. {GenerateAdditionalNotes()}");
-            await ticket_channel.SendMessageAsync(eb);
-        }
+        var text = string.IsNullOrWhiteSpace(category.WelcomeText)
+            ? "Hey! Danke fürs öffnen eines Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit. "
+            : category.WelcomeText;
+
+        var eb = new DiscordEmbedBuilder()
+            .WithAuthor(user.GetFormattedUserName(), user.AvatarUrl)
+            .WithColor(DiscordColor.Blurple).WithFooter("AGC-Support-System")
+            .WithDescription(text + GenerateAdditionalNotes());
+        await ticketChannel.SendMessageAsync(eb);
     }
 
     public static async Task DeleteTicket(ComponentInteractionCreateEventArgs interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -326,7 +334,8 @@ public class TicketManagerHelper
 
     public static async Task ClaimTicket(ComponentInteractionCreateEventArgs interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -419,7 +428,8 @@ public class TicketManagerHelper
     public static async Task AddUserToTicket(DiscordInteraction interaction, DiscordChannel ticket_channel,
         DiscordUser user, bool addedAfter = false)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler && addedAfter)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -477,7 +487,8 @@ public class TicketManagerHelper
 
     public static async Task GenerateTranscriptAndFlag(DiscordInteraction interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -500,6 +511,8 @@ public class TicketManagerHelper
 
     public static async Task TranscriptFlag_Callback(DiscordInteraction interaction, DiscordClient client)
     {
+        if (!await EnsureTeamAsync(interaction)) return;
+
         var users = interaction.Data.Values[0];
         var user = await interaction.Guild.GetMemberAsync(ulong.Parse(users));
         var channel = interaction.Channel;
@@ -585,7 +598,8 @@ public class TicketManagerHelper
 
     public static async Task GenerateTranscriptButton(DiscordInteraction interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -621,6 +635,8 @@ public class TicketManagerHelper
 
     public static async Task UserInfo_Callback(ComponentInteractionCreateEventArgs args)
     {
+        if (!await EnsureTeamAsync(args.Interaction)) return;
+
         var user = args.Interaction.Data.Values[0];
         var member = await args.Guild.GetMemberAsync(ulong.Parse(user));
         var joined_at = member.JoinedAt.Timestamp();
@@ -644,6 +660,47 @@ public class TicketManagerHelper
             .WithImageUrl(member.BannerUrl);
         var irb = new DiscordInteractionResponseBuilder().AddEmbed(eb).AsEphemeral();
         await args.Interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage, irb);
+    }
+
+    public static async Task<List<ulong>> GetTicketUserIdsAsync(DiscordChannel ticketChannel)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            con.CreateCommand("SELECT ticket_users FROM ticketcache WHERE tchannel_id = @channel LIMIT 1");
+        cmd.Parameters.AddWithValue("channel", (long)ticketChannel.Id);
+        var result = await cmd.ExecuteScalarAsync();
+        if (result is not long[] ids) return [];
+
+        return [.. ids.Select(id => (ulong)id)];
+    }
+
+    /// <summary>
+    ///     Drops a user from the ticket roster and takes their channel access away. The member may be null
+    ///     when they already left the guild, in which case only the roster is cleaned up.
+    /// </summary>
+    public static async Task RemoveUserFromTicketAsync(DiscordChannel ticketChannel, ulong userId,
+        DiscordMember? member)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using (var cmd = con.CreateCommand(
+                         "UPDATE ticketcache SET ticket_users = array_remove(ticket_users, @user) " +
+                         "WHERE tchannel_id = @channel"))
+        {
+            cmd.Parameters.AddWithValue("user", (long)userId);
+            cmd.Parameters.AddWithValue("channel", (long)ticketChannel.Id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        if (member is null) return;
+
+        try
+        {
+            await ticketChannel.AddOverwriteAsync(member);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Error while removing user from ticket");
+        }
     }
 
     public static async Task<List<DiscordUser>> GetTicketUsers(DiscordInteraction interaction)
@@ -720,88 +777,11 @@ public class TicketManagerHelper
         return ticket_users_discord;
     }
 
-    public static async Task RemoveUserFromTicket(CommandContext ctx, DiscordChannel ticket_channel,
-        DiscordUser user, bool noautomatic = false)
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query = $"SELECT ticket_id FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
-        await using var cmd = con.CreateCommand(query);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        var ticket_id = "";
-        while (reader.Read()) ticket_id = reader.GetString(0);
-
-        await reader.CloseAsync();
-        await using var cmd2 =
-            con.CreateCommand(
-                $"UPDATE ticketcache SET ticket_users = array_remove(ticket_users, '{(long)user.Id}') WHERE ticket_id = '{ticket_id}'");
-        await cmd2.ExecuteNonQueryAsync();
-        var channel = ticket_channel;
-        var member = await ctx.Guild.GetMemberAsync(user.Id);
-        await channel.AddOverwriteAsync(member);
-        if (noautomatic)
-        {
-            var afteraddembed = new DiscordEmbedBuilder
-            {
-                Title = "User entfernt",
-                Description = $"Der User {user.Mention} ``{member.Id}`` wurde vom Ticket entfernt!",
-                Color = DiscordColor.Red
-            };
-            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(afteraddembed));
-
-            var tr = await GenerateTranscript(ctx.Channel);
-
-            var userembed = new DiscordEmbedBuilder
-            {
-                Title = ticket_channel.Name,
-                Description = $"Du wurdest aus dem Ticket ``{ticket_channel.Name}`` entfernt!",
-                Color = DiscordColor.Green
-            };
-        }
-    }
-
-
-    public static async Task RemoveUserFromTicket(DiscordChannel ticket_channel,
-        DiscordUser user, DiscordClient client, bool noautomatic = false)
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var query = $"SELECT ticket_id FROM ticketcache where tchannel_id = '{(long)ticket_channel.Id}'";
-        await using var cmd = con.CreateCommand(query);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        var ticket_id = "";
-        while (reader.Read()) ticket_id = reader.GetString(0);
-
-        await reader.CloseAsync();
-        await using var cmd2 =
-            con.CreateCommand(
-                $"UPDATE ticketcache SET ticket_users = array_remove(ticket_users, '{(long)user.Id}') WHERE ticket_id = '{ticket_id}'");
-        await cmd2.ExecuteNonQueryAsync();
-        var channel = ticket_channel;
-        var member = await client.GetUserAsync(user.Id);
-        if (noautomatic)
-        {
-            var afteraddembed = new DiscordEmbedBuilder
-            {
-                Title = "User entfernt",
-                Description = $"Der User {user.Mention} ``{member.Id}`` wurde vom Ticket entfernt!",
-                Color = DiscordColor.Red
-            };
-            await ticket_channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(afteraddembed));
-
-            var tr = await GenerateTranscript(ticket_channel);
-
-            var userembed = new DiscordEmbedBuilder
-            {
-                Title = ticket_channel.Name,
-                Description = $"Du wurdest aus dem Ticket ``{ticket_channel.Name}`` entfernt!",
-                Color = DiscordColor.Green
-            };
-        }
-    }
-
     public static async Task RemoveUserFromTicket(DiscordInteraction interaction, DiscordChannel ticket_channel,
         DiscordUser user, bool noautomatic = false)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -919,7 +899,8 @@ public class TicketManagerHelper
 
     public static async Task AddUserToTicketSelector(DiscordInteraction interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -944,7 +925,8 @@ public class TicketManagerHelper
 
     public static async Task RemoveUserFromTicketSelector(DiscordInteraction interaction)
     {
-        var teamler = TeamChecker.IsSupporter(await interaction.User.ConvertToMember(interaction.Guild));
+        var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),
+            interaction.Channel);
         if (!teamler)
         {
             await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
@@ -969,6 +951,8 @@ public class TicketManagerHelper
 
     public static async Task AddUserToTicketSelector_Callback(ComponentInteractionCreateEventArgs interaction)
     {
+        if (!await EnsureTeamAsync(interaction.Interaction)) return;
+
         var values = interaction.Interaction.Data.Values;
         var user = values[0];
         var member = await interaction.Guild.GetMemberAsync(ulong.Parse(user));
@@ -991,6 +975,8 @@ public class TicketManagerHelper
 
     public static async Task RemoveUserFromTicketSelector_Callback(ComponentInteractionCreateEventArgs interaction)
     {
+        if (!await EnsureTeamAsync(interaction.Interaction)) return;
+
         var values = interaction.Interaction.Data.Values;
         var user = values[0];
         var member = await interaction.Guild.GetMemberAsync(ulong.Parse(user));

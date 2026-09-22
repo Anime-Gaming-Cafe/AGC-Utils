@@ -1,8 +1,11 @@
-﻿#region
+#region
 
 using AGC_Management.Components;
-using AGC_Management.Enums;
+using AGC_Management.Entities.Ticket;
 using AGC_Management.Managers;
+using AGC_Management.Services;
+using AGC_Management.Utils;
+using DisCatSharp.Interactivity.Extensions;
 
 #endregion
 
@@ -14,25 +17,8 @@ public class SupportPanel : BaseCommandModule
     [RequireGuildOwner]
     public async Task InitSupportPanel(CommandContext ctx)
     {
-        var embed = new DiscordEmbedBuilder().WithTitle("AGC Support-System").WithDescription("""
-                __Benötigst du Hilfe oder Support? Mach ein Ticket auf.__
-
-                > Wann sollte ich ein Ticket öffnen?
-                Wenn du irgendwelche Fragen hast oder irgendetwas unklar ist, du jemanden wegen Regelverstoß der Server Regeln oder der Discord Richtlinen melden möchtest!
-
-                > Wie öffne ich ein Ticket?
-                Wenn du ein Ticket öffnen willst, klicke unten auf "Ticket öffnen" und wähle danach eine der Kategorien aus, um was es geht. Danach wird ein Ticket mit dir erstellt und du kannst dein Anliegen schlidern.
-                """).WithColor(BotConfig.GetEmbedColor())
-            .WithFooter("Troll und absichtlicher Abuse ist zu unterlassen!")
-            .Build();
-
-        List<DiscordButtonComponent> buttons =
-		[
-			new DiscordButtonComponent(ButtonStyle.Danger, "selectticketcategory", "Ticket öffnen ✉️")
-        ];
-        DiscordMessageBuilder msgb = new();
-        msgb.AddEmbed(embed).AddComponents(buttons);
-        var msg = await ctx.Channel.SendMessageAsync(msgb);
+        var embed = await SupportComponents.BuildPanelEmbedAsync();
+        var msg = await ctx.Channel.SendMessageAsync(SupportComponents.BuildPanelMessage(embed));
         BotConfig.SetConfig("TicketConfig", "SupportPanelMessage", msg.Id.ToString());
         BotConfig.SetConfig("TicketConfig", "SupportPanelChannel", ctx.Channel.Id.ToString());
         BotConfig.SetConfig("TicketConfig", "SupportGuild", ctx.Guild.Id.ToString());
@@ -47,37 +33,125 @@ public class SupportPanelListener : SupportPanel
     {
         _ = Task.Run(async () =>
         {
-            var PanelChannelId = ulong.Parse(BotConfig.GetConfig()["TicketConfig"]["SupportPanelChannel"]);
-            if (e.Channel.Id == PanelChannelId && e.Interaction.Data.CustomId == "selectticketcategory")
+            var customId = e.Interaction.Data.CustomId;
+
+            if (customId == SupportComponents.OpenPanelButtonId)
             {
-                List<DiscordButtonComponent> buttons = [];
+                if (!IsPanelChannel(e.Channel.Id)) return;
 
-                var sup_cats = await SupportComponents.GetSupportCategories();
-                foreach (var cat in sup_cats)
-                    buttons.Add(new DiscordButtonComponent(ButtonStyle.Primary, label: $"{cat.Value}",
-                        customId: $"ticket_open_{cat.Key}"));
-
-                DiscordEmbed embed = new DiscordEmbedBuilder()
-                    .WithTitle("Wähle eine Supportkategorie aus")
-                    .WithFooter("Wähle bitte die korrekte zu deinem Anliegen zutreffende Kategorie aus!")
-                    .WithDescription(
-                        "Wähle unten eine Supportkategorie aus. Dies hilft uns dein Ticket schneller zuzuordnen. \n" +
-                        "Nach Auswahl der Kategorie wird ein Ticket erstellt, bitte schlildere anschließend im Ticket dein Anliegen.\n\n" +
-                        "> Report / Melden \n" +
-                        "Hier kannst du einen Benutzer melden der gegen Regeln verstößt oder anderweitig auffällt. \n\n" +
-                        "> Support \n" +
-                        "Hier kannst du dich bei generellen Anliegen melden").WithColor(BotConfig.GetEmbedColor());
-
-                var ib = new DiscordInteractionResponseBuilder().AsEphemeral().AddComponents(buttons).AddEmbed(embed);
-                await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, ib);
+                await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                    await SupportComponents.BuildPickerAsync());
+                return;
             }
 
-            if (e.Interaction.Data.CustomId == "ticket_open_report")
-                await TicketManager.OpenTicket(e.Interaction, TicketType.Report, client, TicketCreator.User);
-            else if (e.Interaction.Data.CustomId == "ticket_open_support")
-                await TicketManager.OpenTicket(e.Interaction, TicketType.Support, client, TicketCreator.User);
+            if (customId == SupportComponents.CategorySelectId)
+            {
+                var chosen = e.Interaction.Data.Values.FirstOrDefault();
+                await StartTicketAsync(e.Interaction, client, await TicketCategoryService.GetAsync(chosen));
+                return;
+            }
 
-            return Task.CompletedTask;
+            // Panel messages posted before the picker became a select menu still send one button per
+            // category, so those ids keep working instead of going dead on deploy.
+            if (customId.StartsWith(SupportComponents.LegacyOpenPrefix))
+            {
+                var chosen = customId[SupportComponents.LegacyOpenPrefix.Length..];
+                await StartTicketAsync(e.Interaction, client, await TicketCategoryService.GetAsync(chosen));
+            }
         });
+    }
+
+    private static bool IsPanelChannel(ulong channelId)
+    {
+        try
+        {
+            return ulong.Parse(BotConfig.GetConfig()["TicketConfig"]["SupportPanelChannel"]) == channelId;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static async Task StartTicketAsync(DiscordInteraction interaction, DiscordClient client,
+        TicketCategory? category)
+    {
+        if (category is null || !category.Enabled)
+        {
+            await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder()
+                    .AddEmbed(EmbedGenerator.GetErrorEmbed("Diese Kategorie ist nicht mehr verfügbar."))
+                    .AsEphemeral());
+            return;
+        }
+
+        var questions = category.Questions.OrderBy(q => q.Position)
+            .Take(TicketCategoryQuestion.MaxPerCategory).ToList();
+
+        if (!category.IntakeEnabled || questions.Count == 0)
+        {
+            await TicketManager.OpenTicketAsync(interaction, category);
+            return;
+        }
+
+        // A modal has to be the very first response to an interaction, so the limit is checked before
+        // the form opens instead of after it was filled in.
+        var blocking = await TicketManager.FindBlockingTicketAsync(interaction.User.Id, category);
+        if (blocking is not null)
+        {
+            var eb = new DiscordEmbedBuilder
+            {
+                Title = "Fehler | Bereits ein Ticket geöffnet!",
+                Description = $"Du hast bereits ein geöffnetes Ticket! -> <#{blocking}>",
+                Color = DiscordColor.Red
+            };
+            var link = new DiscordLinkButtonComponent(
+                $"https://discord.com/channels/{interaction.Guild.Id}/{blocking}", "Zum Ticket");
+            await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+                new DiscordInteractionResponseBuilder().AddEmbed(eb).AddComponents(link).AsEphemeral());
+            return;
+        }
+
+        var modalId = $"ticket_intake-{category.CustomId}-{TicketManagerHelper.GenerateTicketID(4)}";
+        var modal = new DiscordInteractionModalBuilder();
+        modal.WithTitle($"Ticket: {category.Label}".Truncate(45));
+        modal.CustomId = modalId;
+
+        foreach (var question in questions)
+        {
+            var maxLength = question.MaxLength > 0 ? question.MaxLength : question.IsLong ? 1000 : 200;
+            var minLength = question.Required ? Math.Max(1, question.MinLength) : question.MinLength;
+            modal.AddLabelComponent(new DiscordLabelComponent(question.Label.Truncate(45),
+                component: new DiscordTextInputComponent(
+                    question.IsLong ? TextComponentStyle.Paragraph : TextComponentStyle.Small,
+                    placeholder: question.Placeholder.Truncate(100),
+                    minLength: minLength,
+                    maxLength: maxLength,
+                    required: question.Required)));
+        }
+
+        await interaction.CreateInteractionModalResponseAsync(modal);
+
+        var result = await client.GetInteractivity().WaitForModalAsync(modalId, TimeSpan.FromMinutes(10));
+        if (result.TimedOut) return;
+
+        var modalInteraction = result.Result.Interaction;
+        await modalInteraction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().AsEphemeral());
+
+        var values = modalInteraction.Data.ModalComponents
+            .OfType<DiscordLabelComponent>()
+            .Select(label => (label.Component as DiscordTextInputComponent)?.Value ?? "")
+            .ToList();
+
+        var answers = questions.Select((question, index) => new TicketIntakeAnswer
+        {
+            QuestionId = question.Id,
+            QuestionLabel = question.Label,
+            Answer = index < values.Count ? values[index] : "",
+            Position = index
+        }).ToList();
+
+        await TicketManager.OpenTicketAsync(modalInteraction, category, answers, true);
     }
 }

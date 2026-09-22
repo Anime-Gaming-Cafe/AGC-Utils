@@ -2,6 +2,7 @@
 
 using AGC_Management.Enums;
 using AGC_Management.Managers;
+using AGC_Management.Services;
 using AGC_Management.Utils;
 
 #endregion
@@ -11,8 +12,6 @@ namespace AGC_Management.Eventlistener;
 [EventHandler]
 public class NotificationMessageListener : BaseCommandModule
 {
-    private static readonly long catid = long.Parse(BotConfig.GetConfig()["TicketConfig"]["SupportCategoryId"]);
-
     [Event]
     public static async Task MessageCreated(DiscordClient client, MessageCreateEventArgs e)
     {
@@ -24,12 +23,18 @@ public class NotificationMessageListener : BaseCommandModule
 
             if (e.Message.Channel.Parent == null) return;
 
-            if ((long)e.Message.Channel.Parent.Id != catid) return;
+            // Categories may live in their own Discord category, so the parent is checked against all of
+            // them instead of the single configured support category.
+            var ticketParents = await TicketCategoryService.GetTicketParentIdsAsync();
+            if (!ticketParents.Contains(e.Message.Channel.Parent.Id)) return;
 
             var openticket = await TicketManagerHelper.IsOpenTicket(e.Message.Channel);
             if (!openticket) return;
 
-            if (TeamChecker.IsSupporter(await e.Message.Author.ConvertToMember(e.Message.Guild))) return;
+            await TicketManagerHelper.TouchActivityAsync(e.Message.Channel.Id);
+
+            var author = await e.Message.Author.ConvertToMember(e.Message.Guild);
+            if (await TicketAccess.MayHandleAsync(author, e.Message.Channel)) return;
 
             var subscribedStaffs = await NotificationManager.GetSubscribedStaffs(e.Channel);
             foreach (var staff in subscribedStaffs)

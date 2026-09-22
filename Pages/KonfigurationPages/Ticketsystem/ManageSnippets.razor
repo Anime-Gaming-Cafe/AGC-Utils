@@ -1,0 +1,273 @@
+@page "/konfiguration/ticketsystem/snippets"
+@using AGC_Management.Helper
+@using AGC_Management.Services
+@inject ToastService ToastService
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Snippets"
+            Lead="Vorgefertigte Antworten. Das Team schickt sie im Ticket über den Knopf Snippet senden oder indem es das Kürzel als Nachricht schreibt."
+            BackHref="/konfiguration/ticketsystem" BackText="Ticketsystem"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Snippets werden geladen"
+                Description="Die gespeicherten Textbausteine werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Neues Snippet">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="sn-new-id">Kürzel</label>
+                <input id="sn-new-id" class="form-control" maxlength="80" placeholder="wartezeit"
+                       @bind="newId"/>
+                <span class="field__hint">Genau dieses Wort tippt ein Teammitglied im Ticket, um den Text zu senden.</span>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="sn-new-text">Text</label>
+                <textarea id="sn-new-text" class="form-control" rows="4" @bind="newText"></textarea>
+                <span class="field__hint">@VariableHint</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="Create">Snippet anlegen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="@($"{snippets.Count} Snippets")" Flush="@(Filtered.Count > 0)">
+        @if (snippets.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Snippets"
+                        Description="Sobald du oben eines anlegst, steht es dem Team im Ticket zur Verfügung."/>
+        }
+        else
+        {
+            <div class="field">
+                <label class="field__label" for="sn-filter">Suchen</label>
+                <input id="sn-filter" class="form-control" placeholder="Kürzel oder Textstelle"
+                       @bind="filter" @bind:event="oninput"/>
+            </div>
+
+            @if (Filtered.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Kein Treffer"
+                            Description="@($"Keines der {snippets.Count} Snippets enthält \"{filter}\". Lösche den Suchbegriff, um wieder alle zu sehen.")"/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var snippet in Filtered)
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title mono">@snippet.Id</p>
+                                <p class="rows__text">@Preview(snippet.Text)</p>
+                            </div>
+                            <div class="rows__side">
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                        @onclick="() => Toggle(snippet)">
+                                    @(editing == snippet.Id ? "Schließen" : "Bearbeiten")
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        @onclick="() => pendingDelete = snippet.Id">Löschen
+                                </button>
+                            </div>
+
+                            @if (pendingDelete == snippet.Id)
+                            {
+                                <div class="rows__detail">
+                                    <ConfirmInline Title="@($"Snippet {snippet.Id} löschen?")"
+                                                   ConfirmText="Endgültig löschen"
+                                                   Busy="busy"
+                                                   OnConfirm="() => Delete(snippet)"
+                                                   OnCancel="() => pendingDelete = null">
+                                        <p>Das Team kann diesen Text danach nicht mehr im Ticket abrufen.</p>
+                                    </ConfirmInline>
+                                </div>
+                            }
+                            else if (editing == snippet.Id)
+                            {
+                                <div class="rows__detail">
+                                    <div class="field-grid">
+                                        <div class="field">
+                                            <label class="field__label" for="sn-id-@snippet.Id">Kürzel</label>
+                                            <input id="sn-id-@snippet.Id" class="form-control" maxlength="80"
+                                                   @bind="editId"/>
+                                            <span class="field__hint">Ändern heißt: das Team tippt ab sofort das neue Wort.</span>
+                                        </div>
+                                        <div class="field field--wide">
+                                            <label class="field__label" for="sn-text-@snippet.Id">Text</label>
+                                            <textarea id="sn-text-@snippet.Id" class="form-control" rows="6"
+                                                      @bind="editText"></textarea>
+                                            <span class="field__hint">@VariableHint</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-foot">
+                                        <button type="button" class="btn btn-primary" disabled="@busy"
+                                                @onclick="() => Save(snippet)">Speichern
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </Panel>
+}
+
+@code {
+    private const string VariableHint =
+        "{unixtimestamp} wird beim Senden durch die aktuelle Zeit ersetzt, {unixtimestamp+3600} durch die Zeit in einer Stunde. In Discord daraus einen Zeitstempel machen: <t:{unixtimestamp+3600}:R>";
+
+    private record Snippet(string Id, string Text);
+
+    private bool loaded;
+    private bool busy;
+
+    private List<Snippet> snippets = [];
+    private string filter = "";
+
+    private string? editing;
+    private string editId = "";
+    private string editText = "";
+
+    private string? pendingDelete;
+
+    private string newId = "";
+    private string newText = "";
+
+    private List<Snippet> Filtered =>
+        string.IsNullOrWhiteSpace(filter)
+            ? snippets
+            : [.. snippets.Where(s => s.Id.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                                      || s.Text.Contains(filter, StringComparison.OrdinalIgnoreCase))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        var raw = await SnippetManagerHelper.GetAllSnippetsAsync();
+        snippets = [.. raw.Select(s => new Snippet(s.snipId, s.snippedText)).OrderBy(s => s.Id)];
+    }
+
+    private static string Preview(string text)
+    {
+        var single = text.ReplaceLineEndings(" ").Trim();
+        return single.Length <= 120 ? single : single[..120] + "...";
+    }
+
+    private void Toggle(Snippet snippet)
+    {
+        pendingDelete = null;
+
+        if (editing == snippet.Id)
+        {
+            editing = null;
+            return;
+        }
+
+        editing = snippet.Id;
+        editId = snippet.Id;
+        editText = snippet.Text;
+    }
+
+    private async Task Create()
+    {
+        var id = (newId ?? "").Trim();
+        var text = newText ?? "";
+
+        if (id.Length == 0 || text.Trim().Length == 0)
+        {
+            ToastService.Notify("Kürzel und Text werden beide gebraucht.", "bad");
+            return;
+        }
+
+        if (id.Any(char.IsWhiteSpace))
+        {
+            ToastService.Notify("Das Kürzel darf keine Leerzeichen enthalten, es wird als ganze Nachricht getippt.",
+                "bad");
+            return;
+        }
+
+        busy = true;
+        var created = await SnippetManagerHelper.CreateAsync(id, text);
+        busy = false;
+
+        if (!created)
+        {
+            ToastService.Notify($"Das Kürzel {id} ist schon vergeben.", "bad");
+            return;
+        }
+
+        newId = "";
+        newText = "";
+        await LoadAsync();
+        ToastService.Notify($"Snippet {id} angelegt.", "ok");
+    }
+
+    private async Task Save(Snippet snippet)
+    {
+        var id = (editId ?? "").Trim();
+        var text = editText ?? "";
+
+        if (id.Length == 0 || text.Trim().Length == 0)
+        {
+            ToastService.Notify("Kürzel und Text werden beide gebraucht.", "bad");
+            return;
+        }
+
+        if (id.Any(char.IsWhiteSpace))
+        {
+            ToastService.Notify("Das Kürzel darf keine Leerzeichen enthalten.", "bad");
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            if (!await SnippetManagerHelper.UpdateTextAsync(snippet.Id, text))
+            {
+                ToastService.Notify("Das Snippet gibt es nicht mehr. Die Liste wurde neu geladen.", "bad");
+                await LoadAsync();
+                editing = null;
+                return;
+            }
+
+            if (id != snippet.Id && !await SnippetManagerHelper.RenameAsync(snippet.Id, id))
+            {
+                ToastService.Notify($"Der Text wurde gespeichert, aber das Kürzel {id} ist schon vergeben.", "warn");
+                await LoadAsync();
+                return;
+            }
+        }
+        finally
+        {
+            busy = false;
+        }
+
+        editing = null;
+        await LoadAsync();
+        ToastService.Notify($"Snippet {id} gespeichert.", "ok");
+    }
+
+    private async Task Delete(Snippet snippet)
+    {
+        busy = true;
+        var removed = await SnippetManagerHelper.DeleteAsync(snippet.Id);
+        busy = false;
+
+        pendingDelete = null;
+        if (editing == snippet.Id) editing = null;
+
+        await LoadAsync();
+        ToastService.Notify(removed ? $"Snippet {snippet.Id} gelöscht." : "Das Snippet gab es nicht mehr.",
+            removed ? "ok" : "warn");
+    }
+}

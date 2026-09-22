@@ -45,7 +45,9 @@ public class TicketCommands : BaseCommandModule
     [TicketRequireStaffRole]
     public async Task ContactUser(CommandContext ctx, DiscordMember member)
     {
-        var ticket_channel = await TicketManager.OpenTicket(ctx, TicketType.Support, TicketCreator.Staff, member);
+        var ticket_channel = await TicketManager.OpenTicket(ctx, TicketCreator.Staff, member);
+        if (ticket_channel is null) return;
+
         var eb = new DiscordEmbedBuilder().WithColor(DiscordColor.Green).WithTitle(ctx.Guild.Name)
             .WithDescription($"Du wurdest von {ctx.Member.Mention} kontaktiert! -> {ticket_channel.Mention}").Build();
         var channellink = $"https://discord.com/channels/{ctx.Guild.Id}/{ticket_channel.Id}";

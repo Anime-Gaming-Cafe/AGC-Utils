@@ -424,6 +424,61 @@ public static class DatabaseService
             {
                 "idx_activity_announcement_group_rules_alias",
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_announcement_group_rules_alias ON activity_announcement_group_rules (group_id, alias)"
+            },
+            // The ticket tables predate the schema code, so the live database already has
+            // ticketstore, ticketcache, ticketcategories and snippets. They are declared here for
+            // fresh installs; UpdateTables carries the matching ALTER ... IF EXISTS entries.
+            {
+                "ticketstore",
+                "CREATE TABLE IF NOT EXISTS ticketstore (ticket_id TEXT, ticket_owner BIGINT, tickettype TEXT, closed BOOLEAN DEFAULT false, opened_at BIGINT DEFAULT 0, closed_at BIGINT DEFAULT 0, user_transscript_url TEXT, team_transscript_url TEXT)"
+            },
+            {
+                "ticketcache",
+                "CREATE TABLE IF NOT EXISTS ticketcache (ticket_id TEXT, ticket_owner BIGINT, tchannel_id BIGINT, claimed BOOLEAN DEFAULT false, claimed_from BIGINT, ticket_users BIGINT[] DEFAULT '{}', last_activity BIGINT DEFAULT 0, reminder_sent_at BIGINT DEFAULT 0, header_message_id BIGINT DEFAULT 0)"
+            },
+            {
+                "ticketcategories",
+                "CREATE TABLE IF NOT EXISTS ticketcategories (custom_id TEXT, category_text TEXT, description TEXT, emoji TEXT, channel_prefix TEXT, discord_category_id BIGINT DEFAULT 0, handler_role_ids BIGINT[] DEFAULT '{}', ping_role_ids BIGINT[] DEFAULT '{}', welcome_text TEXT, intake_enabled BOOLEAN DEFAULT false, max_open_per_user INTEGER DEFAULT 1, autoclose_enabled BOOLEAN DEFAULT false, autoclose_reminder_hours INTEGER DEFAULT 0, autoclose_hours INTEGER DEFAULT 0, sort_order INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true)"
+            },
+            {
+                "snippets",
+                "CREATE TABLE IF NOT EXISTS snippets (snip_id TEXT, snipped_text TEXT)"
+            },
+            {
+                "subscriptions",
+                "CREATE TABLE IF NOT EXISTS subscriptions (user_id BIGINT, channel_id BIGINT, mode INTEGER DEFAULT 0)"
+            },
+            {
+                "ticket_category_questions",
+                "CREATE TABLE IF NOT EXISTS ticket_category_questions (id TEXT, category_id TEXT, position INTEGER DEFAULT 0, label TEXT, placeholder TEXT, style TEXT DEFAULT 'short', required BOOLEAN DEFAULT true, min_length INTEGER DEFAULT 0, max_length INTEGER DEFAULT 0)"
+            },
+            {
+                "ticket_intake_answers",
+                "CREATE TABLE IF NOT EXISTS ticket_intake_answers (ticket_id TEXT, question_id TEXT, question_label TEXT, answer TEXT, position INTEGER DEFAULT 0)"
+            },
+            {
+                "ticket_events",
+                "CREATE TABLE IF NOT EXISTS ticket_events (ticket_id TEXT, event_type TEXT, actor_id BIGINT DEFAULT 0, data TEXT, timestamp BIGINT DEFAULT 0)"
+            },
+            {
+                "ticket_counters",
+                "CREATE TABLE IF NOT EXISTS ticket_counters (category_id TEXT, next_number BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_ticket_counters_category",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ticket_counters_category ON ticket_counters (category_id)"
+            },
+            {
+                "idx_ticket_category_questions_category",
+                "CREATE INDEX IF NOT EXISTS idx_ticket_category_questions_category ON ticket_category_questions (category_id)"
+            },
+            {
+                "idx_ticket_intake_answers_ticket",
+                "CREATE INDEX IF NOT EXISTS idx_ticket_intake_answers_ticket ON ticket_intake_answers (ticket_id)"
+            },
+            {
+                "idx_ticket_events_ticket",
+                "CREATE INDEX IF NOT EXISTS idx_ticket_events_ticket ON ticket_events (ticket_id)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1234,7 +1289,8 @@ public static class DatabaseService
                 }
             },
             {
-                // The ticket tables predate the schema code and are not created here, hence IF EXISTS.
+                // The ticket tables predate the schema code, so a live database already has them and
+                // the CREATE TABLE entries only cover fresh installs. Hence IF EXISTS here.
                 "ticketstore", new Dictionary<string, string>
                 {
                     {
@@ -1244,6 +1300,84 @@ public static class DatabaseService
                     {
                         "closed_at",
                         "ALTER TABLE IF EXISTS ticketstore ADD COLUMN IF NOT EXISTS closed_at BIGINT DEFAULT 0"
+                    }
+                }
+            },
+            {
+                "ticketcache", new Dictionary<string, string>
+                {
+                    {
+                        "last_activity",
+                        "ALTER TABLE IF EXISTS ticketcache ADD COLUMN IF NOT EXISTS last_activity BIGINT DEFAULT 0"
+                    },
+                    {
+                        "reminder_sent_at",
+                        "ALTER TABLE IF EXISTS ticketcache ADD COLUMN IF NOT EXISTS reminder_sent_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "header_message_id",
+                        "ALTER TABLE IF EXISTS ticketcache ADD COLUMN IF NOT EXISTS header_message_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        // Tickets that were already open when this shipped have no recorded activity.
+                        // Leaving them at 0 would read as "inactive since 1970" to the auto-close task.
+                        "last_activity_backfill",
+                        "UPDATE ticketcache SET last_activity = EXTRACT(EPOCH FROM now())::BIGINT WHERE last_activity IS NULL OR last_activity = 0"
+                    }
+                }
+            },
+            {
+                "ticketcategories", new Dictionary<string, string>
+                {
+                    { "description", "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS description TEXT" },
+                    { "emoji", "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS emoji TEXT" },
+                    {
+                        "channel_prefix",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS channel_prefix TEXT"
+                    },
+                    {
+                        "discord_category_id",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS discord_category_id BIGINT DEFAULT 0"
+                    },
+                    {
+                        "handler_role_ids",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS handler_role_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "ping_role_ids",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS ping_role_ids BIGINT[] DEFAULT '{}'"
+                    },
+                    {
+                        "welcome_text",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS welcome_text TEXT"
+                    },
+                    {
+                        "intake_enabled",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS intake_enabled BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "max_open_per_user",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS max_open_per_user INTEGER DEFAULT 1"
+                    },
+                    {
+                        "autoclose_enabled",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS autoclose_enabled BOOLEAN DEFAULT false"
+                    },
+                    {
+                        "autoclose_reminder_hours",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS autoclose_reminder_hours INTEGER DEFAULT 0"
+                    },
+                    {
+                        "autoclose_hours",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS autoclose_hours INTEGER DEFAULT 0"
+                    },
+                    {
+                        "sort_order",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0"
+                    },
+                    {
+                        "enabled",
+                        "ALTER TABLE IF EXISTS ticketcategories ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true"
                     }
                 }
             },
@@ -1575,6 +1709,7 @@ public static class DatabaseService
         await InitLeveling();
         await InitBotSettings();
         await InitBanRequestStages();
+        await InitTicketCategories();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -1583,6 +1718,23 @@ public static class DatabaseService
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var defaults = new (string section, string key, string value)[]
         {
+            ("Tickets", "PanelTitle", "AGC Support-System"),
+            ("Tickets", "PanelDescription",
+                "__Benötigst du Hilfe oder Support? Mach ein Ticket auf.__\n\n" +
+                "> Wann sollte ich ein Ticket öffnen?\n" +
+                "Wenn du irgendwelche Fragen hast oder irgendetwas unklar ist, du jemanden wegen Regelverstoß der Server Regeln oder der Discord Richtlinen melden möchtest!\n\n" +
+                "> Wie öffne ich ein Ticket?\n" +
+                "Wenn du ein Ticket öffnen willst, klicke unten auf \"Ticket öffnen\" und wähle danach eine der Kategorien aus, um was es geht. Danach wird ein Ticket mit dir erstellt und du kannst dein Anliegen schlidern."),
+            ("Tickets", "PanelFooter", "Troll und absichtlicher Abuse ist zu unterlassen!"),
+            ("Tickets", "PickerTitle", "Wähle eine Supportkategorie aus"),
+            ("Tickets", "PickerDescription",
+                "Wähle unten eine Supportkategorie aus. Dies hilft uns dein Ticket schneller zuzuordnen.\n" +
+                "Nach Auswahl der Kategorie wird ein Ticket erstellt, bitte schlildere anschließend im Ticket dein Anliegen."),
+            ("Tickets", "AutoCloseEnabled", "false"),
+            ("Tickets", "GlobalAccessRoleIds", TicketTeamRoleIdOrZero()),
+            // One open ticket per user is what the system did before categories existed. A per
+            // category limit alone would silently turn that into one per category.
+            ("Tickets", "MaxOpenPerUserTotal", "1"),
             ("AntiRaid", "DateKickActive", "false"),
             ("AntiRaid", "DateKickDays", "14"),
             ("BoosterColors", "Enabled", "false"),
@@ -1665,6 +1817,171 @@ public static class DatabaseService
             cmd.Parameters.AddWithValue("delay_minutes", delay);
             cmd.Parameters.AddWithValue("target", target);
             cmd.Parameters.AddWithValue("role_id", roleId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static string TicketTeamRoleIdOrZero()
+    {
+        var roleId = TicketConfigId("TeamRoleId");
+        return roleId > 0 ? roleId.ToString() : "0";
+    }
+
+    private static long TicketConfigId(string key)
+    {
+        try
+        {
+            return long.TryParse(BotConfig.GetConfig()["TicketConfig"][key], out var id) ? id : 0;
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    ///     Brings the category table up to the shape the ticket system now expects. Idempotent: it only
+    ///     fills in what is missing, so a database that predates categories keeps behaving exactly as
+    ///     before until someone changes something in the dashboard.
+    /// </summary>
+    private static async Task InitTicketCategories()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var teamRoleId = TicketConfigId("TeamRoleId");
+        var supportCategoryId = TicketConfigId("SupportCategoryId");
+        long[] roles = teamRoleId > 0 ? [teamRoleId] : [];
+
+        const string supportWelcome =
+            "Hey! Danke fürs öffnen eines Support-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit. ";
+        const string reportWelcome =
+            "Hey! Danke fürs öffnen eines Report-Tickets. Ein Teammitglied wird sich gleich um dein Anliegen kümmern. Bitte teile uns in der Zeit alle nötigen Infos mit.\n" +
+            "1. Um wen geht es (User-ID oder User-Name)\n" +
+            "2. Was ist vorgefallen (Bitte versuche die Situation so ausführlich wie möglich zu beschreiben)\n " +
+            "3. Hast du eventuelle Beweise? ";
+
+        var seeds = new (string CustomId, string Label, string Description, string Welcome, int SortOrder)[]
+        {
+            ("report", "Report / Melden",
+                "Hier kannst du einen Benutzer melden der gegen Regeln verstößt oder anderweitig auffällt.",
+                reportWelcome, 0),
+            ("support", "Support", "Hier kannst du dich bei generellen Anliegen melden", supportWelcome, 1)
+        };
+
+        foreach (var seed in seeds)
+        {
+            await using var insert = con.CreateCommand(
+                "INSERT INTO ticketcategories (custom_id, category_text, description, channel_prefix, welcome_text, " +
+                "discord_category_id, handler_role_ids, ping_role_ids, max_open_per_user, sort_order, enabled) " +
+                "SELECT @id, @label, @description, @id, @welcome, @category, @roles, @roles, 1, @sort, true " +
+                "WHERE NOT EXISTS (SELECT 1 FROM ticketcategories WHERE custom_id = @id)");
+            insert.Parameters.AddWithValue("id", seed.CustomId);
+            insert.Parameters.AddWithValue("label", seed.Label);
+            insert.Parameters.AddWithValue("description", seed.Description);
+            insert.Parameters.AddWithValue("welcome", seed.Welcome);
+            insert.Parameters.AddWithValue("category", supportCategoryId);
+            insert.Parameters.AddWithValue("roles", roles);
+            insert.Parameters.AddWithValue("sort", seed.SortOrder);
+            await insert.ExecuteNonQueryAsync();
+
+            await using var fill = con.CreateCommand(
+                "UPDATE ticketcategories SET " +
+                "description = COALESCE(NULLIF(description, ''), @description), " +
+                "welcome_text = COALESCE(NULLIF(welcome_text, ''), @welcome) " +
+                "WHERE custom_id = @id");
+            fill.Parameters.AddWithValue("id", seed.CustomId);
+            fill.Parameters.AddWithValue("description", seed.Description);
+            fill.Parameters.AddWithValue("welcome", seed.Welcome);
+            await fill.ExecuteNonQueryAsync();
+        }
+
+        // Rows that predate this release and are neither support nor report were dead buttons before:
+        // the panel rendered them, the handler matched nothing. Filling them in would quietly turn them
+        // into working categories, so they start disabled and an admin decides. channel_prefix is NULL
+        // exactly for rows this code has never touched.
+        await using (var quarantine = con.CreateCommand(
+                         "UPDATE ticketcategories SET enabled = false " +
+                         "WHERE channel_prefix IS NULL AND custom_id NOT IN ('support', 'report')"))
+        {
+            await quarantine.ExecuteNonQueryAsync();
+        }
+
+        await using (var backfill = con.CreateCommand(
+                         "UPDATE ticketcategories SET " +
+                         "channel_prefix = COALESCE(NULLIF(channel_prefix, ''), custom_id), " +
+                         "discord_category_id = CASE WHEN COALESCE(discord_category_id, 0) = 0 THEN @category ELSE discord_category_id END, " +
+                         "handler_role_ids = CASE WHEN COALESCE(cardinality(handler_role_ids), 0) = 0 THEN @roles ELSE handler_role_ids END, " +
+                         "ping_role_ids = CASE WHEN COALESCE(cardinality(ping_role_ids), 0) = 0 THEN @roles ELSE ping_role_ids END, " +
+                         "max_open_per_user = CASE WHEN COALESCE(max_open_per_user, 0) < 1 THEN 1 ELSE max_open_per_user END, " +
+                         "enabled = COALESCE(enabled, true), " +
+                         "sort_order = COALESCE(sort_order, 0)"))
+        {
+            backfill.Parameters.AddWithValue("category", supportCategoryId);
+            backfill.Parameters.AddWithValue("roles", roles);
+            await backfill.ExecuteNonQueryAsync();
+        }
+
+        // Ticket types that exist in the store but have no category row would otherwise show up
+        // without a label on the dashboard. They are added disabled so nobody can pick them again.
+        await using (var orphans = con.CreateCommand(
+                         "INSERT INTO ticketcategories (custom_id, category_text, channel_prefix, discord_category_id, " +
+                         "handler_role_ids, ping_role_ids, max_open_per_user, sort_order, enabled) " +
+                         "SELECT DISTINCT s.tickettype, s.tickettype, s.tickettype, @category, @roles, @roles, 1, 99, false " +
+                         "FROM ticketstore s WHERE s.tickettype IS NOT NULL AND s.tickettype <> '' " +
+                         "AND NOT EXISTS (SELECT 1 FROM ticketcategories c WHERE c.custom_id = s.tickettype)"))
+        {
+            orphans.Parameters.AddWithValue("category", supportCategoryId);
+            orphans.Parameters.AddWithValue("roles", roles);
+            await orphans.ExecuteNonQueryAsync();
+        }
+
+        await InitReportIntakeQuestions(con);
+
+        try
+        {
+            await using var index = con.CreateCommand(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ticketcategories_custom_id ON ticketcategories (custom_id)");
+            index.CommandTimeout = SchemaCommandTimeoutSeconds;
+            await index.ExecuteNonQueryAsync();
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e,
+                "ticketcategories holds duplicate custom_id values, the unique index was not created");
+        }
+    }
+
+    /// <summary>
+    ///     The three questions the report ticket used to ask in plain text. They are stored so an admin
+    ///     can switch the category to a real form, but intake stays off until someone enables it.
+    /// </summary>
+    private static async Task InitReportIntakeQuestions(NpgsqlDataSource con)
+    {
+        await using (var probe = con.CreateCommand(
+                         "SELECT COUNT(*) FROM ticket_category_questions WHERE category_id = 'report'"))
+        {
+            if (await probe.ExecuteScalarAsync() is long existing && existing > 0) return;
+        }
+
+        var questions = new (string Label, string Placeholder, string Style, bool Required)[]
+        {
+            ("Um wen geht es?", "User-ID oder User-Name", "short", true),
+            ("Was ist vorgefallen?", "Bitte beschreibe die Situation so ausführlich wie möglich.", "long", true),
+            ("Hast du Beweise?", "Links zu Screenshots oder Nachrichten, sonst \"nein\".", "long", false)
+        };
+
+        for (var i = 0; i < questions.Length; i++)
+        {
+            var (label, placeholder, style, required) = questions[i];
+            await using var cmd = con.CreateCommand(
+                "INSERT INTO ticket_category_questions (id, category_id, position, label, placeholder, style, required, min_length, max_length) " +
+                "VALUES (@id, 'report', @position, @label, @placeholder, @style, @required, 0, @max)");
+            cmd.Parameters.AddWithValue("id", ToolSet.GenerateCaseID());
+            cmd.Parameters.AddWithValue("position", i);
+            cmd.Parameters.AddWithValue("label", label);
+            cmd.Parameters.AddWithValue("placeholder", placeholder);
+            cmd.Parameters.AddWithValue("style", style);
+            cmd.Parameters.AddWithValue("required", required);
+            cmd.Parameters.AddWithValue("max", style == "long" ? 1000 : 200);
             await cmd.ExecuteNonQueryAsync();
         }
     }

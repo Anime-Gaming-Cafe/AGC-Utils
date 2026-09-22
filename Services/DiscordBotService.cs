@@ -197,6 +197,7 @@ public class DiscordBotService : IHostedService
         _ = ExtraPermissionSyncTask.LaunchLoops();
         _ = TeamApplicationPhaseTask.LaunchLoops();
         _ = ActivityRoleTask.Run();
+        _ = TicketAutoCloseTask.LaunchLoops();
 
         return Task.CompletedTask;
     }

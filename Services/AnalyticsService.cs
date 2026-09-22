@@ -1,4 +1,4 @@
-namespace AGC_Management.Services;
+﻿namespace AGC_Management.Services;
 
 public readonly record struct WeeklyCount(DateOnly WeekStart, long Count);
 
@@ -8,7 +8,12 @@ public readonly record struct ModeratorCaseCount(ulong PunisherId, long WarnCoun
 
 public readonly record struct CaseTypeTotals(long WarnCount, long FlagCount, long BanCount);
 
-public readonly record struct TicketTypeStats(string TicketType, long ClosedCount, double AvgHours, double MedianHours);
+public readonly record struct TicketTypeStats(
+    string TicketType,
+    long ClosedCount,
+    double AvgHours,
+    double MedianHours,
+    string Label);
 
 public static class AnalyticsService
 {
@@ -98,15 +103,30 @@ public static class AnalyticsService
         cmd.Parameters.AddWithValue("since", since);
 
         List<TicketTypeStats> results = [];
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-            results.Add(new TicketTypeStats(
-                reader.GetString(0),
-                reader.GetInt64(1),
-                reader.GetDouble(2) / 3600.0,
-                reader.GetDouble(3) / 3600.0));
+        await using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+                results.Add(new TicketTypeStats(
+                    reader.GetString(0),
+                    reader.GetInt64(1),
+                    reader.GetDouble(2) / 3600.0,
+                    reader.GetDouble(3) / 3600.0,
+                    reader.GetString(0)));
+        }
 
-        return results;
+        // The stored type is a category id. Show what the category is actually called, and fall back to
+        // the raw value for types whose category row is gone.
+        var categories = await TicketCategoryService.GetAllAsync(true);
+        return
+        [
+            .. results.Select(stat =>
+            {
+                var label = categories
+                    .FirstOrDefault(c => string.Equals(c.CustomId, stat.TicketType, StringComparison.OrdinalIgnoreCase))
+                    ?.Label;
+                return stat with { Label = string.IsNullOrWhiteSpace(label) ? stat.TicketType : label };
+            })
+        ];
     }
 
     private static async Task<List<WeeklyCount>> GetWeeklyCountsAsync(string table, string timestampColumn,

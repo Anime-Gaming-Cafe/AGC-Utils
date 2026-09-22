@@ -1,0 +1,506 @@
+@page "/konfiguration/ticketsystem/{CustomId}"
+@using AGC_Management.Entities.Ticket
+@using AGC_Management.Managers
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="@(category?.Label ?? CustomId)"
+            Lead="Alles, was diese Kategorie vom Rest unterscheidet: Team, Ort, Text und Formular."
+            BackHref="/konfiguration/ticketsystem" BackText="Ticketsystem"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Kategorie wird geladen"
+                Description="Einstellungen, Rollen und Formularfelder werden abgefragt."/>
+}
+else if (category is null)
+{
+    <StateBlock Title="Kategorie nicht gefunden"
+                Description="Diese Kennung gibt es nicht mehr. Möglicherweise wurde sie gelöscht."
+                ActionText="Zur Übersicht" ActionHref="/konfiguration/ticketsystem"/>
+}
+else
+{
+    <Panel Title="Grunddaten">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="tc-label">Bezeichnung</label>
+                <input id="tc-label" class="form-control" maxlength="100" @bind="category.Label"
+                       @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Steht im Auswahlmenü und im Ticket-Header.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="tc-emoji">Emoji</label>
+                <input id="tc-emoji" class="form-control" maxlength="32" @bind="category.Emoji"
+                       @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Optional, steht vor der Option im Auswahlmenü.</span>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="tc-description">Beschreibung</label>
+                <input id="tc-description" class="form-control" maxlength="100" @bind="category.Description"
+                       @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Erklärt im Auswahlmenü, wofür diese Kategorie gedacht ist. Höchstens 100 Zeichen, das ist das Limit von Discord.</span>
+            </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="tc-enabled"
+                           @bind="category.Enabled" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="tc-enabled">Im Panel wählbar</label>
+                </div>
+                <span class="field__hint">Deaktiviert verschwindet sie aus dem Auswahlmenü. Offene Tickets bleiben offen.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="tc-maxopen">Offene Tickets pro Nutzer</label>
+                <input id="tc-maxopen" type="number" min="1" max="10" class="form-control"
+                       @bind="category.MaxOpenPerUser" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">
+                    Zusätzlich gilt das globale Limit über alle Kategorien (aktuell @globalLimitText).
+                    Solange das auf 1 steht, bleibt es bei einem offenen Ticket pro Person.
+                </span>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Channel">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="tc-prefix">Channel-Prefix</label>
+                <input id="tc-prefix" class="form-control" maxlength="32" @bind="category.ChannelPrefix"
+                       @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Der Channel heißt dann @(PrefixPreview)-1, -2 und so weiter.</span>
+            </div>
+            <div class="field">
+                <label class="field__label">Discord-Kategorie</label>
+                <SearchableSelect Items="CategoryItems" NoneLabel="Standard aus der config.ini"
+                                  Placeholder="Kategorie suchen..."
+                                  @bind-SelectedId="category.DiscordCategoryId" @bind-SelectedId:after="OnFieldChanged"/>
+                <span class="field__hint">Ohne Auswahl landen die Tickets in der allgemeinen Support-Kategorie.</span>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Zuständiges Team"
+           Lead="Diese Rollen sehen die Tickets dieser Kategorie und dürfen sie bearbeiten. Ohne Rolle greift die allgemeine Ticket-Team-Rolle aus der config.ini.">
+        <div class="field">
+            <label class="field__label">Bearbeitende Rollen</label>
+            @if (category.HandlerRoleIds.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Keine Rolle gesetzt"
+                            Description="Es greift die allgemeine Ticket-Team-Rolle. Füge eine Rolle hinzu, um diese Kategorie einem eigenen Team zu geben."/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var roleId in category.HandlerRoleIds.ToList())
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">@RoleName(roleId)</p>
+                            </div>
+                            <div class="rows__side">
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        @onclick="() => RemoveHandler(roleId)">Entfernen
+                                </button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label">Rolle hinzufügen</label>
+                <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                  @bind-SelectedId="newHandlerRoleId"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="AddHandler">Rolle hinzufügen</button>
+            <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="ReapplyOverwrites">
+                Rechte auf offene Tickets anwenden
+            </button>
+        </div>
+    </Panel>
+
+    <Panel Title="Ping"
+           Lead="Wer beim Öffnen im Ticket erwähnt wird. Leer bedeutet: dieselben Rollen wie oben.">
+        <div class="field">
+            @if (category.PingRoleIds.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Kein eigener Ping"
+                            Description="Es werden die bearbeitenden Rollen erwähnt."/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var roleId in category.PingRoleIds.ToList())
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">@RoleName(roleId)</p>
+                            </div>
+                            <div class="rows__side">
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        @onclick="() => RemovePing(roleId)">Entfernen
+                                </button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label">Rolle hinzufügen</label>
+                <SearchableSelect Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                  @bind-SelectedId="newPingRoleId"/>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" @onclick="AddPing">Rolle hinzufügen</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Begrüßung"
+           Lead="Die erste Nachricht, die der Nutzer im frisch geöffneten Ticket liest.">
+        <div class="field">
+            <label class="field__label" for="tc-welcome">Text</label>
+            <textarea id="tc-welcome" class="form-control" rows="5" @bind="category.WelcomeText"
+                      @bind:after="OnFieldChanged"></textarea>
+            <span class="field__hint">Hinweise zu Uhrzeit und Feiertagen hängt der Bot selbst an.</span>
+        </div>
+    </Panel>
+
+    <Panel Title="Formular beim Öffnen"
+           Lead="@($"Discord erlaubt höchstens {TicketCategoryQuestion.MaxPerCategory} Felder in einem Formular, und nur Textfelder.")">
+        <div class="field">
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="tc-intake"
+                       @bind="category.IntakeEnabled" @bind:after="OnFieldChanged"/>
+                <label class="form-check-label" for="tc-intake">Formular vor dem Öffnen anzeigen</label>
+            </div>
+            <span class="field__hint">Aus bedeutet: Ticket geht sofort auf, der Nutzer schreibt sein Anliegen selbst.</span>
+        </div>
+
+        @if (questions.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Felder"
+                        Description="Ohne Felder bleibt das Formular aus, auch wenn der Schalter an ist. Füge unten das erste Feld hinzu."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var question in questions)
+                {
+                    var index = questions.IndexOf(question);
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@(string.IsNullOrWhiteSpace(question.Label) ? "Ohne Beschriftung" : question.Label)</p>
+                            <p class="rows__text">
+                                @(question.IsLong ? "Mehrzeilig" : "Einzeilig") · @(question.Required ? "Pflichtfeld" : "Optional")
+                            </p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                    @onclick="() => MoveQuestion(question, -1)">Hoch
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(index == questions.Count - 1)"
+                                    @onclick="() => MoveQuestion(question, 1)">Runter
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    @onclick="() => RemoveQuestion(question)">Entfernen
+                            </button>
+                        </div>
+                        <div class="rows__detail">
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label class="field__label" for="tq-label-@index">Beschriftung</label>
+                                    <input id="tq-label-@index" class="form-control" maxlength="45"
+                                           @bind="question.Label" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="tq-placeholder-@index">Platzhalter</label>
+                                    <input id="tq-placeholder-@index" class="form-control" maxlength="100"
+                                           @bind="question.Placeholder" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="tq-style-@index">Art</label>
+                                    <select id="tq-style-@index" class="form-select" @bind="question.Style"
+                                            @bind:after="OnFieldChanged">
+                                        <option value="short">Einzeilig</option>
+                                        <option value="long">Mehrzeilig</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="tq-max-@index">Maximale Länge</label>
+                                    <input id="tq-max-@index" type="number" min="1" max="4000" class="form-control"
+                                           @bind="question.MaxLength" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                               id="tq-required-@index" @bind="question.Required"
+                                               @bind:after="OnFieldChanged"/>
+                                        <label class="form-check-label" for="tq-required-@index">Pflichtfeld</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary"
+                    disabled="@(questions.Count >= TicketCategoryQuestion.MaxPerCategory)"
+                    @onclick="AddQuestion">Feld hinzufügen
+            </button>
+        </div>
+    </Panel>
+
+    <Panel Title="Auto-Close"
+           Lead="Erinnert und schließt Tickets, in denen niemand mehr schreibt. Greift zusätzlich nur, wenn der globale Schalter unter Panel und Texte an ist.">
+        <div class="field-grid">
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="tc-autoclose"
+                           @bind="category.AutoCloseEnabled" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="tc-autoclose">Für diese Kategorie aktiv</label>
+                </div>
+                <span class="field__hint">Global: @(autoCloseGlobal ? "an" : "aus").</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="tc-reminder">Erinnern nach (Stunden)</label>
+                <input id="tc-reminder" type="number" min="0" max="720" class="form-control"
+                       @bind="category.AutoCloseReminderHours" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 bedeutet: keine Erinnerung.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="tc-close">Schließen nach (Stunden)</label>
+                <input id="tc-close" type="number" min="0" max="2160" class="form-control"
+                       @bind="category.AutoCloseHours" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 bedeutet: nur erinnern, nie automatisch schließen.</span>
+            </div>
+        </div>
+    </Panel>
+}
+
+@code {
+    [Parameter] public string CustomId { get; set; } = "";
+
+    private bool loaded;
+    private bool busy;
+
+    private TicketCategory? category;
+    private List<TicketCategoryQuestion> questions = [];
+
+    private TicketCategory? snapshot;
+    private List<TicketCategoryQuestion> snapshotQuestions = [];
+
+    private List<DiscordRole> assignableRoles = [];
+    private List<DiscordChannel> discordCategories = [];
+    private List<(ulong Id, string Label)> RoleItems => assignableRoles.Select(r => (r.Id, r.Name)).ToList();
+    private List<(ulong Id, string Label)> CategoryItems => discordCategories.Select(c => (c.Id, c.Name)).ToList();
+
+    private ulong newHandlerRoleId;
+    private ulong newPingRoleId;
+
+    private bool autoCloseGlobal;
+    private string globalLimitText = "1";
+
+    private string PrefixPreview => string.IsNullOrWhiteSpace(category?.ChannelPrefix)
+        ? CustomId
+        : category!.ChannelPrefix;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadGuildData();
+        await LoadAsync();
+        Tracker.Register(SaveAsync, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private void LoadGuildData()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (guild is null) return;
+
+        assignableRoles = guild.Roles.Values
+            .Where(r => r.Id != guild.Id)
+            .OrderByDescending(r => r.Position)
+            .ToList();
+
+        discordCategories = guild.Channels.Values
+            .Where(c => c.Type == ChannelType.Category)
+            .OrderBy(c => c.Position)
+            .ToList();
+    }
+
+    private async Task LoadAsync()
+    {
+        TicketCategoryService.Invalidate();
+        category = await TicketCategoryService.GetAsync(CustomId);
+        questions = category?.Questions.OrderBy(q => q.Position).Select(Clone).ToList() ?? [];
+
+        autoCloseGlobal =
+            await RuntimeSettings.GetBoolAsync(TicketCategoryService.SettingsSection, "AutoCloseEnabled", false);
+        var total = await RuntimeSettings.GetIntAsync(TicketCategoryService.SettingsSection, "MaxOpenPerUserTotal", 1);
+        globalLimitText = total > 0 ? total.ToString() : "unbegrenzt";
+
+        snapshot = category is null ? null : Clone(category);
+        snapshotQuestions = questions.Select(Clone).ToList();
+    }
+
+    private static TicketCategory Clone(TicketCategory source) => new()
+    {
+        CustomId = source.CustomId,
+        Label = source.Label,
+        Description = source.Description,
+        Emoji = source.Emoji,
+        ChannelPrefix = source.ChannelPrefix,
+        DiscordCategoryId = source.DiscordCategoryId,
+        HandlerRoleIds = [.. source.HandlerRoleIds],
+        PingRoleIds = [.. source.PingRoleIds],
+        WelcomeText = source.WelcomeText,
+        IntakeEnabled = source.IntakeEnabled,
+        MaxOpenPerUser = source.MaxOpenPerUser,
+        AutoCloseEnabled = source.AutoCloseEnabled,
+        AutoCloseReminderHours = source.AutoCloseReminderHours,
+        AutoCloseHours = source.AutoCloseHours,
+        SortOrder = source.SortOrder,
+        Enabled = source.Enabled
+    };
+
+    private static TicketCategoryQuestion Clone(TicketCategoryQuestion question) => new()
+    {
+        Id = question.Id,
+        CategoryId = question.CategoryId,
+        Position = question.Position,
+        Label = question.Label,
+        Placeholder = question.Placeholder,
+        Style = question.Style,
+        Required = question.Required,
+        MinLength = question.MinLength,
+        MaxLength = question.MaxLength
+    };
+
+    private string RoleName(ulong roleId) =>
+        assignableRoles.FirstOrDefault(r => r.Id == roleId)?.Name ?? roleId.ToString();
+
+    private void AddHandler()
+    {
+        if (category is null || newHandlerRoleId == 0) return;
+        if (category.HandlerRoleIds.Contains(newHandlerRoleId)) return;
+
+        category.HandlerRoleIds.Add(newHandlerRoleId);
+        newHandlerRoleId = 0;
+        Tracker.MarkDirty();
+    }
+
+    private void RemoveHandler(ulong roleId)
+    {
+        category?.HandlerRoleIds.Remove(roleId);
+        Tracker.MarkDirty();
+    }
+
+    private void AddPing()
+    {
+        if (category is null || newPingRoleId == 0) return;
+        if (category.PingRoleIds.Contains(newPingRoleId)) return;
+
+        category.PingRoleIds.Add(newPingRoleId);
+        newPingRoleId = 0;
+        Tracker.MarkDirty();
+    }
+
+    private void RemovePing(ulong roleId)
+    {
+        category?.PingRoleIds.Remove(roleId);
+        Tracker.MarkDirty();
+    }
+
+    private void AddQuestion()
+    {
+        if (questions.Count >= TicketCategoryQuestion.MaxPerCategory) return;
+
+        questions.Add(new TicketCategoryQuestion
+        {
+            Id = "",
+            CategoryId = CustomId,
+            Position = questions.Count,
+            Style = "short",
+            Required = true,
+            MaxLength = 200
+        });
+        Tracker.MarkDirty();
+    }
+
+    private void RemoveQuestion(TicketCategoryQuestion question)
+    {
+        questions.Remove(question);
+        Tracker.MarkDirty();
+    }
+
+    private void MoveQuestion(TicketCategoryQuestion question, int offset)
+    {
+        var from = questions.IndexOf(question);
+        var to = from + offset;
+        if (to < 0 || to >= questions.Count) return;
+
+        (questions[from], questions[to]) = (questions[to], questions[from]);
+        Tracker.MarkDirty();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (category is null) return;
+
+        category.MaxOpenPerUser = Math.Clamp(category.MaxOpenPerUser, 1, 10);
+        category.AutoCloseReminderHours = Math.Clamp(category.AutoCloseReminderHours, 0, 720);
+        category.AutoCloseHours = Math.Clamp(category.AutoCloseHours, 0, 2160);
+        if (string.IsNullOrWhiteSpace(category.ChannelPrefix)) category.ChannelPrefix = CustomId;
+
+        await TicketCategoryService.UpsertAsync(category);
+        await TicketCategoryService.SaveQuestionsAsync(CustomId, questions);
+        await LoadAsync();
+
+        if (category.IntakeEnabled && questions.Count == 0)
+            ToastService.Notify("Gespeichert. Das Formular hat keine Felder und wird deshalb übersprungen.", "warn");
+        else if (category.Enabled && category.HandlerRoleIds.Count == 0)
+            ToastService.Notify("Gespeichert. Ohne eigene Rolle greift die allgemeine Ticket-Team-Rolle.", "warn");
+        else
+            ToastService.Notify("Kategorie gespeichert.", "ok");
+    }
+
+    private async Task ReapplyOverwrites()
+    {
+        if (category is null) return;
+
+        busy = true;
+        var updated = await TicketManager.ReapplyOverwritesAsync(category);
+        busy = false;
+
+        if (updated == 0)
+            ToastService.Notify("Keine offenen Tickets angepasst. Ohne gesetzte Rolle bleiben die Rechte unverändert.",
+                "warn");
+        else
+            ToastService.Notify($"Rechte von {updated} offenen Tickets neu gesetzt.", "ok");
+    }
+
+    private void Discard()
+    {
+        category = snapshot is null ? null : Clone(snapshot);
+        questions = snapshotQuestions.Select(Clone).ToList();
+    }
+}

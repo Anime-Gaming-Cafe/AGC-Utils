@@ -19,10 +19,10 @@ public class UserTicket
     public string? ChannelUrl { get; set; }
     public string? TranscriptUrl { get; set; }
 
-    public string TypeLabel => Type switch
-    {
-        "support" => "Support-Ticket",
-        "report" => "Report-Ticket",
-        _ => "Ticket"
-    };
+    /// <summary>Label of the ticket's category, filled in by the service. Falls back to the raw type.</summary>
+    public string? CategoryLabel { get; set; }
+
+    public string TypeLabel => string.IsNullOrWhiteSpace(CategoryLabel)
+        ? string.IsNullOrWhiteSpace(Type) ? "Ticket" : Type
+        : CategoryLabel;
 }

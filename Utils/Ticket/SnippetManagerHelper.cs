@@ -26,8 +26,65 @@ public class SnippetManagerHelper
         return null;
     }
 
+    public static async Task<bool> ExistsAsync(string snippetId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand("SELECT EXISTS (SELECT 1 FROM snippets WHERE snip_id = @name)");
+        cmd.Parameters.AddWithValue("name", snippetId);
+        return await cmd.ExecuteScalarAsync() is true;
+    }
+
+    /// <summary>Creates a snippet. False means the shortcut is already taken.</summary>
+    public static async Task<bool> CreateAsync(string snippetId, string text)
+    {
+        if (await ExistsAsync(snippetId)) return false;
+
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd =
+            con.CreateCommand("INSERT INTO snippets (snip_id, snipped_text) VALUES (@name, @content)");
+        cmd.Parameters.AddWithValue("name", snippetId);
+        cmd.Parameters.AddWithValue("content", text);
+        await cmd.ExecuteNonQueryAsync();
+        return true;
+    }
+
+    public static async Task<bool> UpdateTextAsync(string snippetId, string text)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand("UPDATE snippets SET snipped_text = @content WHERE snip_id = @name");
+        cmd.Parameters.AddWithValue("name", snippetId);
+        cmd.Parameters.AddWithValue("content", text);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    /// <summary>
+    ///     Renames a snippet. The id is the shortcut staff type in a ticket, so this changes what they have
+    ///     to type. False means the new shortcut is already in use.
+    /// </summary>
+    public static async Task<bool> RenameAsync(string snippetId, string newSnippetId)
+    {
+        if (string.Equals(snippetId, newSnippetId, StringComparison.Ordinal)) return true;
+        if (await ExistsAsync(newSnippetId)) return false;
+
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand("UPDATE snippets SET snip_id = @newName WHERE snip_id = @name");
+        cmd.Parameters.AddWithValue("name", snippetId);
+        cmd.Parameters.AddWithValue("newName", newSnippetId);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public static async Task<bool> DeleteAsync(string snippetId)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand("DELETE FROM snippets WHERE snip_id = @name");
+        cmd.Parameters.AddWithValue("name", snippetId);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
     public static async Task SendSnippetAsync(DiscordInteraction e)
     {
+        if (!await TicketManagerHelper.EnsureTeamAsync(e)) return;
+
         var irb = new DiscordInteractionResponseBuilder();
         irb.WithContent("Sende snippet...");
         await e.CreateResponseAsync(InteractionResponseType.UpdateMessage, irb);

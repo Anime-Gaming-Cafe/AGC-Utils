@@ -6,7 +6,13 @@
 @attribute [Authorize(Policy = DashboardPolicies.AnyStaff)]
 
 <PageHeader Title="Teambereich"
-            Lead="Bewerbungen sichten und entscheiden, Altbestände einsehen."/>
+            Lead="Offene Tickets im Blick behalten, Bewerbungen sichten und entscheiden."/>
+
+<Panel Title="Tickets">
+    <ul class="nav-links">
+        <li><a href="/teamarea/tickets">Offene Tickets</a></li>
+    </ul>
+</Panel>
 
 <Panel Title="Bewerbungen">
     <ul class="nav-links">
