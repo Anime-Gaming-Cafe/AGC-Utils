@@ -1936,17 +1936,47 @@ public static class DatabaseService
 
         await InitReportIntakeQuestions(con);
 
+        await EnsureUniqueIndexAsync(con, "ticketcategories", "custom_id", "idx_ticketcategories_custom_id");
+        await EnsureUniqueIndexAsync(con, "snippets", "snip_id", "idx_snippets_snip_id");
+    }
+
+    /// <summary>
+    ///     Adds a unique index, but only once the data allows it. A blind CREATE UNIQUE INDEX would throw on
+    ///     a table that already holds duplicates and take the whole startup with it, so duplicates are
+    ///     looked for first and named in the log instead.
+    /// </summary>
+    private static async Task EnsureUniqueIndexAsync(NpgsqlDataSource con, string table, string column,
+        string indexName)
+    {
         try
         {
+            List<string> duplicates = [];
+            await using (var probe = con.CreateCommand(
+                             $"SELECT {column}, COUNT(*) FROM {table} GROUP BY {column} HAVING COUNT(*) > 1"))
+            {
+                probe.CommandTimeout = SchemaCommandTimeoutSeconds;
+                await using var reader = await probe.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    duplicates.Add($"{(reader.IsDBNull(0) ? "(leer)" : reader.GetString(0))} x{reader.GetInt64(1)}");
+            }
+
+            if (duplicates.Count > 0)
+            {
+                CurrentApplication.Logger.Warning(
+                    "{Table}.{Column} holds duplicates, so {Index} was not created. Clean these up and restart: {Duplicates}",
+                    table, column, indexName, string.Join(", ", duplicates));
+                return;
+            }
+
             await using var index = con.CreateCommand(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ticketcategories_custom_id ON ticketcategories (custom_id)");
+                $"CREATE UNIQUE INDEX IF NOT EXISTS {indexName} ON {table} ({column})");
             index.CommandTimeout = SchemaCommandTimeoutSeconds;
             await index.ExecuteNonQueryAsync();
         }
         catch (Exception e)
         {
-            CurrentApplication.Logger.Warning(e,
-                "ticketcategories holds duplicate custom_id values, the unique index was not created");
+            CurrentApplication.Logger.Warning(e, "Could not ensure the unique index {Index} on {Table}", indexName,
+                table);
         }
     }
 

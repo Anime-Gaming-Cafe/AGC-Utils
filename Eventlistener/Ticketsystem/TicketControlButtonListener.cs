@@ -22,6 +22,10 @@ public class TicketManagerEventHandler : BaseCommandModule
                 await TicketManager.CloseTicket(e, e.Channel);
             else if (cid == "ticket_delete")
                 await TicketManagerHelper.DeleteTicket(e);
+            else if (cid == TicketComponents.ManageUsersButtonId)
+                await TicketManagerHelper.ManageUsersSelector(e.Interaction);
+            // The two separate buttons are gone from the header, but tickets that were already open keep
+            // theirs, so their ids stay wired up.
             else if (cid == "ticket_add_user")
                 await TicketManagerHelper.AddUserToTicketSelector(e.Interaction);
             else if (cid == "adduser_selector")

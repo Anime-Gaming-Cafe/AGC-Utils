@@ -897,6 +897,30 @@ public class TicketManagerHelper
         return false;
     }
 
+    /// <summary>
+    ///     Both user selectors in one ephemeral message. The two selectors and their callbacks are the same
+    ///     ones the separate "hinzufügen" and "entfernen" buttons used, so nothing downstream changed.
+    /// </summary>
+    public static async Task ManageUsersSelector(DiscordInteraction interaction)
+    {
+        if (!await EnsureTeamAsync(interaction)) return;
+
+        DiscordEmbedBuilder eb = new()
+        {
+            Title = "User verwalten",
+            Description = "Oben jemanden auswählen, um ihn zum Ticket hinzuzufügen. Unten, um ihn zu entfernen.",
+            Color = DiscordColor.Blurple
+        };
+
+        var irb = new DiscordInteractionResponseBuilder()
+            .AddEmbed(eb)
+            .AddComponents(new DiscordUserSelectComponent("Zum Ticket hinzufügen", "adduser_selector", 1))
+            .AddComponents(new DiscordUserSelectComponent("Vom Ticket entfernen", "removeuser_selector", 1))
+            .AsEphemeral();
+
+        await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, irb);
+    }
+
     public static async Task AddUserToTicketSelector(DiscordInteraction interaction)
     {
         var teamler = await TicketAccess.MayHandleAsync(await interaction.User.ConvertToMember(interaction.Guild),

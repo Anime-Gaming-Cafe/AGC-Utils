@@ -1,6 +1,5 @@
 ﻿#region
 
-using AGC_Management.Services;
 using AGC_Management.Utils;
 
 #endregion
@@ -9,14 +8,17 @@ namespace AGC_Management.Components;
 
 public class TicketComponents
 {
+    public const string ManageUsersButtonId = "ticket_manage_users";
+    public const string TransferButtonId = "ticket_transfer";
+
     public static List<DiscordButtonComponent> GetTicketActionRow()
     {
         List<DiscordButtonComponent> buttons =
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌"),
             new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋"),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_add_user", "(Team) User hinzufügen 👥"),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_remove_user", "(Team) User entfernen 👤"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben"),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
         ];
         return buttons;
@@ -28,8 +30,8 @@ public class TicketComponents
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌"),
             new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋", true),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_add_user", "(Team) User hinzufügen 👥"),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_remove_user", "(Team) User entfernen 👤"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben"),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
         ];
         return buttons;
@@ -41,8 +43,8 @@ public class TicketComponents
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌", true),
             new DiscordButtonComponent(ButtonStyle.Primary, "ticket_claim", "(Team) Ticket Claimen 👋", true),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_add_user", "(Team) User hinzufügen 👥", true),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_remove_user", "(Team) User entfernen 👤", true),
+            new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥", true),
+            new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben", true),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
         ];
         return buttons;
@@ -53,14 +55,12 @@ public class TicketComponents
         List<DiscordButtonComponent> buttons =
 		[
 			new DiscordButtonComponent(ButtonStyle.Danger, "ticket_close", "(Team) Ticket schließen ❌"),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_add_user", "(Team) User hinzufügen 👥"),
-            new DiscordButtonComponent(ButtonStyle.Secondary, "ticket_remove_user", "(Team) User entfernen 👤"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, ManageUsersButtonId, "(Team) User verwalten 👥"),
+            new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId, "(Team) Ticket übergeben"),
             new DiscordButtonComponent(ButtonStyle.Success, "ticket_more", "(Team) Mehr...")
         ];
         return buttons;
     }
-
-    public const string TransferButtonId = "ticket_transfer";
 
     public static async Task RenderMore(InteractionCreateEventArgs interactionCreateEvent)
     {
@@ -85,15 +85,6 @@ public class TicketComponents
         };
 
         var responseBuilder = new DiscordInteractionResponseBuilder().AddComponents(buttons).AsEphemeral();
-
-        // A second row: five buttons is the per row limit, and handing a ticket to another team only
-        // makes sense when there is another team to hand it to.
-        var transferable = await TicketAccess.VisibleCategoriesAsync(user, false);
-        var current = await TicketCategoryService.GetForChannelAsync(interaction.Channel.Id);
-        if (transferable.Any(category => category.CustomId != current?.CustomId))
-            responseBuilder.AddComponents(new DiscordButtonComponent(ButtonStyle.Secondary, TransferButtonId,
-                "Ticket übergeben"));
-
         await interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, responseBuilder);
     }
 
