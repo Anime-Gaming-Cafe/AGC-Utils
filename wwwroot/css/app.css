@@ -484,6 +484,10 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     margin-top: var(--s-1);
 }
 
+.field__hint--warn { color: var(--warn-text); }
+
+.field__hint--bad { color: var(--bad-text); }
+
 .field-grid {
     display: grid;
     gap: var(--s-3);

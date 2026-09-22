@@ -479,6 +479,34 @@ public static class DatabaseService
             {
                 "idx_ticket_events_ticket",
                 "CREATE INDEX IF NOT EXISTS idx_ticket_events_ticket ON ticket_events (ticket_id)"
+            },
+            {
+                "infopanels",
+                "CREATE TABLE IF NOT EXISTS infopanels (id TEXT, name TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT, header_text TEXT, author_name TEXT, author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT, banner_mode TEXT DEFAULT 'guild', banner_url TEXT, spacer_url TEXT, color TEXT DEFAULT '2F3136', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT, sort_order INTEGER DEFAULT 0)"
+            },
+            {
+                "infopanel_groups",
+                "CREATE TABLE IF NOT EXISTS infopanel_groups (id TEXT, panel_id TEXT, kind TEXT DEFAULT 'select', placeholder TEXT, date_label TEXT, position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true)"
+            },
+            {
+                "infopanel_pages",
+                "CREATE TABLE IF NOT EXISTS infopanel_pages (id TEXT, group_id TEXT, panel_id TEXT, kind TEXT DEFAULT 'text', label TEXT, description TEXT, emoji TEXT, button_style INTEGER DEFAULT 1, url TEXT, title TEXT, content TEXT, image_url TEXT, color TEXT, position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true, updated_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_infopanels_id",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_infopanels_id ON infopanels (id)"
+            },
+            {
+                "idx_infopanel_groups_panel",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_infopanel_groups_panel ON infopanel_groups (panel_id, id)"
+            },
+            {
+                "idx_infopanel_pages_group",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_infopanel_pages_group ON infopanel_pages (group_id, id)"
+            },
+            {
+                "idx_infopanel_pages_panel",
+                "CREATE INDEX IF NOT EXISTS idx_infopanel_pages_panel ON infopanel_pages (panel_id)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1715,6 +1743,7 @@ public static class DatabaseService
         await InitBotSettings();
         await InitBanRequestStages();
         await InitTicketCategories();
+        await InitInfoPanels();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -2018,6 +2047,75 @@ public static class DatabaseService
             cmd.Parameters.AddWithValue("required", required);
             cmd.Parameters.AddWithValue("max", style == "long" ? 1000 : 200);
             await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Puts the rules panel in place on first start, with the texts the Python bot used. Every insert is
+    ///     ON CONFLICT DO NOTHING, so a later start never writes over what the team edited in the dashboard.
+    ///     Nothing is posted to Discord here: the panel has no channel until an admin picks one.
+    /// </summary>
+    private static async Task InitInfoPanels()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var panel = InfoPanelSeedData.BuildSeedPanel();
+
+        await using (var cmd = con.CreateCommand(
+                         "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, spacer_url, color, auto_repost, rendered_hash, sort_order) " +
+                         "VALUES (@id, @name, 0, 0, false, @headerTitle, @headerText, @authorName, @authorIconMode, '', @bannerMode, '', @spacerUrl, @color, true, '', 0) " +
+                         "ON CONFLICT (id) DO NOTHING"))
+        {
+            cmd.Parameters.AddWithValue("id", panel.Id);
+            cmd.Parameters.AddWithValue("name", panel.Name);
+            cmd.Parameters.AddWithValue("headerTitle", panel.HeaderTitle);
+            cmd.Parameters.AddWithValue("headerText", panel.HeaderText);
+            cmd.Parameters.AddWithValue("authorName", panel.AuthorName);
+            cmd.Parameters.AddWithValue("authorIconMode", panel.AuthorIconMode);
+            cmd.Parameters.AddWithValue("bannerMode", panel.BannerMode);
+            cmd.Parameters.AddWithValue("spacerUrl", panel.SpacerUrl);
+            cmd.Parameters.AddWithValue("color", panel.Color);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        foreach (var group in panel.Groups)
+        {
+            await using (var cmd = con.CreateCommand(
+                             "INSERT INTO infopanel_groups (id, panel_id, kind, placeholder, date_label, position, enabled) " +
+                             "VALUES (@id, @panel, @kind, @placeholder, @dateLabel, @position, true) " +
+                             "ON CONFLICT (panel_id, id) DO NOTHING"))
+            {
+                cmd.Parameters.AddWithValue("id", group.Id);
+                cmd.Parameters.AddWithValue("panel", group.PanelId);
+                cmd.Parameters.AddWithValue("kind", group.Kind);
+                cmd.Parameters.AddWithValue("placeholder", group.Placeholder);
+                cmd.Parameters.AddWithValue("dateLabel", group.DateLabel);
+                cmd.Parameters.AddWithValue("position", group.Position);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            foreach (var page in group.Pages)
+            {
+                await using var pageCmd = con.CreateCommand(
+                    "INSERT INTO infopanel_pages (id, group_id, panel_id, kind, label, description, emoji, button_style, url, title, content, image_url, color, position, enabled, updated_at) " +
+                    "VALUES (@id, @group, @panel, @kind, @label, @description, @emoji, @buttonStyle, @url, @title, @content, @imageUrl, @color, @position, true, @updatedAt) " +
+                    "ON CONFLICT (group_id, id) DO NOTHING");
+                pageCmd.Parameters.AddWithValue("id", page.Id);
+                pageCmd.Parameters.AddWithValue("group", page.GroupId);
+                pageCmd.Parameters.AddWithValue("panel", page.PanelId);
+                pageCmd.Parameters.AddWithValue("kind", page.Kind);
+                pageCmd.Parameters.AddWithValue("label", page.Label);
+                pageCmd.Parameters.AddWithValue("description", page.Description);
+                pageCmd.Parameters.AddWithValue("emoji", page.Emoji);
+                pageCmd.Parameters.AddWithValue("buttonStyle", page.ButtonStyle);
+                pageCmd.Parameters.AddWithValue("url", page.Url);
+                pageCmd.Parameters.AddWithValue("title", page.Title);
+                pageCmd.Parameters.AddWithValue("content", page.Content);
+                pageCmd.Parameters.AddWithValue("imageUrl", page.ImageUrl);
+                pageCmd.Parameters.AddWithValue("color", page.Color);
+                pageCmd.Parameters.AddWithValue("position", page.Position);
+                pageCmd.Parameters.AddWithValue("updatedAt", page.UpdatedAt);
+                await pageCmd.ExecuteNonQueryAsync();
+            }
         }
     }
 

@@ -1,0 +1,18 @@
+@* The Discord limit a field is measured against, shown while typing. Discord rejects an
+   over-long embed outright, so the number has to be readable before saving, not after. *@
+
+<span class="field__hint @ToneClass">@Count / @Max Zeichen@Suffix</span>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] [EditorRequired] public int Max { get; set; }
+
+    private int Count => Value?.Length ?? 0;
+
+    private string Suffix => Count > Max ? $", {Count - Max} zu viel" : "";
+
+    private string? ToneClass =>
+        Count > Max ? "field__hint--bad"
+            : Count >= Max * DiscordLimits.WarnRatio ? "field__hint--warn"
+            : null;
+}

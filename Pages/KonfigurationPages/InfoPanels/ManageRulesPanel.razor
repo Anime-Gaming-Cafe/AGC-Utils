@@ -1,0 +1,629 @@
+@page "/konfiguration/regelwerk"
+@using AGC_Management.Components
+@using AGC_Management.Entities.InfoPanels
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="Regelwerk"
+            Lead="Die Nachricht im Regel-Channel, ihre Buttons und alle Regel- und Infotexte dahinter."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Regelwerk wird geladen"
+                Description="Panel-Einstellungen, Gruppen und Seiten werden abgefragt."/>
+}
+else if (panel is null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Kein Regelwerk-Panel angelegt"
+                Description="In der Datenbank gibt es keine Zeile mit der ID regelwerk. Sie wird beim Start des Bots angelegt. Starte den Bot einmal neu."
+                ActionText="Zurück zur Administration" ActionHref="/konfiguration"/>
+}
+else
+{
+    <Panel Title="Nachricht in Discord"
+           Lead="Wo das Panel steht. Gesendet wird erst, wenn du hier einen Channel wählst.">
+        @if (!panel.IsPosted)
+        {
+            <StateBlock Inline="true"
+                        Title="Noch nicht gesendet"
+                        Description="Das Panel existiert bisher nur hier. Wähle einen Channel und sende es, danach hält der Bot die Nachricht von selbst aktuell."/>
+        }
+        else
+        {
+            <dl class="facts mb-3">
+                <dt>Channel</dt>
+                <dd>@CurrentChannelName</dd>
+                <dt>Nachricht</dt>
+                <dd><a href="@PanelLink" target="_blank" rel="noopener">In Discord öffnen</a></dd>
+            </dl>
+        }
+
+        <div class="field">
+            <label class="field__label" for="rp-channel">Channel</label>
+            <SearchableSelect Id="rp-channel" Items="TextChannelItems" NoneLabel="Channel wählen"
+                              Placeholder="Channel suchen..." @bind-SelectedId="selectedChannelId"/>
+            <span class="field__hint">
+                Der Bot braucht in diesem Channel das Recht, Nachrichten zu schreiben und einzubetten.
+            </span>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="SendPanel">
+                @(panel.IsPosted ? "Neu senden" : "Panel senden")
+            </button>
+            <button type="button" class="btn btn-ghost" disabled="@(busy || !panel.IsPosted)"
+                    @onclick="RefreshPanel">
+                Jetzt aktualisieren
+            </button>
+        </div>
+        @if (panel.IsPosted)
+        {
+            <p class="field__hint">
+                Ein neues Panel ersetzt das alte nicht. Das alte bleibt stehen, wird aber nicht mehr
+                aktualisiert. Lösche es in Discord von Hand.
+            </p>
+        }
+    </Panel>
+
+    <Panel Title="Kopfbereich" Lead="Titel und Text der Panel-Nachricht selbst.">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="rp-title">Überschrift</label>
+                <input id="rp-title" class="form-control" maxlength="@DiscordLimits.EmbedTitle"
+                       @bind="panel.HeaderTitle" @bind:after="OnFieldChanged"/>
+                <CharCount Value="@panel.HeaderTitle" Max="DiscordLimits.EmbedTitle"/>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="rp-text">Text</label>
+                <textarea id="rp-text" class="form-control" rows="8" @bind="panel.HeaderText"
+                          @bind:event="oninput" @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">
+                    Discord-Markdown funktioniert hier. Die Zeilen "Stand der Regeln" und "Stand der Infos"
+                    hängt der Bot selbst an, aus dem Datum der zuletzt geänderten Seite.
+                </span>
+                <CharCount Value="@panel.HeaderText" Max="DiscordLimits.EmbedDescription"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="rp-author">Name über der Überschrift</label>
+                <input id="rp-author" class="form-control" maxlength="@DiscordLimits.EmbedAuthorName"
+                       @bind="panel.AuthorName" @bind:after="OnFieldChanged"/>
+                <CharCount Value="@panel.AuthorName" Max="DiscordLimits.EmbedAuthorName"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="rp-author-icon">Bild daneben</label>
+                <select id="rp-author-icon" class="form-select" @bind="panel.AuthorIconMode"
+                        @bind:after="OnFieldChanged">
+                    <option value="@InfoPanel.ModeGuild">Server-Icon</option>
+                    <option value="@InfoPanel.ModeUrl">Eigene URL</option>
+                    <option value="@InfoPanel.ModeNone">Keines</option>
+                </select>
+            </div>
+            @if (panel.AuthorIconMode == InfoPanel.ModeUrl)
+            {
+                <div class="field field--wide">
+                    <label class="field__label" for="rp-author-icon-url">URL des Bildes</label>
+                    <input id="rp-author-icon-url" class="form-control" @bind="panel.AuthorIconUrl"
+                           @bind:after="OnFieldChanged"/>
+                </div>
+            }
+        </div>
+
+        <p class="field__hint">
+            Zusammen belegt der Kopfbereich @HeaderBudgetUsed von @DiscordLimits.EmbedTotal Zeichen, die
+            Discord über alle Embeds einer Nachricht erlaubt.
+        </p>
+    </Panel>
+
+    <Panel Title="Banner und Farbe">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="rp-banner">Banner</label>
+                <select id="rp-banner" class="form-select" @bind="panel.BannerMode" @bind:after="OnFieldChanged">
+                    <option value="@InfoPanel.ModeGuild">Serverbanner</option>
+                    <option value="@InfoPanel.ModeUrl">Eigene URL</option>
+                    <option value="@InfoPanel.ModeNone">Keines</option>
+                </select>
+                <span class="field__hint">
+                    Beim Serverbanner tauscht der Bot das Bild selbst aus, sobald ihr das Banner ändert.
+                </span>
+            </div>
+            @if (panel.BannerMode == InfoPanel.ModeUrl)
+            {
+                <div class="field">
+                    <label class="field__label" for="rp-banner-url">URL des Banners</label>
+                    <input id="rp-banner-url" class="form-control" @bind="panel.BannerUrl"
+                           @bind:after="OnFieldChanged"/>
+                </div>
+            }
+            <div class="field">
+                <label class="field__label" for="rp-color">Farbe</label>
+                <input id="rp-color" class="form-control mono" maxlength="6" @bind="panel.Color"
+                       @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Hex ohne Raute, zum Beispiel 2F3136.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="rp-spacer">Abstandsbild</label>
+                <input id="rp-spacer" class="form-control" @bind="panel.SpacerUrl" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">
+                    Ein durchsichtiges, breites Bild. Hält das Embed auf gleichbleibender Breite. Leer lassen
+                    geht auch.
+                </span>
+            </div>
+            <div class="field">
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="rp-repost"
+                           @bind="panel.AutoRepost" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="rp-repost">Gelöschte Nachricht neu posten</label>
+                </div>
+                <span class="field__hint">
+                    Findet der Bot die Nachricht nicht mehr, postet er sie im selben Channel neu. Ohne das
+                    ist das Panel nach einem versehentlichen Löschen weg.
+                </span>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Vorschau" Lead="Ungefähre Darstellung. Discord rendert Markdown in Details anders.">
+        @* The preview mirrors Discord's own embed colours, not the dashboard accent.
+           See DESIGN.md, exceptions. *@
+        <div class="embed-preview" style="border-left-color: #@PreviewColor;">
+            @if (!string.IsNullOrWhiteSpace(panel.AuthorName))
+            {
+                <p class="embed-preview__footer" style="margin: 0 0 var(--s-2);">@panel.AuthorName</p>
+            }
+            <p class="embed-preview__title">@panel.HeaderTitle</p>
+            <div class="embed-preview__body">@((MarkupString)headerPreview)</div>
+            @foreach (var line in DateLines)
+            {
+                <div class="embed-preview__body"><strong>@line</strong></div>
+            }
+        </div>
+    </Panel>
+
+    <Panel Title="Menüs und Buttons" Lead="Beschriftung der Auswahlmenüs und welches Datum das Panel meldet.">
+        @foreach (var group in panel.Groups.OrderBy(g => g.Position))
+        {
+            <div class="field-grid">
+                @if (group.IsSelect)
+                {
+                    <div class="field">
+                        <label class="field__label" for="@($"g-ph-{group.Id}")">Beschriftung des Menüs</label>
+                        <input id="@($"g-ph-{group.Id}")" class="form-control"
+                               maxlength="@DiscordLimits.SelectPlaceholder" @bind="group.Placeholder"
+                               @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                        <CharCount Value="@group.Placeholder" Max="DiscordLimits.SelectPlaceholder"/>
+                    </div>
+                }
+                else
+                {
+                    <div class="field">
+                        <label class="field__label">Buttons</label>
+                        <p class="field__hint">Buttons tragen ihre eigene Beschriftung, dieses Feld entfällt.</p>
+                    </div>
+                }
+                <div class="field">
+                    <label class="field__label" for="@($"g-dl-{group.Id}")">Datumszeile im Kopfbereich</label>
+                    <input id="@($"g-dl-{group.Id}")" class="form-control" maxlength="60"
+                           @bind="group.DateLabel" @bind:after="OnFieldChanged"/>
+                    <span class="field__hint">
+                        @DateLabelHint(group)
+                    </span>
+                </div>
+                <div class="field">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="@($"g-en-{group.Id}")" @bind="group.Enabled" @bind:after="OnFieldChanged"/>
+                        <label class="form-check-label" for="@($"g-en-{group.Id}")">Im Panel zeigen</label>
+                    </div>
+                </div>
+            </div>
+        }
+    </Panel>
+
+    @foreach (var group in panel.Groups.OrderBy(g => g.Position))
+    {
+        var pages = OrderedPages(group);
+        <Panel Title="@GroupTitle(group)" Lead="@GroupLead(group)" Flush="@(pages.Count > 0)">
+            <ul class="rows">
+                @foreach (var page in pages)
+                {
+                    var index = pages.IndexOf(page);
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@(string.IsNullOrWhiteSpace(page.Label) ? "Ohne Beschriftung" : page.Label)</p>
+                            <p class="rows__text">@PageSummary(page)</p>
+                        </div>
+                        <div class="rows__side">
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                    @onclick="() => MovePage(group, page, -1)">Hoch</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(index == pages.Count - 1)"
+                                    @onclick="() => MovePage(group, page, 1)">Runter</button>
+                            <a class="btn btn-secondary btn-sm" href="@PageHref(group, page)">Bearbeiten</a>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    @onclick="() => pendingDelete = PageKey(group, page)">Entfernen</button>
+                        </div>
+                        @if (pendingDelete == PageKey(group, page))
+                        {
+                            <div class="rows__detail">
+                                <ConfirmInline Title="@($"\"{page.Label}\" entfernen?")"
+                                               ConfirmText="Entfernen"
+                                               OnConfirm="() => DeletePage(group, page)"
+                                               OnCancel="() => pendingDelete = null">
+                                    <p class="state__text">
+                                        Der Text ist danach weg und die Option verschwindet aus dem Panel.
+                                    </p>
+                                </ConfirmInline>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+
+            @if (pages.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Noch keine Einträge"
+                            Description="@EmptyGroupText(group)"/>
+            }
+        </Panel>
+    }
+
+    <Panel Title="Eintrag hinzufügen"
+           Lead="Legt eine leere Option oder einen leeren Button an und öffnet gleich den Editor.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="new-group">Gruppe</label>
+                <select id="new-group" class="form-select" @bind="newPageGroupId">
+                    @foreach (var group in panel.Groups.OrderBy(g => g.Position))
+                    {
+                        <option value="@group.Id">@GroupTitle(group)</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="new-id">Kurzname</label>
+                <input id="new-id" class="form-control mono" maxlength="40" placeholder="z.B. rule8"
+                       @bind="newPageId"/>
+                <span class="field__hint">
+                    Nur Kleinbuchstaben, Ziffern und Bindestrich. Wird nur intern verwendet.
+                </span>
+            </div>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@SelectedGroupFull"
+                    @onclick="CreatePage">Anlegen</button>
+        </div>
+        @if (SelectedGroupFull && SelectedGroup is not null)
+        {
+            <p class="field__hint field__hint--warn">@GroupFullHint(SelectedGroup)</p>
+        }
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private bool busy;
+
+    private InfoPanel? panel;
+    private InfoPanel? snapshot;
+
+    private List<DiscordChannel> textChannels = [];
+    private List<(ulong Id, string Label)> TextChannelItems =>
+        textChannels.Select(channel => (channel.Id, $"#{channel.Name}")).ToList();
+
+    private ulong selectedChannelId;
+    private string headerPreview = "";
+    private string? pendingDelete;
+    private string newPageGroupId = "";
+    private string newPageId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadChannels();
+        await LoadAsync();
+        Tracker.Register(SaveAsync, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged()
+    {
+        headerPreview = (panel?.HeaderText ?? "").ConvertMarkdownToHtml();
+        Tracker.MarkDirty();
+    }
+
+    private void LoadChannels()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (guild is null) return;
+
+        textChannels = guild.Channels.Values
+            .Where(channel => channel.Type == ChannelType.Text)
+            .OrderBy(channel => channel.Position)
+            .ToList();
+    }
+
+    private async Task LoadAsync()
+    {
+        InfoPanelService.Invalidate();
+        var live = await InfoPanelService.GetAsync(InfoPanelService.RulesPanelId);
+        if (live is null)
+        {
+            panel = null;
+            return;
+        }
+
+        // Bound fields write into this copy, not into the object the bot reads out of the service cache.
+        // The groups are copied too, otherwise Discard would restore them onto themselves.
+        panel = Clone(live);
+        panel.Groups = live.Groups.Select(CloneGroup).ToList();
+        snapshot = Clone(live);
+        snapshot.Groups = live.Groups.Select(CloneGroup).ToList();
+
+        selectedChannelId = panel.ChannelId;
+        headerPreview = panel.HeaderText.ConvertMarkdownToHtml();
+
+        if (string.IsNullOrEmpty(newPageGroupId))
+            newPageGroupId = panel.Groups.OrderBy(group => group.Position).FirstOrDefault()?.Id ?? "";
+    }
+
+    private static InfoPanel Clone(InfoPanel source) => new()
+    {
+        Id = source.Id,
+        Name = source.Name,
+        ChannelId = source.ChannelId,
+        MessageId = source.MessageId,
+        Enabled = source.Enabled,
+        HeaderTitle = source.HeaderTitle,
+        HeaderText = source.HeaderText,
+        AuthorName = source.AuthorName,
+        AuthorIconMode = source.AuthorIconMode,
+        AuthorIconUrl = source.AuthorIconUrl,
+        BannerMode = source.BannerMode,
+        BannerUrl = source.BannerUrl,
+        SpacerUrl = source.SpacerUrl,
+        Color = source.Color,
+        AutoRepost = source.AutoRepost,
+        RenderedHash = source.RenderedHash,
+        SortOrder = source.SortOrder
+    };
+
+    /// <summary>Pages are not edited on this page, so they stay shared between the copies.</summary>
+    private static InfoPanelGroup CloneGroup(InfoPanelGroup source) => new()
+    {
+        Id = source.Id,
+        PanelId = source.PanelId,
+        Kind = source.Kind,
+        Placeholder = source.Placeholder,
+        DateLabel = source.DateLabel,
+        Position = source.Position,
+        Enabled = source.Enabled,
+        Pages = source.Pages
+    };
+
+    private string CurrentChannelName =>
+        panel is not null && CurrentApplication.TargetGuild.Channels.TryGetValue(panel.ChannelId, out var channel)
+            ? "#" + channel.Name
+            : panel?.ChannelId.ToString() ?? "";
+
+    private string PanelLink =>
+        $"https://discord.com/channels/{CurrentApplication.TargetGuild.Id}/{panel?.ChannelId}/{panel?.MessageId}";
+
+    private string PreviewColor => string.IsNullOrWhiteSpace(panel?.Color) ? "2F3136" : panel!.Color;
+
+    private int HeaderBudgetUsed =>
+        (panel?.HeaderTitle.Length ?? 0) + (panel?.HeaderText.Length ?? 0) + (panel?.AuthorName.Length ?? 0);
+
+    private List<string> DateLines =>
+        panel is null
+            ? []
+            : panel.Groups
+                .Where(group => group.Enabled && !string.IsNullOrWhiteSpace(group.DateLabel) &&
+                                group.LastUpdatedUnix > 0)
+                .OrderBy(group => group.Position)
+                .Select(group =>
+                    $"{group.DateLabel}: {DateTimeOffset.FromUnixTimeSeconds(group.LastUpdatedUnix).LocalDateTime:dd.MM.yyyy}")
+                .ToList();
+
+    private static List<InfoPanelPage> OrderedPages(InfoPanelGroup group) =>
+        group.Pages.OrderBy(page => page.Position).ToList();
+
+    private static string GroupTitle(InfoPanelGroup group) =>
+        group.IsSelect
+            ? $"Auswahlmenü: {(string.IsNullOrWhiteSpace(group.Placeholder) ? group.Id : group.Placeholder)}"
+            : "Buttons";
+
+    private static string GroupLead(InfoPanelGroup group) =>
+        group.IsSelect
+            ? $"Höchstens {DiscordLimits.SelectOptionsPerMenu} Optionen. Jede Option antwortet nur dem, der sie anklickt."
+            : $"Höchstens {DiscordLimits.ButtonsPerRow} Buttons nebeneinander.";
+
+    private static bool IsGroupFull(InfoPanelGroup group) =>
+        group.Pages.Count >= (group.IsSelect ? DiscordLimits.SelectOptionsPerMenu : DiscordLimits.ButtonsPerRow);
+
+    private static string DateLabelHint(InfoPanelGroup group) =>
+        group.LastUpdatedUnix > 0
+            ? $"Leer lassen blendet die Zeile aus. Aktuell: {DateTimeOffset.FromUnixTimeSeconds(group.LastUpdatedUnix).LocalDateTime:dd.MM.yyyy}, aus dem zuletzt geänderten Eintrag."
+            : "Leer lassen blendet die Zeile aus. Sie erscheint, sobald ein Eintrag dieser Gruppe ein Änderungsdatum hat.";
+
+    private InfoPanelGroup? SelectedGroup =>
+        panel?.Groups.FirstOrDefault(group => group.Id == newPageGroupId);
+
+    private bool SelectedGroupFull => SelectedGroup is not null && IsGroupFull(SelectedGroup);
+
+    private static string EmptyGroupText(InfoPanelGroup group) =>
+        group.IsSelect
+            ? "In diesem Auswahlmenü gibt es keine Optionen. Lege unten einen Eintrag an, damit das Menü im Panel erscheint."
+            : "In dieser Reihe gibt es keine Buttons. Lege unten einen Eintrag an, damit die Reihe im Panel erscheint.";
+
+    private static string GroupFullHint(InfoPanelGroup group) =>
+        group.IsSelect
+            ? $"Discord erlaubt {DiscordLimits.SelectOptionsPerMenu} Optionen pro Auswahlmenü. Entferne eine, um Platz zu schaffen."
+            : $"Discord erlaubt {DiscordLimits.ButtonsPerRow} Buttons pro Reihe. Entferne einen, um Platz zu schaffen.";
+
+    private static string PageSummary(InfoPanelPage page) =>
+        page.IsLink
+            ? $"Link auf {page.Url}"
+            : $"{page.Content.Length} Zeichen · zuletzt geändert {DateTimeOffset.FromUnixTimeSeconds(page.UpdatedAt).LocalDateTime:dd.MM.yyyy}";
+
+    private static string PageKey(InfoPanelGroup group, InfoPanelPage page) => $"{group.Id}/{page.Id}";
+
+    private static string PageHref(InfoPanelGroup group, InfoPanelPage page) =>
+        $"/konfiguration/regelwerk/{group.Id}/{page.Id}";
+
+    private async Task MovePage(InfoPanelGroup group, InfoPanelPage page, int offset)
+    {
+        var pages = OrderedPages(group);
+        var from = pages.IndexOf(page);
+        var to = from + offset;
+        if (to < 0 || to >= pages.Count) return;
+
+        (pages[from], pages[to]) = (pages[to], pages[from]);
+        for (var i = 0; i < pages.Count; i++) pages[i].Position = i;
+
+        await InfoPanelService.SavePageOrderAsync(group.Id, pages);
+        group.Pages = pages;
+        InfoPanelComponents.QueueRefreshPanel(InfoPanelService.RulesPanelId);
+        ToastService.Notify("Reihenfolge gespeichert.", "ok");
+    }
+
+    private async Task DeletePage(InfoPanelGroup group, InfoPanelPage page)
+    {
+        pendingDelete = null;
+        await InfoPanelService.DeletePageAsync(group.Id, page.Id);
+        await LoadAsync();
+        InfoPanelComponents.QueueRefreshPanel(InfoPanelService.RulesPanelId);
+        ToastService.Notify($"\"{page.Label}\" entfernt.", "ok");
+    }
+
+    private async Task CreatePage()
+    {
+        var group = SelectedGroup;
+        if (group is null)
+        {
+            ToastService.Notify("Bitte zuerst eine Gruppe wählen.", "bad");
+            return;
+        }
+
+        var id = newPageId.Trim().ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            ToastService.Notify("Bitte zuerst einen Kurznamen eingeben.", "bad");
+            return;
+        }
+
+        if (!id.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+        {
+            ToastService.Notify("Der Kurzname darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.", "bad");
+            return;
+        }
+
+        if (await InfoPanelService.PageExistsAsync(group.Id, id))
+        {
+            ToastService.Notify("Diesen Kurznamen gibt es in dieser Gruppe schon.", "bad");
+            return;
+        }
+
+        await InfoPanelService.UpsertPageAsync(new InfoPanelPage
+        {
+            Id = id,
+            GroupId = group.Id,
+            PanelId = InfoPanelService.RulesPanelId,
+            Kind = group.IsSelect ? InfoPanelPage.KindText : InfoPanelPage.KindLink,
+            Label = id,
+            Position = group.Pages.Count,
+            Enabled = false
+        });
+
+        newPageId = "";
+        Nav.NavigateTo($"/konfiguration/regelwerk/{group.Id}/{id}");
+    }
+
+    private async Task SaveAsync()
+    {
+        if (panel is null) return;
+
+        var error = DiscordLimits.Check("Überschrift", panel.HeaderTitle, DiscordLimits.EmbedTitle)
+                    ?? DiscordLimits.Check("Text", panel.HeaderText, DiscordLimits.EmbedDescription)
+                    ?? DiscordLimits.Check("Name über der Überschrift", panel.AuthorName,
+                        DiscordLimits.EmbedAuthorName);
+
+        if (error is not null)
+        {
+            ToastService.Notify(error + " Discord lehnt die Nachricht sonst ab.", "bad");
+            return;
+        }
+
+        panel.Color = panel.Color.TrimStart('#').Trim();
+
+        await InfoPanelService.UpdateSettingsAsync(panel);
+        foreach (var group in panel.Groups) await InfoPanelService.UpsertGroupAsync(group);
+
+        await LoadAsync();
+        InfoPanelComponents.QueueRefreshPanel(InfoPanelService.RulesPanelId);
+
+        ToastService.Notify(panel!.IsPosted
+            ? "Gespeichert. Die Nachricht in Discord zieht in wenigen Sekunden nach."
+            : "Gespeichert. Sende das Panel, damit es in Discord erscheint.", "ok");
+    }
+
+    private void Discard()
+    {
+        if (snapshot is null) return;
+
+        panel = Clone(snapshot);
+        panel.Groups = snapshot.Groups.Select(CloneGroup).ToList();
+        headerPreview = panel.HeaderText.ConvertMarkdownToHtml();
+    }
+
+    private async Task SendPanel()
+    {
+        if (selectedChannelId == 0)
+        {
+            ToastService.Notify("Bitte zuerst einen Channel wählen.", "bad");
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            await InfoPanelComponents.SendPanelToChannelAsync(InfoPanelService.RulesPanelId, selectedChannelId);
+            await LoadAsync();
+            ToastService.Notify("Panel gesendet.", "ok");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "InfoPanel: Senden aus dem Dashboard fehlgeschlagen");
+            ToastService.Notify("Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?",
+                "bad");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RefreshPanel()
+    {
+        busy = true;
+        var refreshed = await InfoPanelComponents.RefreshPanelAsync(InfoPanelService.RulesPanelId, true);
+        busy = false;
+
+        await LoadAsync();
+
+        ToastService.Notify(refreshed
+            ? "Nachricht aktualisiert."
+            : "Die Nachricht konnte nicht aktualisiert werden. Steht sie noch im Channel?", refreshed ? "ok" : "bad");
+    }
+}

@@ -1,0 +1,316 @@
+@page "/konfiguration/regelwerk/{GroupId}/{PageId}"
+@using AGC_Management.Components
+@using AGC_Management.Entities.InfoPanels
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="@HeaderTitle"
+            Lead="@HeaderLead"
+            BackHref="/konfiguration/regelwerk" BackText="Regelwerk"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Seite wird geladen"
+                Description="Beschriftung, Text und Einstellungen dieses Eintrags werden abgefragt."/>
+}
+else if (entry is null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Diesen Eintrag gibt es nicht"
+                Description="Er wurde inzwischen entfernt oder umbenannt."
+                ActionText="Zurück zum Regelwerk" ActionHref="/konfiguration/regelwerk"/>
+}
+else
+{
+    <div class="detail-grid">
+        <div>
+            <Panel Title="Im Panel">
+                <div class="field-grid">
+                    <div class="field field--wide">
+                        <label class="field__label" for="pe-label">Beschriftung</label>
+                        <input id="pe-label" class="form-control" maxlength="@LabelLimit"
+                               @bind="entry.Label" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                        <CharCount Value="@entry.Label" Max="LabelLimit"/>
+                    </div>
+
+                    @if (!entry.IsLink)
+                    {
+                        <div class="field field--wide">
+                            <label class="field__label" for="pe-description">Zeile darunter</label>
+                            <input id="pe-description" class="form-control"
+                                   maxlength="@DiscordLimits.SelectOptionDescription"
+                                   @bind="entry.Description" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                            <span class="field__hint">Optional. Steht im Auswahlmenü klein unter der Beschriftung.</span>
+                            <CharCount Value="@entry.Description" Max="DiscordLimits.SelectOptionDescription"/>
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label class="field__label" for="pe-emoji">Emoji</label>
+                        <input id="pe-emoji" class="form-control" maxlength="64" @bind="entry.Emoji"
+                               @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">
+                            Ein Unicode-Emoji oder ein Server-Emoji als &lt;:name:id&gt;. Leer lassen geht auch.
+                        </span>
+                    </div>
+
+                    <div class="field">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="pe-enabled"
+                                   @bind="entry.Enabled" @bind:after="OnFieldChanged"/>
+                            <label class="form-check-label" for="pe-enabled">Im Panel sichtbar</label>
+                        </div>
+                        <span class="field__hint">Ausgeschaltet verschwindet der Eintrag, der Text bleibt erhalten.</span>
+                    </div>
+
+                    @if (IsButton)
+                    {
+                        <div class="field">
+                            <label class="field__label" for="pe-kind">Art</label>
+                            <select id="pe-kind" class="form-select" @bind="entry.Kind" @bind:after="OnFieldChanged">
+                                <option value="@InfoPanelPage.KindLink">Link auf eine Adresse</option>
+                                <option value="@InfoPanelPage.KindText">Antwortet mit einem Text</option>
+                            </select>
+                        </div>
+                    }
+
+                    @if (entry.IsLink)
+                    {
+                        <div class="field field--wide">
+                            <label class="field__label" for="pe-url">Ziel-URL</label>
+                            <input id="pe-url" class="form-control" @bind="entry.Url" @bind:after="OnFieldChanged"/>
+                            <span class="field__hint">
+                                Link-Buttons öffnen die Adresse direkt. Sie haben keinen eigenen Text.
+                            </span>
+                        </div>
+                    }
+                    else if (IsButton)
+                    {
+                        <div class="field">
+                            <label class="field__label" for="pe-style">Farbe des Buttons</label>
+                            <select id="pe-style" class="form-select" @bind="entry.ButtonStyle"
+                                    @bind:after="OnFieldChanged">
+                                <option value="1">Blau</option>
+                                <option value="2">Grau</option>
+                                <option value="3">Grün</option>
+                                <option value="4">Rot</option>
+                            </select>
+                        </div>
+                    }
+                </div>
+            </Panel>
+
+            @if (!entry.IsLink)
+            {
+                <Panel Title="Antwort" Lead="Was der Nutzer zu sehen bekommt. Nur er selbst sieht es.">
+                    <div class="field-grid">
+                        <div class="field field--wide">
+                            <label class="field__label" for="pe-title">Überschrift</label>
+                            <input id="pe-title" class="form-control" maxlength="@DiscordLimits.EmbedTitle"
+                                   @bind="entry.Title" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                            <CharCount Value="@entry.Title" Max="DiscordLimits.EmbedTitle"/>
+                        </div>
+                        <div class="field field--wide">
+                            <label class="field__label" for="pe-content">Text</label>
+                            <textarea id="pe-content" class="form-control" rows="20" @bind="entry.Content"
+                                      @bind:event="oninput" @bind:after="OnFieldChanged"></textarea>
+                            <span class="field__hint">Discord-Markdown funktioniert hier.</span>
+                            <CharCount Value="@entry.Content" Max="DiscordLimits.EmbedDescription"/>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-image">Bild unter dem Text</label>
+                            <input id="pe-image" class="form-control" @bind="entry.ImageUrl"
+                                   @bind:after="OnFieldChanged"/>
+                            <span class="field__hint">URL eines Bildes oder GIFs. Optional.</span>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-color">Eigene Farbe</label>
+                            <input id="pe-color" class="form-control mono" maxlength="6" @bind="entry.Color"
+                                   @bind:after="OnFieldChanged"/>
+                            <span class="field__hint">Hex ohne Raute. Leer nimmt die Farbe des Panels.</span>
+                        </div>
+                    </div>
+                </Panel>
+
+                <Panel Title="Vorschau" Lead="Ungefähre Darstellung. Discord rendert Markdown in Details anders.">
+                    @* Discord's own embed colours, not the dashboard accent. See DESIGN.md, exceptions. *@
+                    <div class="embed-preview" style="border-left-color: #@PreviewColor;">
+                        @if (!string.IsNullOrWhiteSpace(entry.Title))
+                        {
+                            <p class="embed-preview__title">@entry.Title</p>
+                        }
+                        <div class="embed-preview__body">@((MarkupString)contentPreview)</div>
+                    </div>
+                </Panel>
+            }
+        </div>
+
+        <div>
+            <Panel Title="Stand">
+                <dl class="facts">
+                    <dt>Kurzname</dt>
+                    <dd class="mono">@PageId</dd>
+                    <dt>Gruppe</dt>
+                    <dd class="mono">@GroupId</dd>
+                    <dt>Zuletzt geändert</dt>
+                    <dd>@LastChanged</dd>
+                </dl>
+                <p class="field__hint">
+                    Dieses Datum speist die Zeile "@(group?.DateLabel ?? "Stand")" im Panel. Es bewegt sich nur,
+                    wenn du Überschrift oder Text änderst, nicht bei jedem Speichern.
+                </p>
+            </Panel>
+
+            @if (!entry.IsLink)
+            {
+                <Panel Title="Platzhalter" Flush="true">
+                    <ul class="rows">
+                        @foreach (var (token, description) in InfoPanelTemplateResolver.BuiltIn)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title mono">@token</p>
+                                    <p class="rows__text">@description</p>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </Panel>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string GroupId { get; set; } = "";
+    [Parameter] public string PageId { get; set; } = "";
+
+    private bool loaded;
+    private string? loadedKey;
+    private InfoPanelPage? entry;
+    private InfoPanelPage? snapshot;
+    private InfoPanelGroup? group;
+    private string contentPreview = "";
+
+    private bool IsButton => group is { IsSelect: false };
+
+    private int LabelLimit => IsButton ? DiscordLimits.ButtonLabel : DiscordLimits.SelectOptionLabel;
+
+    private string HeaderTitle =>
+        entry is null || string.IsNullOrWhiteSpace(entry.Label) ? PageId : entry.Label;
+
+    private string HeaderLead =>
+        entry is null
+            ? "Eintrag des Regelwerk-Panels."
+            : entry.IsLink
+                ? "Ein Button, der direkt auf eine Adresse führt."
+                : "Beschriftung im Panel und der Text, den der Bot darauf antwortet.";
+
+    private string PreviewColor =>
+        string.IsNullOrWhiteSpace(entry?.Color) ? "2F3136" : entry!.Color;
+
+    private string LastChanged =>
+        entry is null || entry.UpdatedAt <= 0
+            ? "Noch nie"
+            : DateTimeOffset.FromUnixTimeSeconds(entry.UpdatedAt).LocalDateTime.ToString("dd.MM.yyyy HH:mm");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{GroupId}/{PageId}";
+        if (loadedKey == key) return;
+
+        loadedKey = key;
+        loaded = false;
+        await LoadAsync();
+        Tracker.Register(SaveAsync, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged()
+    {
+        contentPreview = (entry?.Content ?? "").ConvertMarkdownToHtml();
+        Tracker.MarkDirty();
+    }
+
+    private async Task LoadAsync()
+    {
+        InfoPanelService.Invalidate();
+        var panel = await InfoPanelService.GetAsync(InfoPanelService.RulesPanelId);
+        group = panel?.Groups.FirstOrDefault(g => g.Id == GroupId);
+
+        var found = group?.Pages.FirstOrDefault(p => p.Id == PageId);
+        entry = found is null ? null : Clone(found);
+        snapshot = entry is null ? null : Clone(entry);
+        contentPreview = (entry?.Content ?? "").ConvertMarkdownToHtml();
+    }
+
+    private static InfoPanelPage Clone(InfoPanelPage source) => new()
+    {
+        Id = source.Id,
+        GroupId = source.GroupId,
+        PanelId = source.PanelId,
+        Kind = source.Kind,
+        Label = source.Label,
+        Description = source.Description,
+        Emoji = source.Emoji,
+        ButtonStyle = source.ButtonStyle,
+        Url = source.Url,
+        Title = source.Title,
+        Content = source.Content,
+        ImageUrl = source.ImageUrl,
+        Color = source.Color,
+        Position = source.Position,
+        Enabled = source.Enabled,
+        UpdatedAt = source.UpdatedAt
+    };
+
+    private async Task SaveAsync()
+    {
+        if (entry is null) return;
+
+        var error = DiscordLimits.Check("Beschriftung", entry.Label, LabelLimit);
+
+        if (!entry.IsLink)
+            error ??= DiscordLimits.Check("Zeile darunter", entry.Description,
+                          DiscordLimits.SelectOptionDescription)
+                      ?? DiscordLimits.Check("Überschrift", entry.Title, DiscordLimits.EmbedTitle)
+                      ?? DiscordLimits.Check("Text", entry.Content, DiscordLimits.EmbedDescription);
+
+        if (error is not null)
+        {
+            ToastService.Notify(error + " Discord lehnt die Antwort sonst ab.", "bad");
+            return;
+        }
+
+        if (entry.IsLink && string.IsNullOrWhiteSpace(entry.Url))
+        {
+            ToastService.Notify("Ein Link-Button ohne Ziel-URL wird von Discord abgelehnt.", "bad");
+            return;
+        }
+
+        entry.Color = entry.Color.TrimStart('#').Trim();
+
+        await InfoPanelService.UpsertPageAsync(entry);
+        await LoadAsync();
+        InfoPanelComponents.QueueRefreshPanel(InfoPanelService.RulesPanelId);
+
+        if (!entry!.Enabled)
+            ToastService.Notify("Gespeichert. Der Eintrag ist noch nicht sichtbar, schalte ihn oben frei.", "warn");
+        else
+            ToastService.Notify("Gespeichert. Die Nachricht in Discord zieht in wenigen Sekunden nach.", "ok");
+    }
+
+    private void Discard()
+    {
+        if (snapshot is null) return;
+
+        entry = Clone(snapshot);
+        contentPreview = entry.Content.ConvertMarkdownToHtml();
+    }
+}
