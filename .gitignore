@@ -410,3 +410,4 @@ src/Commands/Test/*
 /src/Modules/TestCommands/TestCommands.cs
 /botcache/
 /applyrequirements.txt
+analyze/
