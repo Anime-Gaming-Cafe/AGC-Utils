@@ -61,7 +61,7 @@ public static class InfoPanelService
             var panels = new List<InfoPanel>();
             await using (var cmd = Db.CreateCommand(
                              "SELECT id, name, channel_id, message_id, enabled, header_title, header_text, " +
-                             "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, spacer_url, " +
+                             "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, " +
                              "color, auto_repost, rendered_hash, sort_order FROM infopanels ORDER BY sort_order, id"))
             {
                 await using var reader = await cmd.ExecuteReaderAsync();
@@ -80,11 +80,10 @@ public static class InfoPanelService
                         AuthorIconUrl = Str(reader, 9),
                         BannerMode = Str(reader, 10, InfoPanel.ModeGuild),
                         BannerUrl = Str(reader, 11),
-                        SpacerUrl = Str(reader, 12),
-                        Color = Str(reader, 13, "2F3136"),
-                        AutoRepost = reader.IsDBNull(14) || reader.GetBoolean(14),
-                        RenderedHash = Str(reader, 15),
-                        SortOrder = reader.IsDBNull(16) ? 0 : reader.GetInt32(16)
+                        Color = Str(reader, 12, "2F3136"),
+                        AutoRepost = reader.IsDBNull(13) || reader.GetBoolean(13),
+                        RenderedHash = Str(reader, 14),
+                        SortOrder = reader.IsDBNull(15) ? 0 : reader.GetInt32(15)
                     });
             }
 
@@ -203,7 +202,7 @@ public static class InfoPanelService
                          "enabled = @enabled, header_title = @headerTitle, header_text = @headerText, " +
                          "author_name = @authorName, author_icon_mode = @authorIconMode, " +
                          "author_icon_url = @authorIconUrl, banner_mode = @bannerMode, banner_url = @bannerUrl, " +
-                         "spacer_url = @spacerUrl, color = @color, auto_repost = @autoRepost, " +
+                         "color = @color, auto_repost = @autoRepost, " +
                          "rendered_hash = @hash, sort_order = @sort WHERE id = @id"))
         {
             Bind(update, panel);
@@ -216,10 +215,10 @@ public static class InfoPanelService
 
         await using var insert = Db.CreateCommand(
             "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, " +
-            "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, spacer_url, color, " +
+            "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, color, " +
             "auto_repost, rendered_hash, sort_order) " +
             "VALUES (@id, @name, @channel, @message, @enabled, @headerTitle, @headerText, @authorName, " +
-            "@authorIconMode, @authorIconUrl, @bannerMode, @bannerUrl, @spacerUrl, @color, @autoRepost, " +
+            "@authorIconMode, @authorIconUrl, @bannerMode, @bannerUrl, @color, @autoRepost, " +
             "@hash, @sort)");
         Bind(insert, panel);
         await insert.ExecuteNonQueryAsync();
@@ -248,7 +247,6 @@ public static class InfoPanelService
         cmd.Parameters.AddWithValue("authorIconUrl", panel.AuthorIconUrl ?? "");
         cmd.Parameters.AddWithValue("bannerMode", panel.BannerMode ?? InfoPanel.ModeNone);
         cmd.Parameters.AddWithValue("bannerUrl", panel.BannerUrl ?? "");
-        cmd.Parameters.AddWithValue("spacerUrl", panel.SpacerUrl ?? "");
         cmd.Parameters.AddWithValue("color", string.IsNullOrWhiteSpace(panel.Color) ? "2F3136" : panel.Color);
         cmd.Parameters.AddWithValue("autoRepost", panel.AutoRepost);
         cmd.Parameters.AddWithValue("sort", panel.SortOrder);
@@ -264,7 +262,7 @@ public static class InfoPanelService
         await using var cmd = Db.CreateCommand(
             "UPDATE infopanels SET name = @name, header_title = @headerTitle, header_text = @headerText, " +
             "author_name = @authorName, author_icon_mode = @authorIconMode, author_icon_url = @authorIconUrl, " +
-            "banner_mode = @bannerMode, banner_url = @bannerUrl, spacer_url = @spacerUrl, color = @color, " +
+            "banner_mode = @bannerMode, banner_url = @bannerUrl, color = @color, " +
             "auto_repost = @autoRepost, sort_order = @sort WHERE id = @id");
         BindSettings(cmd, panel);
         await cmd.ExecuteNonQueryAsync();

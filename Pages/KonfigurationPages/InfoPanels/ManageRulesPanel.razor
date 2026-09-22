@@ -150,14 +150,6 @@ else
                 <span class="field__hint">Hex ohne Raute, zum Beispiel 2F3136.</span>
             </div>
             <div class="field">
-                <label class="field__label" for="rp-spacer">Abstandsbild</label>
-                <input id="rp-spacer" class="form-control" @bind="panel.SpacerUrl" @bind:after="OnFieldChanged"/>
-                <span class="field__hint">
-                    Ein durchsichtiges, breites Bild. Hält das Embed auf gleichbleibender Breite. Leer lassen
-                    geht auch.
-                </span>
-            </div>
-            <div class="field">
                 <div class="form-check form-switch m-0">
                     <input class="form-check-input" type="checkbox" role="switch" id="rp-repost"
                            @bind="panel.AutoRepost" @bind:after="OnFieldChanged"/>
@@ -391,7 +383,6 @@ else
         AuthorIconUrl = source.AuthorIconUrl,
         BannerMode = source.BannerMode,
         BannerUrl = source.BannerUrl,
-        SpacerUrl = source.SpacerUrl,
         Color = source.Color,
         AutoRepost = source.AutoRepost,
         RenderedHash = source.RenderedHash,

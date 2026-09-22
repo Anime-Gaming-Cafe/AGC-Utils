@@ -26,6 +26,14 @@ public static class DiscordLimits
     public const int ActionRowsPerMessage = 5;
     public const int CustomId = 100;
 
+    /// <summary>Discord's documented Components V2 text-display content cap. Not enforced by DisCatSharp itself.</summary>
+    public const int TextDisplayContent = 4000;
+
+    public const int SectionMaxTextDisplays = 3;
+    public const int ContainerMaxChildren = 39;
+    public const int MediaGalleryMaxItems = 10;
+    public const int MessageV2MaxComponents = 40;
+
     /// <summary>The share of a limit at which the dashboard starts warning instead of staying neutral.</summary>
     public const double WarnRatio = 0.9;
 

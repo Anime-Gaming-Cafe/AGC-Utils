@@ -28,7 +28,6 @@ public static class InfoPanelSeedData
 
     public const string HeaderTitle = @"Herzlich Willkommen auf dem Anime & Gaming Café";
     public const string AuthorName = @"Anime & Gaming Café";
-    public const string SpacerUrl = @"https://i.imgur.com/U9Fih4D.png";
 
     public const string BirthdayImageUrl =
         @"https://cdn.discordapp.com/attachments/764921088689438771/950057781203959848/biSQObD.gif";
@@ -343,7 +342,6 @@ Siehe <#930878036377747456>
             AuthorName = AuthorName,
             AuthorIconMode = InfoPanel.ModeGuild,
             BannerMode = InfoPanel.ModeGuild,
-            SpacerUrl = SpacerUrl,
             Color = "2F3136",
             AutoRepost = true
         };

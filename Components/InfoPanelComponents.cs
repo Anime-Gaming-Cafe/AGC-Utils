@@ -87,44 +87,34 @@ public static class InfoPanelComponents
 
     public static DiscordMessageBuilder BuildMessage(InfoPanel panel)
     {
-        var builder = new DiscordMessageBuilder();
+        var builder = new DiscordMessageBuilder().WithV2Components();
         var color = panel.DiscordColor;
+        var children = new List<DiscordComponent>();
 
         var bannerUrl = ResolveBannerUrl(panel);
-
-        // Discord only renders an image-only embed at full width when the client can tell it
-        // belongs to the embed below it, which it does by giving both the same (otherwise
-        // invisible) url. Without this, a lone image embed renders as a small thumbnail.
-        var vanityCode = CurrentApplication.TargetGuild?.VanityUrlCode;
-        var groupUrl = !string.IsNullOrWhiteSpace(bannerUrl) && !string.IsNullOrWhiteSpace(vanityCode)
-            ? $"https://discord.gg/{vanityCode}"
-            : null;
-
         if (!string.IsNullOrWhiteSpace(bannerUrl))
+            children.Add(new DiscordMediaGalleryComponent([new DiscordMediaGalleryItem(bannerUrl)]));
+
+        var textDisplays = new List<DiscordTextDisplayComponent>();
+        if (!string.IsNullOrWhiteSpace(panel.AuthorName))
+            textDisplays.Add(new DiscordTextDisplayComponent(
+                $"-# {panel.AuthorName.Truncate(DiscordLimits.EmbedAuthorName)}"));
+        if (!string.IsNullOrWhiteSpace(panel.HeaderTitle))
+            textDisplays.Add(new DiscordTextDisplayComponent($"# {panel.HeaderTitle.Truncate(DiscordLimits.EmbedTitle)}"));
+        var description = BuildHeaderDescription(panel);
+        if (!string.IsNullOrWhiteSpace(description))
+            textDisplays.Add(new DiscordTextDisplayComponent(description));
+
+        if (textDisplays.Count > 0)
         {
-            var banner = new DiscordEmbedBuilder().WithColor(color).WithImageUrl(bannerUrl);
-            if (groupUrl is not null) banner.WithUrl(groupUrl);
-            builder.AddEmbed(banner);
+            var iconUrl = ResolveAuthorIconUrl(panel);
+            if (!string.IsNullOrWhiteSpace(iconUrl))
+                children.Add(new DiscordSectionComponent(textDisplays).WithThumbnailComponent(iconUrl));
+            else
+                children.AddRange(textDisplays);
         }
 
-        var header = new DiscordEmbedBuilder()
-            .WithTitle(panel.HeaderTitle.Truncate(DiscordLimits.EmbedTitle))
-            .WithDescription(BuildHeaderDescription(panel))
-            .WithColor(color);
-
-        if (groupUrl is not null) header.WithUrl(groupUrl);
-
-        if (!string.IsNullOrWhiteSpace(panel.AuthorName))
-            header.WithAuthor(panel.AuthorName.Truncate(DiscordLimits.EmbedAuthorName),
-                iconUrl: ResolveAuthorIconUrl(panel));
-
-        // Only needed as a width-forcing hack when there's no banner; with a banner, a second
-        // embed image in the same message makes Discord shrink both into small gallery tiles.
-        if (string.IsNullOrWhiteSpace(bannerUrl) && !string.IsNullOrWhiteSpace(panel.SpacerUrl))
-            header.WithImageUrl(panel.SpacerUrl);
-
-        builder.AddEmbed(header);
-
+        var actionRows = new List<DiscordActionRowComponent>();
         var rows = 0;
         foreach (var group in panel.Groups.Where(g => g.Enabled).OrderBy(g => g.Position))
         {
@@ -150,8 +140,9 @@ public static class InfoPanelComponents
                     ? "Auswählen"
                     : group.Placeholder.Truncate(DiscordLimits.SelectPlaceholder);
 
-                builder.AddComponents(new DiscordStringSelectComponent(placeholder, options,
-                    SelectCustomId(panel, group), 1, 1));
+                actionRows.Add(new DiscordActionRowComponent([
+                    new DiscordStringSelectComponent(placeholder, options, SelectCustomId(panel, group), 1, 1)
+                ]));
             }
             else
             {
@@ -173,11 +164,19 @@ public static class InfoPanelComponents
                 }
 
                 if (buttons.Count == 0) continue;
-                builder.AddComponents(buttons);
+                actionRows.Add(new DiscordActionRowComponent(buttons));
             }
 
             rows++;
         }
+
+        if (actionRows.Count > 0)
+        {
+            if (children.Count > 0) children.Add(new DiscordSeparatorComponent());
+            children.AddRange(actionRows);
+        }
+
+        builder.AddComponents([new DiscordContainerComponent(children, accentColor: color)]);
 
         return builder;
     }
@@ -217,7 +216,6 @@ public static class InfoPanelComponents
             .Append(panel.AuthorName).Append('\u001f')
             .Append(ResolveAuthorIconUrl(panel)).Append('\u001f')
             .Append(ResolveBannerUrl(panel)).Append('\u001f')
-            .Append(panel.SpacerUrl).Append('\u001f')
             .Append(panel.Color).Append('\u001e');
 
         foreach (var group in panel.Groups.Where(g => g.Enabled).OrderBy(g => g.Position))
@@ -293,6 +291,33 @@ public static class InfoPanelComponents
                 await InfoPanelService.SetLocationAsync(panelId, reposted.ChannelId, reposted.Id);
                 CurrentApplication.Logger.Information(
                     "InfoPanel {PanelId}: Nachricht war geloescht, neu gepostet als {MessageId}", panelId,
+                    reposted.Id);
+            }
+            catch (Exception e) when (panel.AutoRepost)
+            {
+                // Editing can fail for reasons other than "message is gone" (e.g. the first
+                // Components V2 rollout can't turn an existing classic-embed message into one
+                // in place). Reposting fresh keeps the panel from getting stuck either way.
+                CurrentApplication.Logger.Warning(e,
+                    "InfoPanel {PanelId}: Bearbeiten von {MessageId} fehlgeschlagen, poste neu", panelId,
+                    panel.MessageId);
+
+                try
+                {
+                    var stale = await channel.GetMessageAsync(panel.MessageId);
+                    await stale.DeleteAsync();
+                }
+                catch (Exception deleteError)
+                {
+                    CurrentApplication.Logger.Warning(deleteError,
+                        "InfoPanel {PanelId}: Alte Nachricht {MessageId} konnte nicht geloescht werden", panelId,
+                        panel.MessageId);
+                }
+
+                var reposted = await channel.SendMessageAsync(builder);
+                await InfoPanelService.SetLocationAsync(panelId, reposted.ChannelId, reposted.Id);
+                CurrentApplication.Logger.Information(
+                    "InfoPanel {PanelId}: neu gepostet als {MessageId} nach fehlgeschlagenem Bearbeiten", panelId,
                     reposted.Id);
             }
 

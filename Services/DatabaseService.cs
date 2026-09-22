@@ -482,7 +482,7 @@ public static class DatabaseService
             },
             {
                 "infopanels",
-                "CREATE TABLE IF NOT EXISTS infopanels (id TEXT, name TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT, header_text TEXT, author_name TEXT, author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT, banner_mode TEXT DEFAULT 'guild', banner_url TEXT, spacer_url TEXT, color TEXT DEFAULT '2F3136', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT, sort_order INTEGER DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS infopanels (id TEXT, name TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT, header_text TEXT, author_name TEXT, author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT, banner_mode TEXT DEFAULT 'guild', banner_url TEXT, color TEXT DEFAULT '2F3136', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT, sort_order INTEGER DEFAULT 0)"
             },
             {
                 "infopanel_groups",
@@ -1568,6 +1568,18 @@ public static class DatabaseService
                 }
             },
             {
+                "infopanels", new Dictionary<string, string>
+                {
+                    {
+                        // The banner is now a Components V2 media gallery item, which is always full
+                        // width on its own - no more need to force width with a second, invisible image.
+                        // Explicit revert migration, not a silent removal - this already shipped.
+                        "spacer_url",
+                        "ALTER TABLE infopanels DROP COLUMN IF EXISTS spacer_url"
+                    }
+                }
+            },
+            {
                 "activity_role_tiers", new Dictionary<string, string>
                 {
                     { "rule_id", "ALTER TABLE activity_role_tiers ADD COLUMN IF NOT EXISTS rule_id TEXT" },
@@ -2061,8 +2073,8 @@ public static class DatabaseService
         var panel = InfoPanelSeedData.BuildSeedPanel();
 
         await using (var cmd = con.CreateCommand(
-                         "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, spacer_url, color, auto_repost, rendered_hash, sort_order) " +
-                         "VALUES (@id, @name, 0, 0, false, @headerTitle, @headerText, @authorName, @authorIconMode, '', @bannerMode, '', @spacerUrl, @color, true, '', 0) " +
+                         "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, color, auto_repost, rendered_hash, sort_order) " +
+                         "VALUES (@id, @name, 0, 0, false, @headerTitle, @headerText, @authorName, @authorIconMode, '', @bannerMode, '', @color, true, '', 0) " +
                          "ON CONFLICT (id) DO NOTHING"))
         {
             cmd.Parameters.AddWithValue("id", panel.Id);
@@ -2072,7 +2084,6 @@ public static class DatabaseService
             cmd.Parameters.AddWithValue("authorName", panel.AuthorName);
             cmd.Parameters.AddWithValue("authorIconMode", panel.AuthorIconMode);
             cmd.Parameters.AddWithValue("bannerMode", panel.BannerMode);
-            cmd.Parameters.AddWithValue("spacerUrl", panel.SpacerUrl);
             cmd.Parameters.AddWithValue("color", panel.Color);
             await cmd.ExecuteNonQueryAsync();
         }

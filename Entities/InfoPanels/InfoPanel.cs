@@ -29,9 +29,6 @@ public class InfoPanel
     public string BannerMode { get; set; } = ModeGuild;
     public string BannerUrl { get; set; } = "";
 
-    /// <summary>Transparent spacer image that forces a constant embed width.</summary>
-    public string SpacerUrl { get; set; } = "";
-
     public string Color { get; set; } = "2F3136";
 
     /// <summary>Put the message back when it was deleted. Only ever fires once a panel was sent.</summary>
