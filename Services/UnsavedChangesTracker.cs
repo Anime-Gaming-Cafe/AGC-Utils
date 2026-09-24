@@ -40,12 +40,23 @@ public sealed class UnsavedChangesTracker
         OnChange?.Invoke();
     }
 
-    public async Task SaveAsync()
+    private bool _rejected;
+
+    /// <summary>Called from inside the save delegate when validation fails, so the changes stay marked as unsaved.</summary>
+    public void RejectSave()
     {
+        _rejected = true;
+    }
+
+    public async Task<bool> SaveAsync()
+    {
+        _rejected = false;
         if (_save != null) await _save();
-        if (!IsDirty) return;
+        if (_rejected) return false;
+        if (!IsDirty) return true;
         IsDirty = false;
         OnChange?.Invoke();
+        return true;
     }
 
     public void Discard()

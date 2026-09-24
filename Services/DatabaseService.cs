@@ -507,6 +507,26 @@ public static class DatabaseService
             {
                 "idx_infopanel_pages_panel",
                 "CREATE INDEX IF NOT EXISTS idx_infopanel_pages_panel ON infopanel_pages (panel_id)"
+            },
+            {
+                "autoposts",
+                "CREATE TABLE IF NOT EXISTS autoposts (autopost_id TEXT PRIMARY KEY, name TEXT DEFAULT '', enabled BOOLEAN DEFAULT false, channel_id BIGINT DEFAULT 0, trigger_type TEXT DEFAULT 'messages', threshold INTEGER DEFAULT 100, count_scope_ids BIGINT[] DEFAULT '{}', subtract_leaves BOOLEAN DEFAULT true, interval_minutes INTEGER DEFAULT 60, parent_autopost_id TEXT DEFAULT '', parent_delay_seconds INTEGER DEFAULT 0, delete_previous BOOLEAN DEFAULT false, rotation_mode TEXT DEFAULT 'sequential', steps JSONB DEFAULT '[]'::jsonb, counter_since BIGINT DEFAULT 0, join_count INTEGER DEFAULT 0, last_posted_at BIGINT DEFAULT 0, last_message_ids BIGINT[] DEFAULT '{}', rotation_state INTEGER[] DEFAULT '{}', created_at BIGINT DEFAULT 0, updated_at BIGINT DEFAULT 0)"
+            },
+            {
+                "autopost_conditions",
+                "CREATE TABLE IF NOT EXISTS autopost_conditions (condition_id TEXT PRIMARY KEY, autopost_id TEXT, condition_type TEXT, negate BOOLEAN DEFAULT false, params JSONB DEFAULT '{}'::jsonb, created_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_autopost_conditions_autopost",
+                "CREATE INDEX IF NOT EXISTS idx_autopost_conditions_autopost ON autopost_conditions (autopost_id)"
+            },
+            {
+                "autopost_queue",
+                "CREATE TABLE IF NOT EXISTS autopost_queue (queue_id TEXT PRIMARY KEY, autopost_id TEXT, step_index INTEGER DEFAULT 0, due_at BIGINT DEFAULT 0, check_filters BOOLEAN DEFAULT false)"
+            },
+            {
+                "idx_metrics_messages_channel_timestamp",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_messages_channel_timestamp ON metrics_messages (channelid, timestamp)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1756,6 +1776,7 @@ public static class DatabaseService
         await InitBanRequestStages();
         await InitTicketCategories();
         await InitInfoPanels();
+        await InitAutoposts();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -2128,6 +2149,27 @@ public static class DatabaseService
                 await pageCmd.ExecuteNonQueryAsync();
             }
         }
+    }
+
+    /// <summary>
+    ///     Seeds the three posts of the old Python bot, disabled, exactly once. The marker lives in
+    ///     botsettings so a post deleted in the dashboard stays deleted after the next restart.
+    /// </summary>
+    private static async Task InitAutoposts()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using (var check = con.CreateCommand(
+                         "SELECT 1 FROM botsettings WHERE section = 'Autoposts' AND key = 'Seeded'"))
+        {
+            if (await check.ExecuteScalarAsync() is not null) return;
+        }
+
+        foreach (var autopost in AutopostSeedData.Build())
+            await AutopostService.InsertAsync(autopost);
+
+        await using var mark = con.CreateCommand(
+            "INSERT INTO botsettings (section, key, value) VALUES ('Autoposts', 'Seeded', 'true') ON CONFLICT (section, key) DO NOTHING");
+        await mark.ExecuteNonQueryAsync();
     }
 
     private static async Task InitLeveling()

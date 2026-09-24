@@ -47,8 +47,6 @@
     --bs-form-valid-border-color: var(--ok);
 }
 
-/* 2. Base */
-
 html {
     -webkit-text-size-adjust: 100%;
 }
@@ -107,7 +105,6 @@ code {
     padding: 1px 5px;
 }
 
-/* Numbers line up in tables, IDs and timestamps. */
 table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 ::selection {
@@ -115,8 +112,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     color: var(--fg);
 }
 
-/* --- Focus -----------------------------------------------------------------
-   Defined once, never removed. The previous system disabled it on every button. */
 :focus { outline: none; }
 
 :focus-visible {
@@ -140,8 +135,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     outline-offset: -1px;
 }
 
-/* 3. Layout shell */
-
 .app {
     display: flex;
     flex-direction: column;
@@ -162,8 +155,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 @media (min-width: 900px) {
     .app__content { padding: var(--s-6) var(--s-5) var(--s-7); }
 }
-
-/* 4. Page header */
 
 .page-header {
     align-items: flex-start;
@@ -201,8 +192,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .page-back { text-decoration: none; }
 .page-back:hover { color: var(--fg); text-decoration: none; }
-
-/* 5. Panel - the one surface */
 
 .panel {
     background-color: var(--surface);
@@ -247,8 +236,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .panel--flush > .panel__body { padding: 0; }
 
-/* A follow-up question: not a boxed panel of its own, just a divided, indented continuation of
-   its trigger's own card, since it belongs to that question rather than standing next to it. */
 .followup {
     border-top: 1px solid var(--border);
     margin-top: var(--s-4);
@@ -276,8 +263,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     margin: var(--s-6) 0 var(--s-3);
 }
 
-/* A section-title with a trailing action (e.g. a preview link) - the row carries the spacing
-   that .section-title normally carries on its own, so the heading's own margin resets to 0. */
 .section-title-row {
     align-items: center;
     display: flex;
@@ -288,8 +273,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 }
 
 .section-title-row > .section-title { margin: 0; }
-
-/* 6. Buttons */
 
 .btn {
     --bs-btn-border-radius: var(--r-control);
@@ -308,7 +291,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     --bs-btn-padding-y: 3px;
 }
 
-/* The accent's one job on this page. */
 .btn-primary {
     --bs-btn-bg: var(--accent);
     --bs-btn-border-color: var(--accent);
@@ -375,8 +357,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     gap: var(--s-2);
 }
 
-/* 7. Forms */
-
 .form-control,
 .form-select {
     background-color: var(--surface-sunken);
@@ -405,9 +385,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     border-color: var(--accent);
 }
 
-/* Bootstrap paints the range track with --bs-secondary-bg, which is the panel colour here, and hard-codes
-   a blue thumb. The track takes the strong border colour; the thumb is a set value, so like a checked box
-   it takes the accent. Each engine's pseudo-elements need their own rule, a shared list would be dropped. */
 .form-range::-webkit-slider-runnable-track {
     background-color: var(--border-strong);
     border-radius: var(--r-control);
@@ -434,15 +411,11 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .form-range:focus::-webkit-slider-thumb { box-shadow: none; }
 .form-range:focus::-moz-range-thumb { box-shadow: none; }
 
-/* Bootstrap's .form-range:focus { outline: 0 } outranks the global ring. */
 .form-range:focus-visible {
     outline: 2px solid var(--accent-strong);
     outline-offset: 2px;
 }
 
-/* A Number question rendered as a slider: the live value sits next to the track. The output
-   updates on drag via a plain inline oninput (no server round-trip per pixel); @onchange still
-   commits the value to the model once the drag ends. */
 .range-field {
     align-items: center;
     display: flex;
@@ -494,8 +467,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-/* 8. Tables */
-
 .table-wrap {
     overflow-x: auto;
 }
@@ -526,8 +497,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .table > tbody tr:last-child td { border-bottom: 0; }
 
-/* 9. Record list - the scannable list of decisions */
-
 .record-list {
     display: flex;
     flex-direction: column;
@@ -556,8 +525,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .record > a:hover { text-decoration: none; }
 
-/* The left edge carries the record's real status. It is a signal, not decoration
-   (DESIGN.md, "Exceptions on record"). */
 .record--new { border-left-color: var(--fg-muted); }
 .record--read { border-left-color: var(--border-strong); }
 .record--shortlisted { border-left-color: var(--border-strong); }
@@ -589,7 +556,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     margin-top: var(--s-2);
 }
 
-/* --- Definition list used for facts ---------------------------------------- */
 .facts {
     display: grid;
     gap: var(--s-2) var(--s-4);
@@ -642,8 +608,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     gap: var(--s-1);
 }
 
-/* Overlapping keeps a long reader list short. The ring takes the colour of whatever is behind the
-   stack, so every avatar keeps its edge where it covers the next one. */
 .avatar-stack {
     align-items: center;
     display: inline-flex;
@@ -667,7 +631,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding: 0;
 }
 
-/* A tapped avatar is a selection, one of the four places the accent is allowed. */
 .avatar-button[aria-pressed="true"] .avatar { border-color: var(--accent); }
 
 .record:hover .avatar-stack { --avatar-ring: var(--surface-raised); }
@@ -685,8 +648,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-4);
 }
 
-/* 10. Status pill */
-
 .pill {
     border: 1px solid transparent;
     border-radius: var(--r-control);
@@ -702,8 +663,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .pill--ok { background-color: var(--ok-tint); border-color: var(--ok); color: var(--ok-text); }
 .pill--warn { background-color: var(--warn-tint); border-color: var(--warn); color: var(--warn-text); }
 .pill--bad { background-color: var(--bad-tint); border-color: var(--bad); color: var(--bad-text); }
-
-/* 11. Notices */
 
 .notice {
     background-color: var(--surface-raised);
@@ -727,8 +686,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .notice--ok { border-left-color: var(--ok); }
 .notice--warn { border-left-color: var(--warn); }
 .notice--bad { border-left-color: var(--bad); }
-
-/* 12. State block - loading / empty / error */
 
 .state {
     align-items: center;
@@ -769,7 +726,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .state--bad .state__title { color: var(--bad-text); }
 
-/* The only perpetual motion in the system: it reports real progress. */
 .spinner {
     animation: spin 0.8s linear infinite;
     border: 2px solid var(--border-strong);
@@ -787,8 +743,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
     .spinner { animation-duration: 2s; }
 }
-
-/* 13. Pager */
 
 .pager {
     align-items: center;
@@ -808,8 +762,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     display: flex;
     gap: var(--s-2);
 }
-
-/* 14. Inline confirm - this codebase has no modals, on purpose */
 
 .confirm {
     background-color: var(--bad-tint);
@@ -840,8 +792,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     --bs-btn-hover-color: var(--fg);
 }
 
-/* 15. Icons */
-
 .icon {
     display: inline-block;
     fill: none;
@@ -854,8 +804,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     vertical-align: -0.125em;
     width: 1em;
 }
-
-/* 16. Top bar. One navigation level with at most six entries. The bar shares the content's max width and side padding, so its left edge lines up with the page below. */
 
 .topbar {
     background-color: var(--surface);
@@ -888,7 +836,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .topbar__brand:hover { color: var(--fg); text-decoration: none; }
 
-/* Below the breakpoint the menu expands the bar itself instead of floating a drawer. */
 .topnav {
     flex-basis: 100%;
     order: 3;
@@ -1014,8 +961,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .topbar__toggle { display: none; }
 }
 
-/* 17. Blazor chrome */
-
 #blazor-error-ui {
     background-color: var(--bad-tint);
     border-top: 1px solid var(--bad);
@@ -1036,8 +981,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     right: var(--s-4);
     top: var(--s-3);
 }
-
-/* 18. Link list - hub pages. A card wrapped around a single link carried no information, so hubs are lists. */
 
 .nav-links {
     display: flex;
@@ -1068,8 +1011,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     color: var(--fg-muted);
     font-size: var(--f-sm);
 }
-
-/* 19. Rows - a plain list inside a flush panel */
 
 .rows {
     list-style: none;
@@ -1116,8 +1057,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-3);
 }
 
-/* 20. Question list - one form, not one card per question */
-
 .question-list > .field {
     margin: 0;
     padding-block: var(--s-4);
@@ -1126,8 +1065,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .question-list > .field:first-child { padding-top: 0; }
 .question-list > .field + .field { border-top: 1px solid var(--border); }
 
-/* A follow-up field: pulled up close under the question it belongs to, with no divider between
-   them - it reads as part of that question, not the next item in the list. */
 .question-list > .field + .field--followup {
     border-top: none;
     margin-top: calc(var(--s-4) * -1);
@@ -1144,8 +1081,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding-top: var(--s-4);
 }
 
-/* 21. Detail layout. The page's weight sits in the main column (answers, decision, notes); facts about the applicant are supporting material and go to the side. */
-
 .detail-grid {
     align-items: start;
     display: grid;
@@ -1156,7 +1091,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .detail-grid { grid-template-columns: minmax(0, 1fr) 340px; }
 }
 
-/* Snapshot vs. live, activity windows: a real comparison, so a real table. */
 .compare {
     border-collapse: collapse;
     font-size: var(--f-sm);
@@ -1196,8 +1130,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .filter-bar .field { margin: 0; }
 
-/* 22. Form helpers */
-
 .field--wide { grid-column: 1 / -1; }
 
 .option-row {
@@ -1226,15 +1158,10 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 
 .option-row__other .field__hint { grid-column: 1 / -1; }
 
-/* The inline "Sonstiges" field an applicant fills in - aligned under the option's label text
-   (not the checkbox/radio itself) and kept compact, so it reads as part of that option rather
-   than as its own boxed component. */
 .option-answer-other {
     margin: var(--s-1) 0 var(--s-3) 1.5em;
     max-width: 420px;
 }
-
-/* 23. Page helpers */
 
 .panel-grid {
     align-items: start;
@@ -1255,7 +1182,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .editor-grid { grid-template-columns: 360px minmax(0, 1fr); }
 }
 
-/* The signed-in user's own leaderboard row is their selection on the list. */
 .rows > li.is-self { background-color: var(--accent-tint); }
 
 .rank {
@@ -1320,8 +1246,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     max-width: 100%;
 }
 
-/* Imitates Discord's embed rendering - these colours are Discord's, not ours.
-   See DESIGN.md, "Exceptions on record". */
 .embed-preview {
     background-color: #2b2d31;
     border-left: 4px solid;
@@ -1350,7 +1274,88 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     margin: var(--s-3) 0 0;
 }
 
-/* Blazor EditForm validation */
+.embed-preview--split {
+    display: grid;
+    gap: var(--s-3);
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.embed-preview__author {
+    align-items: center;
+    color: #f2f3f5;
+    display: flex;
+    font-size: var(--f-sm);
+    font-weight: 600;
+    gap: var(--s-2);
+    margin-bottom: var(--s-2);
+}
+
+.embed-preview__author img {
+    border-radius: 50%;
+    height: 24px;
+    width: 24px;
+}
+
+.embed-preview__thumb {
+    border-radius: var(--r-control);
+    height: 80px;
+    object-fit: cover;
+    width: 80px;
+}
+
+.embed-preview__image {
+    border-radius: var(--r-control);
+    display: block;
+    margin-top: var(--s-3);
+    max-width: 100%;
+}
+
+.message-preview__content {
+    color: #dbdee1;
+    margin: 0 0 var(--s-2);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.message-preview__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+    max-width: 560px;
+}
+
+.message-preview__button {
+    background-color: #4e5058;
+    border-radius: var(--r-control);
+    color: #fff;
+    font-size: var(--f-sm);
+    padding: var(--s-1) var(--s-3);
+}
+
+.variant-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+}
+
+.variant-tabs .btn[aria-pressed="true"] {
+    border-color: rgb(var(--accent-rgb));
+}
+
+.step-block + .step-block {
+    border-top: 1px solid var(--border);
+    margin-top: var(--s-4);
+    padding-top: var(--s-4);
+}
+
+.weekday-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+}
+
 .validation-errors {
     color: var(--bad-text);
     font-size: var(--f-sm);
@@ -1366,10 +1371,7 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 .form-control.invalid,
 .form-select.invalid { border-color: var(--bad); }
 
-/* A row list inside a padded panel body that has to run to the panel's edges. */
 .rows--bleed { margin-inline: calc(var(--s-4) * -1); }
-
-/* 24. Toasts. Replaces the inline .notice confirmation that used to sit under the page title. Same tone classes, just floated instead of pinned to the page. */
 
 .toast-host {
     display: flex;
@@ -1406,8 +1408,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     .toast-host { left: var(--s-4); max-width: none; right: var(--s-4); }
 }
 
-/* 25. Unsaved changes bar. A floating pill, not a docked bar: it sits above the page with a gap on every side, same reasoning for --shadow-overlay as the other floating elements (see DESIGN.md, "Elevation"). */
-
 .unsaved-bar {
     align-items: center;
     background-color: var(--surface-raised);
@@ -1425,14 +1425,12 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     padding: var(--s-3) var(--s-4);
     pointer-events: none;
     position: fixed;
-    /* Resting (hidden) position: pushed below its own box plus a margin, so it starts fully out of view
-       and slides up into place instead of appearing out of nothing. */
+
     transform: translate(-50%, calc(100% + var(--s-6)));
     transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease);
     z-index: 1040;
 }
 
-/* Save/Discard both clear IsDirty, which drops this class again and slides the bar back down. */
 .unsaved-bar.is-visible {
     opacity: 1;
     pointer-events: auto;
@@ -1444,12 +1442,8 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     gap: var(--s-2);
 }
 
-/* The one deliberate exception to MOTION 1 (see DESIGN.md, "Exceptions on
-   record"): a single non-looping shake when a blocked navigation attempt
-   needs to be felt, not just read. */
 .unsaved-bar.is-shaking { animation: shake 0.4s var(--ease); }
 
-/* Offsets stack onto the visible resting transform, not replace it. */
 @keyframes shake {
     10%, 90% { transform: translate(calc(-50% - 1px), 0); }
     20%, 80% { transform: translate(calc(-50% + 2px), 0); }
@@ -1460,8 +1454,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
     .unsaved-bar.is-shaking { animation: none; }
 }
-
-/* 26. Weekly bar chart */
 
 .weekly-chart__scroll {
     overflow-x: auto;
@@ -1475,7 +1467,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     fill: var(--fg);
     font-size: var(--f-xs);
 }
-
 
 .searchable-select {
     position: relative;
@@ -1495,8 +1486,6 @@ table, .tnum, time, .pager__info { font-variant-numeric: tabular-nums; }
     background-color: var(--bs-dropdown-link-hover-bg);
     color: var(--bs-dropdown-link-hover-color);
 }
-
-/* 28. Rendered-message preview (announcement builder) */
 
 .preview-block {
     background-color: var(--surface-sunken);

@@ -198,16 +198,7 @@ public static class InfoPanelComponents
 
     private static DiscordComponentEmoji? BuildEmoji(string? emoji)
     {
-        if (string.IsNullOrWhiteSpace(emoji)) return null;
-
-        try
-        {
-            return new DiscordComponentEmoji(emoji);
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        return ComponentEmojiParser.Parse(emoji);
     }
 
     /// <summary>

@@ -23,6 +23,7 @@ public static class InfoPanelTemplateResolver
         ("{membercount}", "Aktuelle Mitgliederzahl des Servers."),
         ("{boostcount}", "Anzahl der aktiven Boosts."),
         ("{guildname}", "Name des Servers."),
+        ("{guildicon}", "Adresse des Server-Icons, z.B. für Autor-Icon oder Thumbnail."),
         ("{unixtimestamp}", "Aktuelle Zeit als Unix-Zeitstempel."),
         ("{unixtimestamp+3600}", "Zeit in einer Stunde. Beliebige Sekundenzahl möglich. Für einen echten Discord-Zeitstempel: <t:{unixtimestamp+3600}:R>"),
         ("{role:ROLEID}", "Alle Mitglieder mit dieser Rolle, alphabetisch, als Erwähnungen."),
@@ -39,6 +40,7 @@ public static class InfoPanelTemplateResolver
             text = text.Replace("{membercount}", (guild.MemberCount ?? 0).ToString("N0"));
             text = text.Replace("{boostcount}", (guild.PremiumSubscriptionCount ?? 0).ToString("N0"));
             text = text.Replace("{guildname}", guild.Name);
+            text = text.Replace("{guildicon}", guild.IconUrl ?? "");
 
             if (text.Contains("{role:"))
                 foreach (Match match in Regex.Matches(text, @"\{role:(\d+)(?::(ASC|DESC))?\}",

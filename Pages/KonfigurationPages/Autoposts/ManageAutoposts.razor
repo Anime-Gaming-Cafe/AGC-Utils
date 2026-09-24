@@ -1,0 +1,122 @@
+@page "/konfiguration/autoposts"
+@using AGC_Management.Entities.Autoposts
+@using AGC_Management.Enums.Autoposts
+@using AGC_Management.Services
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Autoposts"
+            Lead="Nachrichten, die der Bot von selbst schickt, sobald ein Auslöser erreicht ist und alle Bedingungen passen."
+            BackHref="/Konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading" Title="Autoposts werden geladen" Description="Einstellungen und Zählerstände werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Autoposts" Flush="@(autoposts.Count > 0)">
+        @if (autoposts.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Noch kein Autopost angelegt" Description="Lege unten den ersten an. Er startet ausgeschaltet."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var autopost in autoposts)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@autopost.Name</p>
+                            <p class="rows__text">
+                                @ChannelName(autopost.ChannelId) &middot; @TriggerLabel(autopost.TriggerType) &middot; @(progress.TryGetValue(autopost.AutopostId, out var p) ? p.Text : "")
+                            </p>
+                            <p class="rows__text">Zuletzt gepostet: @LastPosted(autopost.LastPostedAt)</p>
+                        </div>
+                        <div class="rows__side">
+                            <StatusPill Text="@(autopost.Enabled ? "Aktiv" : "Aus")"
+                                        Tone="@(autopost.Enabled ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+                            <a class="btn btn-secondary btn-sm" href="/konfiguration/autoposts/@autopost.AutopostId">Bearbeiten</a>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Neuer Autopost">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="ap-name">Name</label>
+                <input id="ap-name" class="form-control" @bind="newName" placeholder="z.B. Ticket-Reminder"/>
+                <span class="field__hint">Nur für das Dashboard. Auslöser, Kanal und Inhalt stellst du danach ein.</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@creating" @onclick="Create">Autopost anlegen</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private bool creating;
+    private List<Autopost> autoposts = [];
+    private Dictionary<string, AutopostService.Progress> progress = [];
+    private string newName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        autoposts = await AutopostService.GetAllAsync();
+        foreach (var autopost in autoposts)
+            progress[autopost.AutopostId] = await AutopostService.GetProgressAsync(autopost, autoposts);
+        loaded = true;
+    }
+
+    private static string ChannelName(ulong channelId)
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (channelId == 0) return "Kein Kanal";
+        return guild != null && guild.Channels.TryGetValue(channelId, out var channel)
+            ? $"#{channel.Name}"
+            : "Kanal nicht gefunden";
+    }
+
+    public static string TriggerLabel(AutopostTriggerType type) => type switch
+    {
+        AutopostTriggerType.Messages => "Nach Nachrichten",
+        AutopostTriggerType.Joins => "Nach Beitritten",
+        AutopostTriggerType.Interval => "Zeitintervall",
+        _ => "Folgt auf Autopost"
+    };
+
+    private static string LastPosted(long unix) =>
+        unix <= 0 ? "noch nie" : DateTimeOffset.FromUnixTimeSeconds(unix).LocalDateTime.ToString("dd.MM.yyyy HH:mm");
+
+    private async Task Create()
+    {
+        if (creating) return;
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            ToastService.Notify("Bitte einen Namen vergeben.", "bad");
+            return;
+        }
+
+        creating = true;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var autopost = new Autopost
+        {
+            AutopostId = ToolSet.GenerateCaseID(),
+            Name = newName.Trim(),
+            Steps = [new AutopostStep()],
+            CounterSince = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        await AutopostService.InsertAsync(autopost);
+        ToastService.Notify("Autopost angelegt.", "ok");
+        Nav.NavigateTo($"/konfiguration/autoposts/{autopost.AutopostId}");
+    }
+}

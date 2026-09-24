@@ -1,0 +1,887 @@
+@page "/konfiguration/autoposts/{AutopostId}"
+@using System.Text.Json
+@using AGC_Management.Entities.ApplicationSystem
+@using AGC_Management.Entities.Autoposts
+@using AGC_Management.Enums.Autoposts
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="@(draft?.Name ?? "Autopost")"
+            Lead="Wann der Bot postet, unter welchen Bedingungen, und was."
+            BackHref="/konfiguration/autoposts" BackText="Autoposts"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading" Title="Autopost wird geladen" Description="Einstellungen, Bedingungen und Zählerstand werden abgefragt."/>
+}
+else if (draft == null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Autopost nicht gefunden"
+                Description="Dieser Autopost existiert nicht mehr, oder er wurde gelöscht."
+                ActionText="Zu den Autoposts" ActionHref="/konfiguration/autoposts"/>
+}
+else
+{
+    <div class="detail-grid">
+        <div>
+            <Panel Title="Allgemein">
+                <div class="field-grid">
+                    <div class="field field--wide">
+                        <label class="field__label" for="ap-name">Name</label>
+                        <input id="ap-name" class="form-control" @bind="draft.Name" @bind:after="OnFieldChanged"/>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="ap-channel">Zielkanal</label>
+                        <SearchableSelect Id="ap-channel" Items="TextChannelItems" NoneLabel="Kein Kanal" Placeholder="Kanal suchen..."
+                                          @bind-SelectedId="draft.ChannelId" @bind-SelectedId:after="OnFieldChanged"/>
+                    </div>
+                    <div class="field">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="ap-enabled"
+                                   @bind="draft.Enabled" @bind:after="OnFieldChanged"/>
+                            <label class="form-check-label" for="ap-enabled">Aktiv</label>
+                        </div>
+                        <span class="field__hint">Beim Einschalten beginnt die Zählung von vorn.</span>
+                    </div>
+                </div>
+            </Panel>
+
+            <Panel Title="Auslöser" Lead="Genau ein Auslöser pro Autopost. Ist er erreicht, prüft der Bot die Bedingungen und postet, sobald alle passen.">
+                <div class="field-grid">
+                    <div class="field">
+                        <label class="field__label" for="ap-trigger">Art</label>
+                        <select id="ap-trigger" class="form-select" @bind="draft.TriggerType" @bind:after="OnFieldChanged">
+                            <option value="@AutopostTriggerType.Messages">Nach Anzahl Nachrichten</option>
+                            <option value="@AutopostTriggerType.Joins">Nach Anzahl Beitritte</option>
+                            <option value="@AutopostTriggerType.Interval">Zeitintervall</option>
+                            <option value="@AutopostTriggerType.AfterAutopost">Folgt auf anderen Autopost</option>
+                        </select>
+                    </div>
+
+                    @switch (draft.TriggerType)
+                    {
+                        case AutopostTriggerType.Messages:
+                            <div class="field">
+                                <label class="field__label" for="ap-threshold">Nachrichten</label>
+                                <input id="ap-threshold" type="number" min="1" class="form-control" @bind="draft.Threshold" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">Nachrichten von Bots zählen nicht mit.</span>
+                            </div>
+                            break;
+                        case AutopostTriggerType.Joins:
+                            <div class="field">
+                                <label class="field__label" for="ap-threshold">Beitritte</label>
+                                <input id="ap-threshold" type="number" min="1" class="form-control" @bind="draft.Threshold" @bind:after="OnFieldChanged"/>
+                            </div>
+                            <div class="field">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="ap-subtract"
+                                           @bind="draft.SubtractLeaves" @bind:after="OnFieldChanged"/>
+                                    <label class="form-check-label" for="ap-subtract">Austritte abziehen</label>
+                                </div>
+                                <span class="field__hint">Zählt dann nur, wer auch geblieben ist.</span>
+                            </div>
+                            break;
+                        case AutopostTriggerType.Interval:
+                            <div class="field">
+                                <label class="field__label" for="ap-interval">Alle ... Minuten</label>
+                                <input id="ap-interval" type="number" min="1" class="form-control" @bind="draft.IntervalMinutes" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">Gemessen ab dem letzten Post.</span>
+                            </div>
+                            break;
+                        default:
+                            <div class="field">
+                                <label class="field__label" for="ap-parent">Nach Autopost</label>
+                                <SearchableSelect TKey="string" Id="ap-parent" Items="ParentItems" NoneLabel="Keiner" NoneValue="@("")"
+                                                  Placeholder="Autopost suchen..."
+                                                  @bind-SelectedId="draft.ParentAutopostId" @bind-SelectedId:after="OnFieldChanged"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label" for="ap-parent-delay">Verzögerung (Sekunden)</label>
+                                <input id="ap-parent-delay" type="number" min="0" class="form-control" @bind="draft.ParentDelaySeconds" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">Gezählt ab der letzten Nachricht des anderen Autoposts. 300 = 5 Minuten.</span>
+                            </div>
+                            break;
+                    }
+                </div>
+
+                @if (draft.TriggerType == AutopostTriggerType.Messages)
+                {
+                    <h3 class="section-title">Gezählte Kanäle</h3>
+                    @if (draft.CountScopeIds.Length == 0)
+                    {
+                        <p class="field__hint">Keine Auswahl: nur Nachrichten im Zielkanal zählen.</p>
+                    }
+                    else
+                    {
+                        <ul class="rows">
+                            @foreach (var id in draft.CountScopeIds)
+                            {
+                                <li>
+                                    <div class="rows__main"><p class="rows__title">@ChannelOrCategoryName(id)</p></div>
+                                    <div class="rows__side">
+                                        <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveScope(id)">Entfernen</button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    <div class="form-foot">
+                        <SearchableSelect Items="ScopeItems" NoneLabel="Kanal/Kategorie wählen" Placeholder="Kanal/Kategorie suchen..."
+                                          @bind-SelectedId="newScopeId"/>
+                        <button type="button" class="btn btn-secondary" @onclick="AddScope">Hinzufügen</button>
+                    </div>
+                }
+            </Panel>
+
+            <Panel Title="Bedingungen" Lead="Alle müssen passen. Blockiert eine, bleibt der Zähler stehen und der Post kommt, sobald sie wieder passt. Folge-Autoposts werden dagegen übersprungen." Flush="false">
+                @if (draft.Conditions.Count == 0)
+                {
+                    <StateBlock Inline="true" Title="Keine Bedingungen" Description="Der Autopost geht raus, sobald der Auslöser erreicht ist."/>
+                }
+                else
+                {
+                    @foreach (var condition in draft.Conditions)
+                    {
+                        var c = condition;
+                        <div class="step-block">
+                            <div class="section-title-row">
+                                <h3 class="section-title">@ConditionLabel(c.Type)</h3>
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveCondition(c)">Entfernen</button>
+                            </div>
+                            <div class="field-grid">
+                                @switch (c.Type)
+                                {
+                                    case AutopostConditionType.ApplicationPhase:
+                                        <div class="field">
+                                            <label class="field__label">Position</label>
+                                            <select class="form-select" @bind="c.Params.PositionId" @bind:after="OnFieldChanged">
+                                                <option value="">Beliebige Position</option>
+                                                @foreach (var position in positions)
+                                                {
+                                                    <option value="@position.PositionId">@position.PositionName</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        break;
+                                    case AutopostConditionType.TimeWindow:
+                                        <div class="field">
+                                            <label class="field__label">Von</label>
+                                            <input type="time" class="form-control" value="@c.Params.From" @onchange="(ChangeEventArgs e) => SetTime(c, true, e.Value?.ToString())"/>
+                                        </div>
+                                        <div class="field">
+                                            <label class="field__label">Bis</label>
+                                            <input type="time" class="form-control" value="@c.Params.To" @onchange="(ChangeEventArgs e) => SetTime(c, false, e.Value?.ToString())"/>
+                                            <span class="field__hint">Bis vor Von geht über Mitternacht, z.B. 18:00 bis 02:00.</span>
+                                        </div>
+                                        <div class="field field--wide">
+                                            <label class="field__label">Wochentage</label>
+                                            <div class="weekday-picks">
+                                                @for (var day = 1; day <= 7; day++)
+                                                {
+                                                    var d = day;
+                                                    <div class="form-check m-0">
+                                                        <input class="form-check-input" type="checkbox" id="wd-@c.ConditionId-@d"
+                                                               checked="@c.Params.Weekdays.Contains(d)" @onchange="() => ToggleWeekday(c, d)"/>
+                                                        <label class="form-check-label" for="wd-@c.ConditionId-@d">@AutopostConditionEvaluator.WeekdayName(d)</label>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                        break;
+                                    case AutopostConditionType.DateRange:
+                                        <div class="field">
+                                            <label class="field__label">Ab</label>
+                                            <input type="datetime-local" class="form-control" value="@ToLocalInput(c.Params.DateFrom)"
+                                                   @onchange="(ChangeEventArgs e) => SetDate(c, true, e.Value?.ToString())"/>
+                                        </div>
+                                        <div class="field">
+                                            <label class="field__label">Bis</label>
+                                            <input type="datetime-local" class="form-control" value="@ToLocalInput(c.Params.DateTo)"
+                                                   @onchange="(ChangeEventArgs e) => SetDate(c, false, e.Value?.ToString())"/>
+                                            <span class="field__hint">Leer lassen heißt offen.</span>
+                                        </div>
+                                        break;
+                                    case AutopostConditionType.ChannelActivity:
+                                        <div class="field">
+                                            <label class="field__label">Mindestens Nachrichten</label>
+                                            <input type="number" min="1" class="form-control" @bind="c.Params.MinMessages" @bind:after="OnFieldChanged"/>
+                                        </div>
+                                        <div class="field">
+                                            <label class="field__label">In den letzten ... Minuten</label>
+                                            <input type="number" min="1" class="form-control" @bind="c.Params.WindowMinutes" @bind:after="OnFieldChanged"/>
+                                            <span class="field__hint">Gezählt im Zielkanal. Verhindert Posts in einen leeren Chat.</span>
+                                        </div>
+                                        break;
+                                    case AutopostConditionType.Cooldown:
+                                        <div class="field">
+                                            <label class="field__label">Minuten seit dem letzten Post</label>
+                                            <input type="number" min="0" class="form-control" @bind="c.Params.Minutes" @bind:after="OnFieldChanged"/>
+                                        </div>
+                                        break;
+                                    case AutopostConditionType.LastMessageNotAutopost:
+                                        <p class="field__hint field--wide">Postet nicht, solange die neueste Nachricht im Zielkanal noch von einem Autopost stammt.</p>
+                                        break;
+                                }
+                                <div class="field">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="neg-@c.ConditionId"
+                                               @bind="c.Negate" @bind:after="OnFieldChanged"/>
+                                        <label class="form-check-label" for="neg-@c.ConditionId">Umkehren</label>
+                                    </div>
+                                    <span class="field__hint">@AutopostConditionEvaluator.Summarize(c, positionNames)</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                <div class="form-foot">
+                    <select class="form-select w-auto" @bind="newConditionType">
+                        @foreach (var (type, label) in AutopostConditionEvaluator.Types)
+                        {
+                            <option value="@type">@label</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-secondary" @onclick="AddCondition">Bedingung hinzufügen</button>
+                </div>
+            </Panel>
+
+            <Panel Title="Nachrichten" Lead="Ein Autopost kann mehrere Nachrichten nacheinander schicken. Hat ein Schritt mehrere Varianten, wird pro Post eine davon gewählt.">
+                @for (var stepIndex = 0; stepIndex < draft.Steps.Count; stepIndex++)
+                {
+                    var si = stepIndex;
+                    var step = draft.Steps[si];
+                    var vi = SelectedVariant(si);
+                    var variant = step.Variants[vi];
+                    <div class="step-block">
+                        <div class="section-title-row">
+                            <h3 class="section-title">Schritt @(si + 1)</h3>
+                            @if (draft.Steps.Count > 1)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveStep(si)">Schritt entfernen</button>
+                            }
+                        </div>
+
+                        @if (si > 0)
+                        {
+                            <div class="field-grid mb-3">
+                                <div class="field">
+                                    <label class="field__label" for="step-delay-@si">Warten nach Schritt @si (Sekunden)</label>
+                                    <input id="step-delay-@si" type="number" min="0" class="form-control" @bind="step.DelaySeconds" @bind:after="OnFieldChanged"/>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="variant-tabs">
+                            @for (var v = 0; v < step.Variants.Count; v++)
+                            {
+                                var vv = v;
+                                <button type="button" class="btn btn-secondary btn-sm" aria-pressed="@(vv == vi ? "true" : "false")"
+                                        @onclick="() => selectedVariants[si] = vv">
+                                    Variante @(vv + 1)
+                                </button>
+                            }
+                            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => AddVariant(si)">Variante hinzufügen</button>
+                            @if (step.Variants.Count > 1)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveVariant(si, vi)">Variante @(vi + 1) entfernen</button>
+                            }
+                        </div>
+
+                        <div class="field-grid">
+                            <div class="field field--wide">
+                                <label class="field__label">Text über dem Embed</label>
+                                <textarea class="form-control" rows="2" @bind="variant.Content" @bind:event="oninput" @bind:after="OnFieldChanged"></textarea>
+                                <CharCount Value="@variant.Content" Max="2000"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Autor</label>
+                                <input class="form-control" @bind="variant.Embed.AuthorName" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                                <CharCount Value="@variant.Embed.AuthorName" Max="DiscordLimits.EmbedAuthorName"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Autor-Icon</label>
+                                <input class="form-control" @bind="variant.Embed.AuthorIconUrl" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">URL oder {guildicon}.</span>
+                            </div>
+                            <div class="field field--wide">
+                                <label class="field__label">Titel</label>
+                                <input class="form-control" @bind="variant.Embed.Title" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                                <CharCount Value="@variant.Embed.Title" Max="DiscordLimits.EmbedTitle"/>
+                            </div>
+                            <div class="field field--wide">
+                                <label class="field__label">Beschreibung</label>
+                                <textarea class="form-control" rows="6" @bind="variant.Embed.Description" @bind:event="oninput" @bind:after="OnFieldChanged"></textarea>
+                                <span class="field__hint">Discord-Markdown funktioniert hier.</span>
+                                <CharCount Value="@variant.Embed.Description" Max="DiscordLimits.EmbedDescription"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Farbe</label>
+                                <input class="form-control mono" maxlength="7" @bind="variant.Embed.Color" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">Hex, z.B. 2F84A2. Leer lässt Discord entscheiden.</span>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Thumbnail</label>
+                                <input class="form-control" @bind="variant.Embed.ThumbnailUrl" @bind:after="OnFieldChanged"/>
+                                <span class="field__hint">Kleines Bild oben rechts. URL oder {guildicon}.</span>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Bild</label>
+                                <input class="form-control" @bind="variant.Embed.ImageUrl" @bind:after="OnFieldChanged"/>
+                            </div>
+                            <div class="field">
+                                <label class="field__label">Footer</label>
+                                <input class="form-control" @bind="variant.Embed.Footer" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                            </div>
+                        </div>
+
+                        <h3 class="section-title">Link-Buttons</h3>
+                        @foreach (var button in variant.Buttons)
+                        {
+                            var b = button;
+                            <div class="field-grid mb-2">
+                                <div class="field">
+                                    <label class="field__label">Beschriftung</label>
+                                    <input class="form-control" maxlength="@DiscordLimits.ButtonLabel" @bind="b.Label" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label">Ziel-URL</label>
+                                    <input class="form-control" @bind="b.Url" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label">Emoji</label>
+                                    <input class="form-control" maxlength="64" @bind="b.Emoji" @bind:after="OnFieldChanged"/>
+                                    <span class="field__hint">Unicode, &lt;:name:id&gt; oder nur die Emoji-ID.</span>
+                                </div>
+                                <div class="field">
+                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveButton(variant, b)">Button entfernen</button>
+                                </div>
+                            </div>
+                        }
+                        @if (variant.Buttons.Count < DiscordLimits.ButtonsPerRow * DiscordLimits.ActionRowsPerMessage)
+                        {
+                            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => AddButton(variant)">Button hinzufügen</button>
+                        }
+
+                        <h3 class="section-title">Vorschau</h3>
+                        @* Discord's own colours, not the dashboard accent. See DESIGN.md, exceptions. *@
+                        @if (AutopostService.IsEmpty(variant))
+                        {
+                            <p class="field__hint">Diese Variante ist leer und wird beim Posten übersprungen.</p>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(variant.Content))
+                            {
+                                <p class="message-preview__content">@R(variant.Content)</p>
+                            }
+                            @if (!variant.Embed.IsEmpty)
+                            {
+                                var thumb = R(variant.Embed.ThumbnailUrl);
+                                <div class="embed-preview @(string.IsNullOrWhiteSpace(thumb) ? "" : "embed-preview--split")"
+                                     style="border-left-color: #@PreviewColor(variant.Embed.Color);">
+                                    <div>
+                                        @if (!string.IsNullOrWhiteSpace(variant.Embed.AuthorName))
+                                        {
+                                            var icon = R(variant.Embed.AuthorIconUrl);
+                                            <p class="embed-preview__author">
+                                                @if (!string.IsNullOrWhiteSpace(icon))
+                                                {
+                                                    <img src="@icon" alt=""/>
+                                                }
+                                                @R(variant.Embed.AuthorName)
+                                            </p>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(variant.Embed.Title))
+                                        {
+                                            <p class="embed-preview__title">@R(variant.Embed.Title)</p>
+                                        }
+                                        <div class="embed-preview__body">@((MarkupString)R(variant.Embed.Description).ConvertMarkdownToHtml())</div>
+                                        @if (!string.IsNullOrWhiteSpace(variant.Embed.ImageUrl))
+                                        {
+                                            <img class="embed-preview__image" src="@R(variant.Embed.ImageUrl)" alt=""/>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(variant.Embed.Footer))
+                                        {
+                                            <p class="embed-preview__footer">@R(variant.Embed.Footer)</p>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(thumb))
+                                    {
+                                        <img class="embed-preview__thumb" src="@thumb" alt=""/>
+                                    }
+                                </div>
+                            }
+                            @if (variant.Buttons.Count > 0)
+                            {
+                                <div class="message-preview__buttons">
+                                    @foreach (var button in variant.Buttons)
+                                    {
+                                        <span class="message-preview__button">@EmojiPreview(button.Emoji) @button.Label</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+                <div class="form-foot">
+                    <button type="button" class="btn btn-secondary" @onclick="AddStep">Schritt hinzufügen</button>
+                </div>
+            </Panel>
+        </div>
+
+        <div>
+            <Panel Title="Stand">
+                <dl class="facts">
+                    <dt>Status</dt>
+                    <dd>@(saved?.Enabled == true ? "Aktiv" : "Aus")</dd>
+                    <dt>Auslöser</dt>
+                    <dd>@(progress?.Text ?? "")</dd>
+                    @if (saved?.Conditions.Count > 0)
+                    {
+                        <dt>Bedingungen</dt>
+                        <dd>@(conditionResult?.Passed == true ? "erfüllt" : $"blockiert: {conditionResult?.BlockedBy}")</dd>
+                    }
+                    <dt>Zuletzt gepostet</dt>
+                    <dd>@FormatTime(saved?.LastPostedAt ?? 0)</dd>
+                </dl>
+                @if (queue.Count > 0)
+                {
+                    <h3 class="section-title">Geplant</h3>
+                    <ul class="rows">
+                        @foreach (var entry in queue)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">@(entry.StepIndex == 0 ? "Start" : $"Schritt {entry.StepIndex + 1}")</p>
+                                    <p class="rows__text">@FormatTime(entry.DueAt)</p>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                <div class="form-foot">
+                    <button type="button" class="btn btn-secondary" disabled="@sending" @onclick="SendNow">Jetzt senden</button>
+                    <span class="field__hint">Speichert zuerst, ignoriert Auslöser und Bedingungen, setzt den Zähler zurück und stößt auch Folge-Autoposts an.</span>
+                </div>
+            </Panel>
+
+            <Panel Title="Verhalten">
+                <div class="field-grid">
+                    <div class="field field--wide">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="ap-delete"
+                                   @bind="draft.DeletePrevious" @bind:after="OnFieldChanged"/>
+                            <label class="form-check-label" for="ap-delete">Vorherigen Post löschen</label>
+                        </div>
+                        <span class="field__hint">Beim neuen Post verschwinden die Nachrichten vom letzten Mal.</span>
+                    </div>
+                    <div class="field field--wide">
+                        <label class="field__label" for="ap-rotation">Varianten</label>
+                        <select id="ap-rotation" class="form-select" @bind="draft.RotationMode" @bind:after="OnFieldChanged">
+                            <option value="@AutopostRotationMode.Sequential">Reihum</option>
+                            <option value="@AutopostRotationMode.Random">Zufällig</option>
+                        </select>
+                    </div>
+                </div>
+            </Panel>
+
+            <Panel Title="Platzhalter" Flush="true">
+                <ul class="rows">
+                    @foreach (var (token, description) in InfoPanelTemplateResolver.BuiltIn)
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title mono">@token</p>
+                                <p class="rows__text">@description</p>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </Panel>
+
+            <Panel Title="Autopost löschen">
+                @if (!confirmingDelete)
+                {
+                    <button type="button" class="btn btn-danger" @onclick="() => confirmingDelete = true">Autopost löschen</button>
+                }
+                else
+                {
+                    <ConfirmInline Title="Autopost wirklich löschen?" ConfirmText="Ja, löschen" Busy="deleting"
+                                   OnConfirm="Delete" OnCancel="() => confirmingDelete = false">
+                        <p>Bedingungen und geplante Nachrichten gehen mit. Folge-Autoposts bleiben, verlieren aber ihren Auslöser.</p>
+                    </ConfirmInline>
+                }
+            </Panel>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string AutopostId { get; set; } = "";
+
+    private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web);
+
+    private bool loaded;
+    private Autopost? draft;
+    private Autopost? saved;
+    private string snapshot = "";
+
+    private List<Autopost> all = [];
+    private List<TeamApplicationPosition> positions = [];
+    private Dictionary<string, string> positionNames = [];
+    private AutopostService.Progress? progress;
+    private AutopostConditionEvaluator.Result? conditionResult;
+    private List<AutopostQueueEntry> queue = [];
+
+    private readonly Dictionary<int, int> selectedVariants = [];
+    private ulong newScopeId;
+    private AutopostConditionType newConditionType = AutopostConditionType.TimeWindow;
+
+    private bool sending;
+    private bool confirmingDelete;
+    private bool deleting;
+
+    private List<DiscordChannel> textChannels = [];
+    private List<DiscordChannel> scopeCandidates = [];
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+
+    private List<(ulong Id, string Label)> ScopeItems => scopeCandidates
+        .Select(c => (c.Id, c.Type == ChannelType.Category ? $"Kategorie: {c.Name}" : $"#{c.Name}")).ToList();
+
+    private List<(string Id, string Label)> ParentItems => all
+        .Where(a => a.AutopostId != AutopostId && !DescendsFrom(a, AutopostId))
+        .Select(a => (a.AutopostId, a.Name))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        if (draft != null) Tracker.Register(Save, Discard);
+        loaded = true;
+    }
+
+    public void Dispose()
+    {
+        Tracker.Unregister();
+    }
+
+    private void OnFieldChanged()
+    {
+        Tracker.MarkDirty();
+    }
+
+    private async Task Load()
+    {
+        all = await AutopostService.GetAllAsync();
+        saved = all.FirstOrDefault(a => a.AutopostId == AutopostId);
+        if (saved == null)
+        {
+            draft = null;
+            return;
+        }
+
+        if (saved.Steps.Count == 0) saved.Steps.Add(new AutopostStep());
+        foreach (var step in saved.Steps.Where(s => s.Variants.Count == 0)) step.Variants.Add(new AutopostVariant());
+
+        snapshot = JsonSerializer.Serialize(saved, CloneOptions);
+        draft = Clone();
+
+        positions = await TeamApplicationService.GetPositionsAsync();
+        positionNames = positions.ToDictionary(p => p.PositionId, p => p.PositionName);
+
+        progress = await AutopostService.GetProgressAsync(saved, all);
+        conditionResult = saved.Conditions.Count > 0 ? await AutopostConditionEvaluator.EvaluateAsync(saved) : null;
+        queue = await AutopostService.GetQueueAsync(AutopostId);
+
+        var guild = CurrentApplication.TargetGuild;
+        textChannels = guild.Channels.Values
+            .Where(c => c.Type is ChannelType.Text or ChannelType.News)
+            .OrderBy(c => c.Position).ToList();
+        scopeCandidates = guild.Channels.Values
+            .Where(c => c.Type is ChannelType.Text or ChannelType.News or ChannelType.Voice or ChannelType.Stage or ChannelType.Category)
+            .OrderBy(c => c.Position).ToList();
+    }
+
+    private Autopost Clone()
+    {
+        return JsonSerializer.Deserialize<Autopost>(snapshot, CloneOptions)!;
+    }
+
+    private void Discard()
+    {
+        draft = Clone();
+        selectedVariants.Clear();
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        if (draft == null) return;
+
+        var error = Validate(draft);
+        if (error != null)
+        {
+            ToastService.Notify(error, "bad");
+            Tracker.RejectSave();
+            return;
+        }
+
+        draft.Name = draft.Name.Trim();
+        foreach (var variant in draft.Steps.SelectMany(s => s.Variants))
+            variant.Embed.Color = variant.Embed.Color.Trim().TrimStart('#');
+
+        await AutopostService.UpdateAsync(draft);
+        ToastService.Notify(draft.Enabled ? "Gespeichert." : "Gespeichert. Der Autopost ist noch ausgeschaltet.",
+            draft.Enabled ? "ok" : "warn");
+        await Load();
+    }
+
+    private string? Validate(Autopost a)
+    {
+        if (string.IsNullOrWhiteSpace(a.Name)) return "Bitte einen Namen vergeben.";
+        if (a.Enabled && a.ChannelId == 0) return "Ohne Zielkanal kann der Autopost nicht aktiv sein.";
+
+        switch (a.TriggerType)
+        {
+            case AutopostTriggerType.Messages or AutopostTriggerType.Joins when a.Threshold < 1:
+                return "Die Schwelle muss mindestens 1 sein.";
+            case AutopostTriggerType.Interval when a.IntervalMinutes < 1:
+                return "Das Intervall muss mindestens 1 Minute sein.";
+            case AutopostTriggerType.AfterAutopost when a.Enabled && string.IsNullOrEmpty(a.ParentAutopostId):
+                return "Bitte wählen, auf welchen Autopost dieser folgt.";
+        }
+
+        if (a.Enabled && a.Steps[0].Variants.All(AutopostService.IsEmpty))
+            return "Schritt 1 hat keinen Inhalt. Ein aktiver Autopost braucht mindestens eine Nachricht.";
+
+        for (var s = 0; s < a.Steps.Count; s++)
+        for (var v = 0; v < a.Steps[s].Variants.Count; v++)
+        {
+            var variant = a.Steps[s].Variants[v];
+            var where = $"Schritt {s + 1}, Variante {v + 1}: ";
+            var embed = variant.Embed;
+
+            var error = DiscordLimits.Check("Text über dem Embed", variant.Content, 2000)
+                        ?? DiscordLimits.Check("Autor", embed.AuthorName, DiscordLimits.EmbedAuthorName)
+                        ?? DiscordLimits.Check("Titel", embed.Title, DiscordLimits.EmbedTitle)
+                        ?? DiscordLimits.Check("Beschreibung", embed.Description, DiscordLimits.EmbedDescription)
+                        ?? DiscordLimits.Check("Footer", embed.Footer, DiscordLimits.EmbedFooter);
+            if (error != null) return where + error;
+
+            var total = embed.AuthorName.Length + embed.Title.Length + embed.Description.Length + embed.Footer.Length;
+            if (total > DiscordLimits.EmbedTotal)
+                return where + $"Das Embed ist insgesamt {total - DiscordLimits.EmbedTotal} Zeichen zu lang.";
+
+            if (!string.IsNullOrWhiteSpace(embed.Color) && AutopostService.ParseColor(embed.Color) == null)
+                return where + "Die Farbe ist kein gültiger Hex-Wert.";
+
+            foreach (var button in variant.Buttons)
+            {
+                if (string.IsNullOrWhiteSpace(button.Url))
+                    return where + "Ein Link-Button braucht eine Ziel-URL.";
+                if (string.IsNullOrWhiteSpace(button.Label) && string.IsNullOrWhiteSpace(button.Emoji))
+                    return where + "Ein Link-Button braucht eine Beschriftung oder ein Emoji.";
+                if (!string.IsNullOrWhiteSpace(button.Emoji) && ComponentEmojiParser.Parse(button.Emoji) == null)
+                    return where + $"Das Emoji \"{button.Emoji}\" kann Discord nicht verwenden.";
+            }
+        }
+
+        return null;
+    }
+
+    private bool DescendsFrom(Autopost autopost, string ancestorId)
+    {
+        var current = autopost;
+        for (var depth = 0; depth < all.Count && current != null; depth++)
+        {
+            if (current.ParentAutopostId == ancestorId) return true;
+            current = all.FirstOrDefault(a => a.AutopostId == current.ParentAutopostId);
+        }
+
+        return false;
+    }
+
+    private int SelectedVariant(int stepIndex)
+    {
+        var count = draft!.Steps[stepIndex].Variants.Count;
+        var selected = selectedVariants.GetValueOrDefault(stepIndex);
+        return Math.Clamp(selected, 0, count - 1);
+    }
+
+    private void AddStep()
+    {
+        draft!.Steps.Add(new AutopostStep { DelaySeconds = 60 });
+        OnFieldChanged();
+    }
+
+    private void RemoveStep(int stepIndex)
+    {
+        draft!.Steps.RemoveAt(stepIndex);
+        selectedVariants.Clear();
+        OnFieldChanged();
+    }
+
+    private void AddVariant(int stepIndex)
+    {
+        var step = draft!.Steps[stepIndex];
+        var source = step.Variants[SelectedVariant(stepIndex)];
+        step.Variants.Add(JsonSerializer.Deserialize<AutopostVariant>(JsonSerializer.Serialize(source, CloneOptions), CloneOptions)!);
+        selectedVariants[stepIndex] = step.Variants.Count - 1;
+        OnFieldChanged();
+    }
+
+    private void RemoveVariant(int stepIndex, int variantIndex)
+    {
+        draft!.Steps[stepIndex].Variants.RemoveAt(variantIndex);
+        selectedVariants[stepIndex] = Math.Max(variantIndex - 1, 0);
+        OnFieldChanged();
+    }
+
+    private void AddButton(AutopostVariant variant)
+    {
+        variant.Buttons.Add(new AutopostButton());
+        OnFieldChanged();
+    }
+
+    private void RemoveButton(AutopostVariant variant, AutopostButton button)
+    {
+        variant.Buttons.Remove(button);
+        OnFieldChanged();
+    }
+
+    private void AddScope()
+    {
+        if (newScopeId == 0 || draft!.CountScopeIds.Contains((long)newScopeId)) return;
+
+        draft.CountScopeIds = [..draft.CountScopeIds, (long)newScopeId];
+        newScopeId = 0;
+        OnFieldChanged();
+    }
+
+    private void RemoveScope(long id)
+    {
+        draft!.CountScopeIds = draft.CountScopeIds.Where(s => s != id).ToArray();
+        OnFieldChanged();
+    }
+
+    private string ChannelOrCategoryName(long id)
+    {
+        var channel = scopeCandidates.FirstOrDefault(c => c.Id == (ulong)id);
+        if (channel == null) return $"Unbekannter Kanal ({id})";
+        return channel.Type == ChannelType.Category ? $"Kategorie: {channel.Name}" : $"#{channel.Name}";
+    }
+
+    private void AddCondition()
+    {
+        draft!.Conditions.Add(new AutopostCondition
+        {
+            ConditionId = ToolSet.GenerateCaseID(),
+            AutopostId = AutopostId,
+            Type = newConditionType
+        });
+        OnFieldChanged();
+    }
+
+    private void RemoveCondition(AutopostCondition condition)
+    {
+        draft!.Conditions.Remove(condition);
+        OnFieldChanged();
+    }
+
+    private void ToggleWeekday(AutopostCondition condition, int day)
+    {
+        if (!condition.Params.Weekdays.Remove(day)) condition.Params.Weekdays.Add(day);
+        OnFieldChanged();
+    }
+
+    private void SetTime(AutopostCondition condition, bool from, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (from) condition.Params.From = value;
+        else condition.Params.To = value;
+        OnFieldChanged();
+    }
+
+    private void SetDate(AutopostCondition condition, bool from, string? value)
+    {
+        var unix = FromLocalInput(value);
+        if (from) condition.Params.DateFrom = unix;
+        else condition.Params.DateTo = unix;
+        OnFieldChanged();
+    }
+
+    private static string ConditionLabel(AutopostConditionType type)
+    {
+        return AutopostConditionEvaluator.Types.FirstOrDefault(t => t.Type == type).Label ?? type.ToString();
+    }
+
+    private static string R(string? text) => InfoPanelTemplateResolver.Resolve(text);
+
+    private static string PreviewColor(string? hex)
+    {
+        var value = hex?.Trim().TrimStart('#') ?? "";
+        return AutopostService.ParseColor(value) == null ? "1e1f22" : value;
+    }
+
+    private static string EmojiPreview(string? emoji)
+    {
+        if (string.IsNullOrWhiteSpace(emoji)) return "";
+        var value = emoji.Trim();
+        return value.StartsWith('<') || ulong.TryParse(value, out _) ? "" : value;
+    }
+
+    private static string FormatTime(long unix) =>
+        unix <= 0 ? "noch nie" : DateTimeOffset.FromUnixTimeSeconds(unix).LocalDateTime.ToString("dd.MM.yyyy HH:mm");
+
+    private static string ToLocalInput(long unix)
+    {
+        if (unix <= 0) return "";
+
+        var utc = DateTimeOffset.FromUnixTimeSeconds(unix).UtcDateTime;
+        return TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.Local).ToString("yyyy-MM-ddTHH:mm");
+    }
+
+    private static long FromLocalInput(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0;
+        if (!DateTime.TryParse(value, out var local)) return 0;
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified),
+            TimeZoneInfo.Local);
+        return new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds();
+    }
+
+    private async Task SendNow()
+    {
+        if (sending) return;
+        sending = true;
+
+        if (Tracker.IsDirty && !await Tracker.SaveAsync())
+        {
+            sending = false;
+            return;
+        }
+
+        var result = await AutopostService.SendNowAsync(AutopostId);
+        sending = false;
+        ToastService.Notify(result.Sent ? "Gesendet." : result.Message, result.Sent ? "ok" : "bad");
+        await Load();
+    }
+
+    private async Task Delete()
+    {
+        if (deleting) return;
+        deleting = true;
+        await AutopostService.DeleteAsync(AutopostId);
+        deleting = false;
+        Tracker.Unregister();
+        ToastService.Notify("Autopost gelöscht.", "ok");
+        Nav.NavigateTo("/konfiguration/autoposts");
+    }
+}
