@@ -254,12 +254,63 @@ public static class GameCatalogService
             renumbered++;
         }
 
-        if (renamed + merged + renumbered == 0) return;
+        if (renamed + merged + renumbered > 0)
+        {
+            Invalidate();
+            CurrentApplication.Logger.Information(
+                "Spielkatalog: {Renamed} umbenannt, {Merged} zusammengefuehrt, {Renumbered} neu nummeriert",
+                renamed, merged, renumbered);
+        }
 
-        Invalidate();
+        await RepairSamplesAsync();
+    }
+
+    /// <summary>
+    ///     Repoints sample rows whose id no longer resolves to a catalogue entry. They were written while
+    ///     the identity still came from the application id, so every game recorded through Medal shared
+    ///     one number. The row keeps the name it was written with, so the correct id can be recomputed -
+    ///     and "Roblox with Medal" lands on the same id as "Roblox" instead of being thrown away.
+    ///     Driven by the orphan join, so it costs one indexed lookup and does nothing once all rows fit.
+    /// </summary>
+    private static async Task RepairSamplesAsync()
+    {
+        var fixes = new List<(string Name, long ActivityId)>();
+
+        await using (var cmd = Db.CreateCommand(
+                         "SELECT DISTINCT a.activityname, a.activityid FROM metrics_activity a " +
+                         "LEFT JOIN metrics_activitymap m ON m.activityid = a.activityid " +
+                         "WHERE m.activityname IS NULL"))
+        {
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var name = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                var key = ActivityMatcher.Key(name);
+                if (key.Length == 0) continue;
+
+                var expected = StableId(key);
+                if (!reader.IsDBNull(1) && reader.GetInt64(1) == expected) continue;
+
+                fixes.Add((name, expected));
+            }
+        }
+
+        if (fixes.Count == 0) return;
+
+        var moved = 0;
+        foreach (var (name, activityId) in fixes)
+        {
+            await using var cmd = Db.CreateCommand(
+                "UPDATE metrics_activity SET activityid = @activity " +
+                "WHERE activityname = @name AND activityid <> @activity");
+            cmd.CommandTimeout = 900;
+            cmd.Parameters.AddWithValue("name", name);
+            cmd.Parameters.AddWithValue("activity", activityId);
+            moved += await cmd.ExecuteNonQueryAsync();
+        }
+
         CurrentApplication.Logger.Information(
-            "Spielkatalog: {Renamed} umbenannt, {Merged} zusammengefuehrt, {Renumbered} neu nummeriert",
-            renamed, merged, renumbered);
+            "Spielmetrik: {Rows} Messzeilen aus {Names} Namen neu zugeordnet", moved, fixes.Count);
     }
 
     private static async Task RenameAsync(GameCatalogEntry entry, string key)
