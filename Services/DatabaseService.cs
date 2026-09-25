@@ -1938,7 +1938,6 @@ public static class DatabaseService
         await InitBotSettings();
         await InitBanRequestStages();
         await InitTicketCategories();
-        await InitSelfroles();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -2031,41 +2030,6 @@ public static class DatabaseService
     ///     Seeds the escalation ladder once, so a fresh install pings sensibly before anyone touches the
     ///     dashboard. Role stages are skipped when their config key is missing.
     /// </summary>
-    /// <summary>
-    ///     Brings over the selfrole catalogue the Python bot kept in code, once. The marker lives in
-    ///     botsettings rather than relying on ON CONFLICT, because a category deleted in the dashboard has
-    ///     to stay deleted instead of reappearing on the next start. Nothing is posted to Discord here:
-    ///     the panel stays disabled until an admin presses the button.
-    /// </summary>
-    private static async Task InitSelfroles()
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using (var check = con.CreateCommand(
-                         "SELECT 1 FROM botsettings WHERE section = 'Selfroles' AND key = 'Seeded'"))
-        {
-            if (await check.ExecuteScalarAsync() is not null) return;
-        }
-
-        await SelfroleService.UpsertPanelAsync(SelfroleSeedData.BuildPanel());
-
-        var categories = SelfroleSeedData.BuildCategories();
-        for (var index = 0; index < categories.Count; index++)
-        {
-            var category = categories[index];
-            category.Position = index;
-            await SelfroleService.UpsertCategoryAsync(category);
-
-            foreach (var option in category.Options) await SelfroleService.UpsertOptionAsync(option);
-        }
-
-        await using var mark = con.CreateCommand(
-            "INSERT INTO botsettings (section, key, value) VALUES ('Selfroles', 'Seeded', 'true') ON CONFLICT (section, key) DO NOTHING");
-        await mark.ExecuteNonQueryAsync();
-
-        CurrentApplication.Logger.Information("Selfroles: {Count} Kategorien aus dem alten Bot uebernommen",
-            categories.Count);
-    }
-
     private static async Task InitBanRequestStages()
     {
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
