@@ -21,6 +21,16 @@ public static class GetGameMetrics
     public static async Task LaunchLoops()
     {
         await Task.Delay(TimeSpan.FromSeconds(30));
+
+        try
+        {
+            await GameCatalogService.RepairIdentitiesAsync();
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Spielkatalog: Neunummerierung fehlgeschlagen");
+        }
+
         while (true)
         {
             try

@@ -81,12 +81,13 @@ public static class AnalyticsService
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         var filter = unboundOnly ? "AND COALESCE(map.optionid, '') = '' " : "";
         await using var cmd = con.CreateCommand(CombinedPlaytime +
-                                                "SELECT combined.activityid, COALESCE(map.displayname, ''), " +
+                                                "SELECT combined.activityid, " +
+                                                "COALESCE(MIN(map.displayname), ''), " +
                                                 "SUM(combined.minutes), COUNT(DISTINCT combined.userid) " +
                                                 "FROM combined LEFT JOIN metrics_activitymap map " +
                                                 "ON map.activityid = combined.activityid " +
                                                 $"WHERE true {filter}" +
-                                                "GROUP BY combined.activityid, map.displayname " +
+                                                "GROUP BY combined.activityid " +
                                                 "ORDER BY SUM(combined.minutes) DESC LIMIT @limit");
         AddPlaytimeWindow(cmd, weeks);
         cmd.Parameters.AddWithValue("limit", limit);
@@ -100,11 +101,16 @@ public static class AnalyticsService
         return results;
     }
 
-    /// <summary>Minutes and distinct players per game, for the catalogue list.</summary>
+    /// <summary>
+    ///     Minutes and distinct players per game, for the catalogue list. Keyed defensively: a duplicate
+    ///     id must never be able to take the page down, whatever the catalogue looks like.
+    /// </summary>
     public static async Task<Dictionary<long, GameCount>> GetGameUsage(int weeks = 12)
     {
-        var games = await GetTopGames(weeks, 5000);
-        return games.ToDictionary(game => game.ActivityId);
+        var usage = new Dictionary<long, GameCount>();
+        foreach (var game in await GetTopGames(weeks, 5000)) usage[game.ActivityId] = game;
+
+        return usage;
     }
 
     private static void AddPlaytimeWindow(NpgsqlCommand cmd, int weeks)

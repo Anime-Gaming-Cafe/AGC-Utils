@@ -86,9 +86,11 @@ public static class GameCatalogService
     }
 
     /// <summary>
-    ///     The catalogue row for an activity, created on first sighting. The id is settled right there and
-    ///     never moves again - an application id that only turns up later is kept alongside instead, so a
-    ///     game whose rows were already written under a hashed id does not split into two.
+    ///     The catalogue row for an activity, created on first sighting.
+    ///     The id is derived from the name, never from the application id: overlays and recorders report
+    ///     their own application. Medal for instance sends 307998818547531777 for every game it records,
+    ///     so "Apex Legends with Medal" and "Fortnite with Medal" would collapse into one identity.
+    ///     The application id is kept as metadata only.
     /// </summary>
     public static async Task<GameCatalogEntry?> ResolveAsync(string activityName, ulong applicationId)
     {
@@ -108,7 +110,7 @@ public static class GameCatalogService
         var entry = new GameCatalogEntry
         {
             Key = key,
-            ActivityId = applicationId != 0 ? (long)applicationId : StableId(key),
+            ActivityId = StableId(key),
             DisplayName = activityName.Trim(),
             ApplicationId = applicationId,
             FirstSeen = now,
@@ -208,8 +210,34 @@ public static class GameCatalogService
     }
 
     /// <summary>
-    ///     A deterministic id for games Discord gives no application id for. 63 bits so it stays a
-    ///     positive BIGINT, and derived from the key so the same game always lands on the same number.
+    ///     Renumbers rows that still carry an application id as their identity. Runs once at startup and
+    ///     is a no-op afterwards; the bindings in <c>optionid</c> are untouched.
+    /// </summary>
+    public static async Task RepairIdentitiesAsync()
+    {
+        var repaired = 0;
+        foreach (var entry in await GetAllAsync())
+        {
+            var expected = StableId(entry.Key);
+            if (entry.ActivityId == expected) continue;
+
+            await using var cmd = Db.CreateCommand(
+                "UPDATE metrics_activitymap SET activityid = @activity WHERE activityname = @key");
+            cmd.Parameters.AddWithValue("key", entry.Key);
+            cmd.Parameters.AddWithValue("activity", expected);
+            await cmd.ExecuteNonQueryAsync();
+            repaired++;
+        }
+
+        if (repaired == 0) return;
+
+        Invalidate();
+        CurrentApplication.Logger.Information("Spielkatalog: {Count} Eintraege neu nummeriert", repaired);
+    }
+
+    /// <summary>
+    ///     The identity of a game: 63 bits so it stays a positive BIGINT, derived from the normalised
+    ///     name so the same game always lands on the same number.
     /// </summary>
     private static long StableId(string key)
     {
