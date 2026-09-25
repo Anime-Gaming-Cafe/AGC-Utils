@@ -88,7 +88,6 @@ public static class GetGameMetrics
         var activityname = cmd.Parameters.AddWithValue("activityname", "");
         var activityid = cmd.Parameters.AddWithValue("activityid", 0L);
         cmd.Parameters.AddWithValue("timestamp", timestamp);
-        await cmd.PrepareAsync();
 
         foreach (var (member, entry) in playing)
         {

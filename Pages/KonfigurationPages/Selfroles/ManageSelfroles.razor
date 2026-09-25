@@ -117,7 +117,7 @@ else
                                     disabled="@(index == categories.Count - 1)"
                                     @onclick="() => Move(category, 1)">Runter
                             </button>
-                            <a class="btn btn-secondary btn-sm" href="/konfiguration/selfroles/@category.Id">Bearbeiten</a>
+                            <a class="btn btn-secondary btn-sm" href="/konfiguration/selfroles/kategorie/@category.Id">Bearbeiten</a>
                             <button type="button" class="btn btn-danger btn-sm"
                                     @onclick="() => pendingDelete = category.Id">Löschen
                             </button>
@@ -565,7 +565,7 @@ else
         });
         busy = false;
 
-        Nav.NavigateTo($"/konfiguration/selfroles/{id}");
+        Nav.NavigateTo($"/konfiguration/selfroles/kategorie/{id}");
     }
 
     private async Task SendPanel()
