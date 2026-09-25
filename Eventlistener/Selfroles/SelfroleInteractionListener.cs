@@ -67,6 +67,15 @@ public sealed class SelfroleInteractionListener : BaseCommandModule
             return;
         }
 
+        if (customId.StartsWith(SelfroleComponents.AutoPrefix, StringComparison.Ordinal))
+        {
+            var optedOut = await SelfroleService.IsOptedOutAsync(member.Id);
+            await SelfroleService.SetOptOutAsync(member.Id, !optedOut);
+            await UpdateMenu(args, category, SelfroleService.HeldOptionIds(member, category),
+                optedOut ? "Autozuweisung aktiviert." : "Autozuweisung deaktiviert.");
+            return;
+        }
+
         SelfroleChange change;
         if (customId.StartsWith(SelfroleComponents.ClearPrefix, StringComparison.Ordinal))
         {
@@ -128,29 +137,36 @@ public sealed class SelfroleInteractionListener : BaseCommandModule
         return parts.Length < 2 ? ("", "") : (parts[1], parts.Length > 2 ? parts[2] : "");
     }
 
-    private static Task OpenMenu(ComponentInteractionCreateEventArgs args, SelfroleCategory category,
-        IReadOnlySet<string> held)
+    private static async Task<bool?> ResolveAutoAssignState(SelfroleCategory category, ulong userId)
     {
-        var (embed, rows) = SelfroleComponents.BuildCategoryMenu(category, held, null);
-        return args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-            new DiscordInteractionResponseBuilder().AddEmbed(embed).AddComponents(rows).AsEphemeral());
+        if (!category.AutoAssign || !await SelfroleService.AutoDetectEnabledAsync()) return null;
+        return !await SelfroleService.IsOptedOutAsync(userId);
     }
 
-    private static Task UpdateMenu(ComponentInteractionCreateEventArgs args, SelfroleCategory category,
+    private static async Task OpenMenu(ComponentInteractionCreateEventArgs args, SelfroleCategory category,
+        IReadOnlySet<string> held)
+    {
+        var autoAssign = await ResolveAutoAssignState(category, args.User.Id);
+        var container = SelfroleComponents.BuildCategoryMenu(category, held, null, autoAssign);
+        await args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
+            new DiscordInteractionResponseBuilder().WithV2Components().AddComponents([container]).AsEphemeral());
+    }
+
+    private static async Task UpdateMenu(ComponentInteractionCreateEventArgs args, SelfroleCategory category,
         IReadOnlySet<string> held, string notice)
     {
-        var (embed, rows) = SelfroleComponents.BuildCategoryMenu(category, held, notice);
-        return args.Interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage,
-            new DiscordInteractionResponseBuilder().AddEmbed(embed).AddComponents(rows));
+        var autoAssign = await ResolveAutoAssignState(category, args.User.Id);
+        var container = SelfroleComponents.BuildCategoryMenu(category, held, notice, autoAssign);
+        await args.Interaction.CreateResponseAsync(InteractionResponseType.UpdateMessage,
+            new DiscordInteractionResponseBuilder().WithV2Components().AddComponents([container]));
     }
 
     private static Task Reject(ComponentInteractionCreateEventArgs args, string message)
     {
-        var embed = new DiscordEmbedBuilder()
-            .WithDescription(message)
-            .WithColor(BotConfig.GetEmbedColor());
+        var container = new DiscordContainerComponent([new DiscordTextDisplayComponent(message)],
+            accentColor: BotConfig.GetEmbedColor());
 
         return args.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource,
-            new DiscordInteractionResponseBuilder().AddEmbed(embed).AsEphemeral());
+            new DiscordInteractionResponseBuilder().WithV2Components().AddComponents([container]).AsEphemeral());
     }
 }

@@ -25,6 +25,7 @@ public static class SelfroleComponents
     public const string SelectPrefix = Prefix + "sel:";
     public const string TogglePrefix = Prefix + "tog:";
     public const string ClearPrefix = Prefix + "clr:";
+    public const string AutoPrefix = Prefix + "auto:";
 
     private static readonly Timer RefreshTimer =
         new(_ => _ = RefreshPanelAsync(), null, Timeout.Infinite, Timeout.Infinite);
@@ -53,6 +54,11 @@ public static class SelfroleComponents
     public static string ClearCustomId(SelfroleCategory category)
     {
         return ClearPrefix + category.Id;
+    }
+
+    public static string AutoCustomId(SelfroleCategory category)
+    {
+        return AutoPrefix + category.Id;
     }
 
     #region Panel
@@ -248,28 +254,37 @@ public static class SelfroleComponents
     ///     The private menu behind a panel button, built for one member: their roles come back checked,
     ///     so picking one more is one click instead of reselecting everything they already had.
     /// </summary>
-    public static (DiscordEmbed Embed, List<DiscordActionRowComponent> Rows) BuildCategoryMenu(
-        SelfroleCategory category, IReadOnlySet<string> heldOptionIds, string? notice)
+    public static DiscordContainerComponent BuildCategoryMenu(SelfroleCategory category,
+        IReadOnlySet<string> heldOptionIds, string? notice, bool? autoAssignActive)
     {
         var options = category.ActiveOptions;
         var held = options.Where(option => heldOptionIds.Contains(option.Id)).ToList();
 
-        var description = new StringBuilder();
-        if (!string.IsNullOrWhiteSpace(notice)) description.Append(notice).Append("\n\n");
+        var children = new List<DiscordComponent>
+        {
+            new DiscordTextDisplayComponent($"## {category.Name.Truncate(DiscordLimits.EmbedTitle)}")
+        };
 
+        if (!string.IsNullOrWhiteSpace(notice))
+            children.Add(new DiscordTextDisplayComponent(notice.Truncate(DiscordLimits.EmbedDescription)));
+
+        var description = new StringBuilder();
         description.Append("**Aktuell:** ")
             .Append(held.Count == 0 ? "nichts ausgewählt" : string.Join(", ", held.Select(o => o.Label)));
 
         if (category.MinValues > 0)
             description.Append("\n-# Aus dieser Kategorie kannst du nur wechseln, nicht alles entfernen.");
 
-        var embed = new DiscordEmbedBuilder()
-            .WithTitle(category.Name.Truncate(DiscordLimits.EmbedTitle))
-            .WithDescription(description.ToString().Truncate(DiscordLimits.EmbedDescription))
-            .WithColor(BotConfig.GetEmbedColor())
-            .Build();
+        if (autoAssignActive is true)
+            description.Append("\n-# 🎮 Autozuweisung ist an: Wenn du ein passendes Spiel spielst, " +
+                               "bekommst du die Rolle automatisch.");
+        else if (autoAssignActive is false)
+            description.Append("\n-# Autozuweisung ist aus. Rollen aus dieser Kategorie bekommst du nur, " +
+                               "wenn du sie selbst auswählst.");
 
-        var extras = BuildExtraRow(category, held.Count);
+        children.Add(new DiscordTextDisplayComponent(description.ToString().Truncate(DiscordLimits.EmbedDescription)));
+
+        var extras = BuildExtraRow(category, held.Count, autoAssignActive);
         var budget = DiscordLimits.ActionRowsPerMessage - (extras is null ? 0 : 1);
         var rows = category.IsSelect
             ? BuildSelectRows(category, options, held, budget)
@@ -277,7 +292,13 @@ public static class SelfroleComponents
 
         if (extras is not null) rows.Add(extras);
 
-        return (embed, rows);
+        if (rows.Count > 0)
+        {
+            children.Add(new DiscordSeparatorComponent());
+            children.AddRange(rows);
+        }
+
+        return new DiscordContainerComponent(children, accentColor: BotConfig.GetEmbedColor());
     }
 
     private static List<DiscordActionRowComponent> BuildSelectRows(SelfroleCategory category,
@@ -333,13 +354,22 @@ public static class SelfroleComponents
         ];
     }
 
-    private static DiscordActionRowComponent? BuildExtraRow(SelfroleCategory category, int heldCount)
+    private static DiscordActionRowComponent? BuildExtraRow(SelfroleCategory category, int heldCount,
+        bool? autoAssignActive)
     {
-        if (!category.AllowClear || category.MinValues > 0 || heldCount == 0) return null;
+        var buttons = new List<DiscordButtonComponent>();
 
-        return new DiscordActionRowComponent([
-            new DiscordButtonComponent(ButtonStyle.Danger, ClearCustomId(category), "Alle entfernen")
-        ]);
+        if (category.AllowClear && category.MinValues == 0 && heldCount > 0)
+            buttons.Add(new DiscordButtonComponent(ButtonStyle.Danger, ClearCustomId(category), "Alle entfernen"));
+
+        if (autoAssignActive is { } active)
+            buttons.Add(active
+                ? new DiscordButtonComponent(ButtonStyle.Secondary, AutoCustomId(category),
+                    "Autozuweisung deaktivieren")
+                : new DiscordButtonComponent(ButtonStyle.Success, AutoCustomId(category),
+                    "Autozuweisung aktivieren"));
+
+        return buttons.Count == 0 ? null : new DiscordActionRowComponent(buttons);
     }
 
     /// <summary>The line above the menu after a change, so nobody has to guess what the click did.</summary>
@@ -348,10 +378,10 @@ public static class SelfroleComponents
         if (change.Rejection is not null) return change.Rejection;
 
         var parts = new List<string>();
-        if (change.Added.Count > 0) parts.Add("+ " + string.Join(", ", change.Added));
-        if (change.Removed.Count > 0) parts.Add("− " + string.Join(", ", change.Removed));
+        if (change.Added.Count > 0) parts.Add("**Hinzugefügt:** " + string.Join(", ", change.Added));
+        if (change.Removed.Count > 0) parts.Add("**Entfernt:** " + string.Join(", ", change.Removed));
         if (change.Skipped.Count > 0)
-            parts.Add($"Nicht möglich: {string.Join(", ", change.Skipped)} — die Rolle fehlt oder steht über mir.");
+            parts.Add($"**Nicht möglich:** {string.Join(", ", change.Skipped)}. Die Rolle fehlt oder steht über mir.");
 
         return parts.Count == 0 ? "Nichts geändert." : string.Join("\n", parts);
     }
