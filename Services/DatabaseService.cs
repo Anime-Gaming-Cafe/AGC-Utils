@@ -1775,8 +1775,6 @@ public static class DatabaseService
         await InitBotSettings();
         await InitBanRequestStages();
         await InitTicketCategories();
-        await InitInfoPanels();
-        await InitAutoposts();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -2081,95 +2079,6 @@ public static class DatabaseService
             cmd.Parameters.AddWithValue("max", style == "long" ? 1000 : 200);
             await cmd.ExecuteNonQueryAsync();
         }
-    }
-
-    /// <summary>
-    ///     Puts the rules panel in place on first start, with the texts the Python bot used. Every insert is
-    ///     ON CONFLICT DO NOTHING, so a later start never writes over what the team edited in the dashboard.
-    ///     Nothing is posted to Discord here: the panel has no channel until an admin picks one.
-    /// </summary>
-    private static async Task InitInfoPanels()
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        var panel = InfoPanelSeedData.BuildSeedPanel();
-
-        await using (var cmd = con.CreateCommand(
-                         "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, color, auto_repost, rendered_hash, sort_order) " +
-                         "VALUES (@id, @name, 0, 0, false, @headerTitle, @headerText, @authorName, @authorIconMode, '', @bannerMode, '', @color, true, '', 0) " +
-                         "ON CONFLICT (id) DO NOTHING"))
-        {
-            cmd.Parameters.AddWithValue("id", panel.Id);
-            cmd.Parameters.AddWithValue("name", panel.Name);
-            cmd.Parameters.AddWithValue("headerTitle", panel.HeaderTitle);
-            cmd.Parameters.AddWithValue("headerText", panel.HeaderText);
-            cmd.Parameters.AddWithValue("authorName", panel.AuthorName);
-            cmd.Parameters.AddWithValue("authorIconMode", panel.AuthorIconMode);
-            cmd.Parameters.AddWithValue("bannerMode", panel.BannerMode);
-            cmd.Parameters.AddWithValue("color", panel.Color);
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        foreach (var group in panel.Groups)
-        {
-            await using (var cmd = con.CreateCommand(
-                             "INSERT INTO infopanel_groups (id, panel_id, kind, placeholder, date_label, position, enabled) " +
-                             "VALUES (@id, @panel, @kind, @placeholder, @dateLabel, @position, true) " +
-                             "ON CONFLICT (panel_id, id) DO NOTHING"))
-            {
-                cmd.Parameters.AddWithValue("id", group.Id);
-                cmd.Parameters.AddWithValue("panel", group.PanelId);
-                cmd.Parameters.AddWithValue("kind", group.Kind);
-                cmd.Parameters.AddWithValue("placeholder", group.Placeholder);
-                cmd.Parameters.AddWithValue("dateLabel", group.DateLabel);
-                cmd.Parameters.AddWithValue("position", group.Position);
-                await cmd.ExecuteNonQueryAsync();
-            }
-
-            foreach (var page in group.Pages)
-            {
-                await using var pageCmd = con.CreateCommand(
-                    "INSERT INTO infopanel_pages (id, group_id, panel_id, kind, label, description, emoji, button_style, url, title, content, image_url, color, position, enabled, updated_at) " +
-                    "VALUES (@id, @group, @panel, @kind, @label, @description, @emoji, @buttonStyle, @url, @title, @content, @imageUrl, @color, @position, true, @updatedAt) " +
-                    "ON CONFLICT (group_id, id) DO NOTHING");
-                pageCmd.Parameters.AddWithValue("id", page.Id);
-                pageCmd.Parameters.AddWithValue("group", page.GroupId);
-                pageCmd.Parameters.AddWithValue("panel", page.PanelId);
-                pageCmd.Parameters.AddWithValue("kind", page.Kind);
-                pageCmd.Parameters.AddWithValue("label", page.Label);
-                pageCmd.Parameters.AddWithValue("description", page.Description);
-                pageCmd.Parameters.AddWithValue("emoji", page.Emoji);
-                pageCmd.Parameters.AddWithValue("buttonStyle", page.ButtonStyle);
-                pageCmd.Parameters.AddWithValue("url", page.Url);
-                pageCmd.Parameters.AddWithValue("title", page.Title);
-                pageCmd.Parameters.AddWithValue("content", page.Content);
-                pageCmd.Parameters.AddWithValue("imageUrl", page.ImageUrl);
-                pageCmd.Parameters.AddWithValue("color", page.Color);
-                pageCmd.Parameters.AddWithValue("position", page.Position);
-                pageCmd.Parameters.AddWithValue("updatedAt", page.UpdatedAt);
-                await pageCmd.ExecuteNonQueryAsync();
-            }
-        }
-    }
-
-    /// <summary>
-    ///     Seeds the three posts of the old Python bot, disabled, exactly once. The marker lives in
-    ///     botsettings so a post deleted in the dashboard stays deleted after the next restart.
-    /// </summary>
-    private static async Task InitAutoposts()
-    {
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using (var check = con.CreateCommand(
-                         "SELECT 1 FROM botsettings WHERE section = 'Autoposts' AND key = 'Seeded'"))
-        {
-            if (await check.ExecuteScalarAsync() is not null) return;
-        }
-
-        foreach (var autopost in AutopostSeedData.Build())
-            await AutopostService.InsertAsync(autopost);
-
-        await using var mark = con.CreateCommand(
-            "INSERT INTO botsettings (section, key, value) VALUES ('Autoposts', 'Seeded', 'true') ON CONFLICT (section, key) DO NOTHING");
-        await mark.ExecuteNonQueryAsync();
     }
 
     private static async Task InitLeveling()

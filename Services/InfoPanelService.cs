@@ -13,7 +13,7 @@ namespace AGC_Management.Services;
 public static class InfoPanelService
 {
     /// <summary>The only panel that ships today. Selfroles would be a second row in the same tables.</summary>
-    public const string RulesPanelId = InfoPanelSeedData.PanelId;
+    public const string RulesPanelId = "regelwerk";
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
     private static readonly SemaphoreSlim LoadLock = new(1, 1);
