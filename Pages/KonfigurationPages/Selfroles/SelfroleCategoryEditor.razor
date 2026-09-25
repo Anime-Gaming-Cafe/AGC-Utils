@@ -187,17 +187,28 @@ else
                                         </span>
                                     </div>
                                     <div class="field field--wide">
-                                        <label class="field__label" for="@($"sc-game-{option.Id}")">Zuweisungsvorschlag</label>
-                                        <SearchableSelect TKey="string" Id="@($"sc-game-{option.Id}")"
-                                                          Items="GameItemsFor(option)" AllowNone="false"
-                                                          NoneLabel="Spiel zuordnen..." Placeholder="Spiel suchen..."
-                                                          SelectedId="@("")"
-                                                          SelectedIdChanged="@((string key) => BindGame(option, key))"/>
-                                        <span class="field__hint">
-                                            Ein zugeordnetes Spiel vergibt diese Rolle exakt, ohne Umweg über das Muster.
-                                            Die Vorschläge stehen oben, darunter der ganze
-                                            <a href="/konfiguration/selfroles/games">Spielkatalog</a>.
-                                        </span>
+                                        <p class="field__label">Zuweisungsvorschlag</p>
+                                        @if (GameItemsFor(option).Count > 0)
+                                        {
+                                            <SearchableSelect TKey="string" Items="GameItemsFor(option)"
+                                                              AllowNone="false" NoneLabel="Spiel zuordnen..."
+                                                              Placeholder="Spiel suchen..." SelectedId="@("")"
+                                                              SelectedIdChanged="@((string key) => BindGame(option, key))"/>
+                                            <span class="field__hint">
+                                                Ein zugeordnetes Spiel vergibt diese Rolle exakt, ohne Umweg über das
+                                                Muster. Hier stehen die 15 ähnlichsten Namen aus dem Katalog; ist das
+                                                gesuchte nicht dabei, ordnest du es im
+                                                <a href="/konfiguration/selfroles/games">Spielkatalog</a> zu.
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="field__hint">
+                                                Kein Spielname im Katalog ähnelt dieser Rolle. Zuordnen kannst du sie
+                                                trotzdem — im <a href="/konfiguration/selfroles/games">Spielkatalog</a>,
+                                                dort steht jedes gesehene Spiel.
+                                            </span>
+                                        }
                                         @if (BoundGames(option).Count > 0)
                                         {
                                             <div class="chip-list mt-2">
@@ -306,6 +317,9 @@ else
 @code {
     [Parameter] public string CategoryId { get; set; } = "";
 
+    /// <summary>Der ganze Katalog je Option waere hunderte Eintraege im Renderbaum fuer nichts.</summary>
+    private const int SuggestionLimit = 15;
+
     private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web);
 
     private bool loaded;
@@ -386,7 +400,10 @@ else
         gameItemCache.Clear();
     }
 
-    /// <summary>Was zu dieser Option passen koennte, nach Score sortiert, danach der Rest des Katalogs.</summary>
+    /// <summary>
+    ///     Die aehnlichsten ungebundenen Katalogspiele, bestes zuerst. Was darunter liegt, ordnet man im
+    ///     Katalog zu - dort gibt es Suche und die volle Liste.
+    /// </summary>
     private List<(string Id, string Label)> GameItemsFor(SelfroleOption option)
     {
         if (gameItemCache.TryGetValue(option.Id, out var cached)) return cached;
@@ -395,11 +412,13 @@ else
         var ranked = catalog
             .Where(game => !game.IsBound)
             .Select(game => (Game: game, Score: ActivityMatcher.Score(patterns, game.DisplayName)))
+            .Where(entry => entry.Score > 0)
             .OrderByDescending(entry => entry.Score)
             .ThenBy(entry => entry.Game.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Take(SuggestionLimit)
             .Select(entry => (entry.Game.Key,
                 entry.Score >= ActivityMatcher.Threshold
-                    ? $"{entry.Game.DisplayName}  (Vorschlag)"
+                    ? $"{entry.Game.DisplayName}  (wird automatisch erkannt)"
                     : entry.Game.DisplayName))
             .ToList();
 
