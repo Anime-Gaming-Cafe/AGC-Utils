@@ -202,6 +202,7 @@ public class DiscordBotService : IHostedService
         _ = AutopostTask.LaunchLoops();
         _ = BirthdayTask.LaunchLoops();
         _ = SelfroleTask.LaunchLoops();
+        _ = GetGameMetrics.LaunchLoops();
 
         return Task.CompletedTask;
     }
