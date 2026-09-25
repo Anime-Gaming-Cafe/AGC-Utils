@@ -24,11 +24,11 @@ public static class GetGameMetrics
 
         try
         {
-            await GameCatalogService.RepairIdentitiesAsync();
+            await GameCatalogService.RepairCatalogAsync();
         }
         catch (Exception e)
         {
-            CurrentApplication.Logger.Error(e, "Spielkatalog: Neunummerierung fehlgeschlagen");
+            CurrentApplication.Logger.Error(e, "Spielkatalog: Aufraeumen fehlgeschlagen");
         }
 
         while (true)

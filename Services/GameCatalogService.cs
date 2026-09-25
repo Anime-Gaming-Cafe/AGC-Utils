@@ -210,29 +210,113 @@ public static class GameCatalogService
     }
 
     /// <summary>
-    ///     Renumbers rows that still carry an application id as their identity. Runs once at startup and
-    ///     is a no-op afterwards; the bindings in <c>optionid</c> are untouched.
+    ///     Brings existing rows in line with the current normalisation: renames what now tokenises
+    ///     differently, folds a row into its twin when both spellings of one game are already in the
+    ///     catalogue, and renumbers ids that were once taken from the application id. Runs once at
+    ///     startup and is a no-op afterwards. Bindings survive: a merge keeps the target's option, or
+    ///     adopts the source's when the target has none.
     /// </summary>
-    public static async Task RepairIdentitiesAsync()
+    public static async Task RepairCatalogAsync()
     {
-        var repaired = 0;
-        foreach (var entry in await GetAllAsync())
+        var byKey = (await GetAllAsync()).ToDictionary(entry => entry.Key, StringComparer.Ordinal);
+        var renamed = 0;
+        var merged = 0;
+        var renumbered = 0;
+
+        foreach (var entry in byKey.Values.ToList())
         {
+            var key = ActivityMatcher.Key(entry.DisplayName);
+            if (key.Length == 0) continue;
+
+            if (key != entry.Key)
+            {
+                if (byKey.TryGetValue(key, out var target))
+                {
+                    await MergeAsync(entry, target);
+                    byKey.Remove(entry.Key);
+                    merged++;
+                    continue;
+                }
+
+                await RenameAsync(entry, key);
+                byKey.Remove(entry.Key);
+                entry.Key = key;
+                entry.ActivityId = StableId(key);
+                byKey[key] = entry;
+                renamed++;
+                continue;
+            }
+
             var expected = StableId(entry.Key);
             if (entry.ActivityId == expected) continue;
 
-            await using var cmd = Db.CreateCommand(
-                "UPDATE metrics_activitymap SET activityid = @activity WHERE activityname = @key");
-            cmd.Parameters.AddWithValue("key", entry.Key);
-            cmd.Parameters.AddWithValue("activity", expected);
-            await cmd.ExecuteNonQueryAsync();
-            repaired++;
+            await SetActivityIdAsync(entry.Key, expected);
+            renumbered++;
         }
 
-        if (repaired == 0) return;
+        if (renamed + merged + renumbered == 0) return;
 
         Invalidate();
-        CurrentApplication.Logger.Information("Spielkatalog: {Count} Eintraege neu nummeriert", repaired);
+        CurrentApplication.Logger.Information(
+            "Spielkatalog: {Renamed} umbenannt, {Merged} zusammengefuehrt, {Renumbered} neu nummeriert",
+            renamed, merged, renumbered);
+    }
+
+    private static async Task RenameAsync(GameCatalogEntry entry, string key)
+    {
+        await using var cmd = Db.CreateCommand(
+            "UPDATE metrics_activitymap SET activityname = @key, activityid = @activity " +
+            "WHERE activityname = @old");
+        cmd.Parameters.AddWithValue("old", entry.Key);
+        cmd.Parameters.AddWithValue("key", key);
+        cmd.Parameters.AddWithValue("activity", StableId(key));
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static async Task MergeAsync(GameCatalogEntry source, GameCatalogEntry target)
+    {
+        var option = target.IsBound ? target.OptionId : source.OptionId;
+        var boundAt = target.IsBound ? target.BoundAt : source.BoundAt;
+
+        await using (var cmd = Db.CreateCommand(
+                         "UPDATE metrics_activitymap SET activityid = @activity, optionid = @option, " +
+                         "boundat = @boundat, applicationid = @application, firstseen = @firstseen, " +
+                         "lastseen = @lastseen WHERE activityname = @key"))
+        {
+            cmd.Parameters.AddWithValue("key", target.Key);
+            cmd.Parameters.AddWithValue("activity", StableId(target.Key));
+            cmd.Parameters.AddWithValue("option", option);
+            cmd.Parameters.AddWithValue("boundat", boundAt);
+            cmd.Parameters.AddWithValue("application",
+                (long)(target.ApplicationId != 0 ? target.ApplicationId : source.ApplicationId));
+            cmd.Parameters.AddWithValue("firstseen", SmallestSeen(source.FirstSeen, target.FirstSeen));
+            cmd.Parameters.AddWithValue("lastseen", Math.Max(source.LastSeen, target.LastSeen));
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using var delete = Db.CreateCommand("DELETE FROM metrics_activitymap WHERE activityname = @key");
+        delete.Parameters.AddWithValue("key", source.Key);
+        await delete.ExecuteNonQueryAsync();
+
+        if (source.IsBound && target.IsBound && source.OptionId != target.OptionId)
+            CurrentApplication.Logger.Warning(
+                "Spielkatalog: {Source} und {Target} zeigten auf verschiedene Optionen, {Option} behalten",
+                source.DisplayName, target.DisplayName, option);
+    }
+
+    private static long SmallestSeen(long a, long b)
+    {
+        if (a == 0) return b;
+        return b == 0 ? a : Math.Min(a, b);
+    }
+
+    private static async Task SetActivityIdAsync(string key, long activityId)
+    {
+        await using var cmd = Db.CreateCommand(
+            "UPDATE metrics_activitymap SET activityid = @activity WHERE activityname = @key");
+        cmd.Parameters.AddWithValue("key", key);
+        cmd.Parameters.AddWithValue("activity", activityId);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     /// <summary>

@@ -30,6 +30,16 @@ public static class ActivityMatcher
     };
 
     /// <summary>
+    ///     Trailing phrases a recorder or overlay appends to the game name. Discord then reports
+    ///     "Apex Legends with Medal", which is the same game and must not become its own catalogue entry.
+    ///     Matched as a whole phrase at the end, so a title like "Medal of Honor" stays intact.
+    /// </summary>
+    private static readonly string[][] TrailingNoise =
+    [
+        ["with", "medal"]
+    ];
+
+    /// <summary>
     ///     Only the numerals that actually show up in titles. A general parser would read "mix" as 1009.
     /// </summary>
     private static readonly Dictionary<string, string> RomanNumerals = new(StringComparer.Ordinal)
@@ -60,9 +70,30 @@ public static class ActivityMatcher
 
         Flush(tokens, current);
 
+        StripTrailingNoise(tokens);
+
         // Dropping every noise word would leave a title like "Definitive Edition" with nothing at all.
         var meaningful = tokens.Where(token => !Noise.Contains(token)).ToList();
         return [.. (meaningful.Count > 0 ? meaningful : tokens)];
+    }
+
+    private static void StripTrailingNoise(List<string> tokens)
+    {
+        foreach (var phrase in TrailingNoise)
+        {
+            if (tokens.Count <= phrase.Length) continue;
+
+            var start = tokens.Count - phrase.Length;
+            var matches = true;
+            for (var i = 0; i < phrase.Length; i++)
+                if (!string.Equals(tokens[start + i], phrase[i], StringComparison.Ordinal))
+                {
+                    matches = false;
+                    break;
+                }
+
+            if (matches) tokens.RemoveRange(start, phrase.Length);
+        }
     }
 
     private static void Flush(List<string> tokens, StringBuilder current)
