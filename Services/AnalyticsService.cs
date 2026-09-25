@@ -4,6 +4,8 @@ public readonly record struct WeeklyCount(DateOnly WeekStart, long Count);
 
 public readonly record struct ChannelCount(ulong ChannelId, long Count);
 
+public readonly record struct GameCount(long ActivityId, string DisplayName, long Minutes, long Players);
+
 public readonly record struct ModeratorCaseCount(ulong PunisherId, long WarnCount, long FlagCount, long BanCount);
 
 public readonly record struct CaseTypeTotals(long WarnCount, long FlagCount, long BanCount);
@@ -38,6 +40,79 @@ public static class AnalyticsService
         foreach (var b in bans) merged[b.WeekStart] = merged.GetValueOrDefault(b.WeekStart) + b.Count;
 
         return FillWeeklyGaps(merged, weeks);
+    }
+
+    /// <summary>
+    ///     Play time over closed days comes from the rolled-up table, today's from the raw samples. The
+    ///     two never overlap, because the rollup only ever folds days that are already over.
+    /// </summary>
+    private const string CombinedPlaytime =
+        "WITH combined AS (" +
+        "SELECT activityid, userid, day, minutes FROM metrics_activitydaily WHERE day >= @sinceday AND day < @today" +
+        " UNION ALL " +
+        "SELECT activityid, userid, (to_timestamp(timestamp) AT TIME ZONE 'UTC')::date AS day, " +
+        "COUNT(*) AS minutes " +
+        "FROM metrics_activity WHERE timestamp >= @todayunix GROUP BY activityid, userid, day) ";
+
+    public static async Task<List<WeeklyCount>> GetWeeklyGameMinutes(int weeks = 12)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using var cmd = con.CreateCommand(CombinedPlaytime +
+                                                "SELECT date_trunc('week', day) AS week_start, SUM(minutes) " +
+                                                "FROM combined GROUP BY week_start ORDER BY week_start");
+        AddPlaytimeWindow(cmd, weeks);
+
+        Dictionary<DateOnly, long> raw = [];
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var weekStart = DateOnly.FromDateTime(reader.GetFieldValue<DateTime>(0));
+            raw[weekStart] = reader.GetInt64(1);
+        }
+
+        return FillWeeklyGaps(raw, weeks);
+    }
+
+    /// <summary>Most played games in the window. <paramref name="unboundOnly" /> is the gap list:
+    ///     what people play that no selfrole option covers yet.</summary>
+    public static async Task<List<GameCount>> GetTopGames(int weeks = 12, int limit = 10,
+        bool unboundOnly = false)
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        var filter = unboundOnly ? "AND COALESCE(map.optionid, '') = '' " : "";
+        await using var cmd = con.CreateCommand(CombinedPlaytime +
+                                                "SELECT combined.activityid, COALESCE(map.displayname, ''), " +
+                                                "SUM(combined.minutes), COUNT(DISTINCT combined.userid) " +
+                                                "FROM combined LEFT JOIN metrics_activitymap map " +
+                                                "ON map.activityid = combined.activityid " +
+                                                $"WHERE true {filter}" +
+                                                "GROUP BY combined.activityid, map.displayname " +
+                                                "ORDER BY SUM(combined.minutes) DESC LIMIT @limit");
+        AddPlaytimeWindow(cmd, weeks);
+        cmd.Parameters.AddWithValue("limit", limit);
+
+        List<GameCount> results = [];
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            results.Add(new GameCount(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2),
+                reader.GetInt64(3)));
+
+        return results;
+    }
+
+    /// <summary>Minutes and distinct players per game, for the catalogue list.</summary>
+    public static async Task<Dictionary<long, GameCount>> GetGameUsage(int weeks = 12)
+    {
+        var games = await GetTopGames(weeks, 5000);
+        return games.ToDictionary(game => game.ActivityId);
+    }
+
+    private static void AddPlaytimeWindow(NpgsqlCommand cmd, int weeks)
+    {
+        var today = DateTime.UtcNow.Date;
+        cmd.Parameters.AddWithValue("sinceday", today.AddDays(-weeks * 7));
+        cmd.Parameters.AddWithValue("today", today);
+        cmd.Parameters.AddWithValue("todayunix", new DateTimeOffset(today, TimeSpan.Zero).ToUnixTimeSeconds());
     }
 
     public static async Task<List<ChannelCount>> GetTopChannelsByMessages(int weeks = 12, int limit = 10)

@@ -1,0 +1,611 @@
+@page "/konfiguration/selfroles"
+@using System.Text.Json
+@using AGC_Management.Components
+@using AGC_Management.Entities.Selfroles
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Selfroles"
+            Lead="Das Panel trägt je Kategorie einen Button. Dahinter öffnet sich ein privates Menü, in dem die eigenen Rollen schon angehakt sind."
+            BackHref="/konfiguration" BackText="Administration">
+    <Actions>
+        <a class="btn btn-secondary btn-sm" href="/konfiguration/selfroles/spiele">Spielkatalog</a>
+    </Actions>
+</PageHeader>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Selfroles werden geladen"
+                Description="Panel, Kategorien und Rollen werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Nachricht in Discord"
+           Lead="Wo das Panel steht. Gesendet wird erst, wenn du hier einen Channel wählst.">
+        @if (!panel.IsPosted)
+        {
+            <StateBlock Inline="true"
+                        Title="Noch nicht gesendet"
+                        Description="Das Panel existiert bisher nur hier. Wähle einen Channel und sende es, danach hält der Bot die Nachricht von selbst aktuell."/>
+        }
+        else
+        {
+            <dl class="facts mb-3">
+                <dt>Channel</dt>
+                <dd>@ChannelName(panel.ChannelId)</dd>
+                <dt>Nachricht</dt>
+                <dd><a href="@PanelLink" target="_blank" rel="noopener">In Discord öffnen</a></dd>
+            </dl>
+        }
+
+        <div class="field">
+            <label class="field__label" for="sr-channel">Channel</label>
+            <SearchableSelect Id="sr-channel" Items="TextChannelItems" NoneLabel="Channel wählen"
+                              Placeholder="Channel suchen..." @bind-SelectedId="selectedChannelId"/>
+            <span class="field__hint">
+                Der Bot braucht in diesem Channel das Recht, Nachrichten zu schreiben und einzubetten.
+            </span>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="SendPanel">
+                @(panel.IsPosted ? "Neu senden" : "Panel senden")
+            </button>
+            <button type="button" class="btn btn-ghost" disabled="@(busy || !panel.IsPosted)" @onclick="RefreshPanel">
+                Jetzt aktualisieren
+            </button>
+        </div>
+        @if (panel.IsPosted)
+        {
+            <p class="field__hint">
+                Ein neues Panel ersetzt das alte nicht. Das alte bleibt stehen, wird aber nicht mehr
+                aktualisiert. Lösche es in Discord von Hand.
+            </p>
+        }
+    </Panel>
+
+    <Panel Title="Kategorien" Lead="Die Reihenfolge ist die Reihenfolge der Buttons im Panel."
+           Flush="@(categories.Count > 0)">
+        @if (categories.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Kategorien"
+                        Description="Ohne Kategorie hat das Panel keine Buttons. Lege unten die erste an."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var category in categories)
+                {
+                    var index = categories.IndexOf(category);
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@category.Name</p>
+                            <p class="rows__text">
+                                @(category.IsSelect ? "Auswahlmenü" : "Buttons") · @category.ActiveOptions.Count Optionen
+                                · @LimitLabel(category)
+                                @if (category.ChunkCount > 1)
+                                {
+                                    <text> · @category.ChunkCount Teile</text>
+                                }
+                            </p>
+                            <p class="rows__text">
+                                @(category.Sticky ? "Wird bei Rejoin zurückgegeben" : "Geht bei Rejoin verloren")
+                                @if (category.AutoAssign)
+                                {
+                                    <text> · Automatische Erkennung</text>
+                                }
+                                @if (!category.AllowClear)
+                                {
+                                    <text> · Ohne „Alle entfernen"</text>
+                                }
+                            </p>
+                        </div>
+                        <div class="rows__side">
+                            <StatusPill Text="@(category.Enabled ? "Aktiv" : "Aus")"
+                                        Tone="@(category.Enabled ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+                            <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                    @onclick="() => Move(category, -1)">Hoch
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(index == categories.Count - 1)"
+                                    @onclick="() => Move(category, 1)">Runter
+                            </button>
+                            <a class="btn btn-secondary btn-sm" href="/konfiguration/selfroles/@category.Id">Bearbeiten</a>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    @onclick="() => pendingDelete = category.Id">Löschen
+                            </button>
+                        </div>
+                        @if (pendingDelete == category.Id)
+                        {
+                            <div class="rows__detail">
+                                <ConfirmInline Title="@($"Kategorie {category.Name} löschen?")"
+                                               ConfirmText="Endgültig löschen"
+                                               Busy="busy"
+                                               OnConfirm="() => Delete(category)"
+                                               OnCancel="() => pendingDelete = null">
+                                    <p>
+                                        Die @category.Options.Count Optionen gehen mit. Die Rollen selbst bleiben,
+                                        Mitglieder behalten sie also. Deaktivieren statt löschen nimmt nur den Button
+                                        aus dem Panel.
+                                    </p>
+                                </ConfirmInline>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Kategorie anlegen"
+           Lead="Die Kennung steht in der Datenbank und in den Button-IDs. Sie lässt sich später nicht mehr ändern.">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="sr-new-id">Kennung</label>
+                <input id="sr-new-id" class="form-control" maxlength="32" placeholder="musik" @bind="newId"/>
+                <span class="field__hint">Kleinbuchstaben, Ziffern und Bindestriche.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sr-new-name">Name</label>
+                <input id="sr-new-name" class="form-control" maxlength="@DiscordLimits.ButtonLabel"
+                       placeholder="Musikgeschmack" @bind="newName"/>
+                <span class="field__hint">So heißt der Button im Panel.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sr-new-kind">Darstellung</label>
+                <select id="sr-new-kind" class="form-select" @bind="newKind">
+                    <option value="@SelfroleCategory.KindSelect">Auswahlmenü</option>
+                    <option value="@SelfroleCategory.KindButtons">Buttons</option>
+                </select>
+                <span class="field__hint">Buttons sind bei wenigen Rollen übersichtlicher, ab 25 geht nur ein Menü.</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="Create">Anlegen und bearbeiten</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Kopfbereich" Lead="Überschrift, Text und Bild der Panel-Nachricht.">
+        <div class="field-grid">
+            <div class="field field--wide">
+                <label class="field__label" for="sr-title">Überschrift</label>
+                <input id="sr-title" class="form-control" maxlength="@DiscordLimits.EmbedTitle"
+                       @bind="panel.HeaderTitle" @bind:event="oninput" @bind:after="OnFieldChanged"/>
+                <CharCount Value="@panel.HeaderTitle" Max="DiscordLimits.EmbedTitle"/>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="sr-text">Text</label>
+                <textarea id="sr-text" class="form-control" rows="3" @bind="panel.HeaderText"
+                          @bind:event="oninput" @bind:after="OnFieldChanged"></textarea>
+                <CharCount Value="@panel.HeaderText" Max="DiscordLimits.TextDisplayContent"/>
+                <span class="field__hint">Platzhalter wie {membercount} oder {guildname} werden beim Senden ersetzt.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sr-author">Autorzeile</label>
+                <input id="sr-author" class="form-control" maxlength="@DiscordLimits.EmbedAuthorName"
+                       @bind="panel.AuthorName" @bind:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sr-color">Farbe</label>
+                <input id="sr-color" class="form-control" maxlength="6" @bind="panel.Color" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">Hex ohne Raute, z.B. 2F84A2.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sr-banner">Banner</label>
+                <select id="sr-banner" class="form-select" @bind="panel.BannerMode" @bind:after="OnFieldChanged">
+                    <option value="@SelfrolePanel.ModeGuild">Serverbanner</option>
+                    <option value="@SelfrolePanel.ModeUrl">Eigene URL</option>
+                    <option value="@SelfrolePanel.ModeNone">Keins</option>
+                </select>
+                <span class="field__hint">Beim Serverbanner tauscht der Bot das Bild selbst aus, sobald ihr es ändert.</span>
+            </div>
+            @if (panel.BannerMode == SelfrolePanel.ModeUrl)
+            {
+                <div class="field">
+                    <label class="field__label" for="sr-banner-url">URL des Banners</label>
+                    <input id="sr-banner-url" class="form-control" @bind="panel.BannerUrl"
+                           @bind:after="OnFieldChanged" placeholder="https://..."/>
+                </div>
+            }
+        </div>
+
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="sr-repost"
+                   @bind="panel.AutoRepost" @bind:after="OnFieldChanged"/>
+            <label class="form-check-label" for="sr-repost">Gelöschte Nachricht neu posten</label>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="sr-enabled"
+                   @bind="enabled" @bind:after="OnFieldChanged"/>
+            <label class="form-check-label" for="sr-enabled">Selfrole-System aktiviert</label>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="SaveAndNotify">Einstellungen speichern</button>
+        </div>
+    </Panel>
+
+    <Panel Title="Gemerkte Rollen"
+           Lead="Wer den Server verlässt, bekommt seine Rollen beim Wiederbeitritt zurück.">
+        <dl class="facts mb-3">
+            <dt>Mitglieder mit gemerkten Rollen</dt>
+            <dd class="tnum">@stickyMembers</dd>
+        </dl>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="sr-retention">Aufbewahrung in Tagen</label>
+                <input id="sr-retention" type="number" min="0" max="3650" class="form-control"
+                       @bind="stickyRetentionDays" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 bewahrt sie unbegrenzt auf. Aufgeräumt wird einmal täglich.</span>
+            </div>
+        </div>
+    </Panel>
+
+    <Panel Title="Automatische Erkennung"
+           Lead="Vergibt Rollen, sobald jemand ein passendes Spiel spielt. Nur hinzufügen, nie entfernen.">
+        @if (!presenceAvailable)
+        {
+            <div class="notice notice--info">
+                <p class="notice__title">Presence-Intent fehlt</p>
+                <p>
+                    Der Bot bekommt von Discord gerade keine Aktivitäten. Aktiviere den Presence-Intent im
+                    Discord Developer Portal und starte den Bot neu, danach steht die Erkennung hier zur Verfügung.
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="sr-autodetect"
+                       @bind="autoDetect" @bind:after="OnFieldChanged"/>
+                <label class="form-check-label" for="sr-autodetect">Rollen automatisch vergeben</label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="sr-autonotify"
+                       @bind="autoDetectNotify" @bind:after="OnFieldChanged"/>
+                <label class="form-check-label" for="sr-autonotify">Einmalige Nachricht an das Mitglied</label>
+            </div>
+
+            <p class="field__hint mt-3">
+                @if (AutoAssignCategories.Count == 0)
+                {
+                    <text>Bisher ist keine Kategorie dafür freigegeben. Der Schalter steht in der Kategorie selbst.</text>
+                }
+                else
+                {
+                    <text>Freigegeben: @string.Join(", ", AutoAssignCategories.Select(c => c.Name))</text>
+                }
+            </p>
+        }
+    </Panel>
+
+    <Panel Title="Vorschau" Lead="Was im Panel steht und was hinter jedem Button auftaucht.">
+        @if (PanelCategories.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Nichts zu zeigen"
+                        Description="Es gibt keine aktive Kategorie mit mindestens einer Option. Das Panel hätte keine Buttons."/>
+        }
+        else
+        {
+            <h3 class="section-title">Panel</h3>
+            <div class="chip-list mb-3">
+                @foreach (var category in PanelCategories)
+                {
+                    <code>@category.Name</code>
+                }
+            </div>
+
+            @foreach (var category in PanelCategories)
+            {
+                <h3 class="section-title">@category.Name</h3>
+                <p class="field__hint">
+                    @(category.IsSelect ? $"{category.ChunkCount} Auswahlmenü(s)" : $"{category.ChunkCount} Button-Reihe(n)")
+                    · @LimitLabel(category)
+                    @if (category.AllowClear)
+                    {
+                        <text> · mit „Alle entfernen"</text>
+                    }
+                </p>
+                <div class="chip-list mb-3">
+                    @foreach (var option in category.ActiveOptions)
+                    {
+                        <code>@option.Label@(RoleExists(option) ? "" : " (Rolle fehlt)")</code>
+                    }
+                </div>
+            }
+
+            @if (Warnings.Count > 0)
+            {
+                <div class="notice notice--warn">
+                    <p class="notice__title">Das fällt beim Senden auf</p>
+                    @foreach (var warning in Warnings)
+                    {
+                        <p>@warning</p>
+                    }
+                </div>
+            }
+        }
+    </Panel>
+}
+
+@code {
+    private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web);
+
+    private bool loaded;
+    private bool busy;
+
+    private SelfrolePanel panel = new();
+    private List<SelfroleCategory> categories = [];
+    private List<DiscordChannel> textChannels = [];
+    private string? pendingDelete;
+
+    private ulong selectedChannelId;
+    private bool enabled;
+    private int stickyRetentionDays = 365;
+    private int stickyMembers;
+    private bool autoDetect;
+    private bool autoDetectNotify = true;
+    private bool presenceAvailable;
+
+    private string newId = "";
+    private string newName = "";
+    private string newKind = SelfroleCategory.KindSelect;
+
+    private List<(ulong Id, string Label)> TextChannelItems =>
+        textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+
+    private List<SelfroleCategory> PanelCategories => SelfroleComponents.PanelCategories(panel);
+
+    private List<SelfroleCategory> AutoAssignCategories =>
+        [.. categories.Where(c => c is { Enabled: true, AutoAssign: true })];
+
+    private string PanelLink =>
+        $"https://discord.com/channels/{CurrentApplication.TargetGuild?.Id}/{panel.ChannelId}/{panel.MessageId}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        textChannels = guild is null
+            ? []
+            : [.. guild.Channels.Values.Where(c => c.Type == ChannelType.Text).OrderBy(c => c.Position)];
+
+        presenceAvailable = CurrentApplication.DiscordClient.Intents.HasIntent(DiscordIntents.GuildPresences);
+
+        await LoadAsync();
+        Tracker.Register(Save, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private async Task LoadAsync()
+    {
+        SelfroleService.Invalidate();
+        var current = await SelfroleService.GetPanelAsync();
+
+        // A copy, because the service hands out the instance the bot renders the message from and an
+        // unsaved field in this form has no business showing up in Discord.
+        panel = JsonSerializer.Deserialize<SelfrolePanel>(
+            JsonSerializer.Serialize(current, CloneOptions), CloneOptions)!;
+        categories = [.. panel.Categories.OrderBy(c => c.Position)];
+        enabled = panel.Enabled;
+        if (selectedChannelId == 0) selectedChannelId = panel.ChannelId;
+
+        stickyMembers = await SelfroleService.CountStickyMembersAsync();
+        stickyRetentionDays = await RuntimeSettings.GetIntAsync(SelfroleService.Section, "StickyRetentionDays", 365);
+        autoDetect = await RuntimeSettings.GetBoolAsync(SelfroleService.Section, "AutoDetect", false);
+        autoDetectNotify = await RuntimeSettings.GetBoolAsync(SelfroleService.Section, "AutoDetectNotify", true);
+    }
+
+    private static string LimitLabel(SelfroleCategory category)
+    {
+        var max = category.MaxValues <= 0 ? "beliebig viele" : $"höchstens {category.MaxValues}";
+        return category.MinValues > 0 ? $"{max}, mindestens {category.MinValues}" : max;
+    }
+
+    private static bool RoleExists(SelfroleOption option) =>
+        CurrentApplication.TargetGuild?.GetRole(option.RoleId) is not null;
+
+    private static string ChannelName(ulong channelId)
+    {
+        var guild = CurrentApplication.TargetGuild;
+        if (channelId == 0) return "Kein Channel";
+        return guild is not null && guild.Channels.TryGetValue(channelId, out var channel)
+            ? $"#{channel.Name}"
+            : "Channel nicht gefunden";
+    }
+
+    private List<string> Warnings
+    {
+        get
+        {
+            var warnings = new List<string>();
+            var missing = PanelCategories
+                .SelectMany(c => c.ActiveOptions)
+                .Count(option => !RoleExists(option));
+            if (missing > 0)
+                warnings.Add($"{missing} Optionen zeigen auf eine Rolle, die es nicht mehr gibt. Sie werden übersprungen.");
+
+            var skipped = categories.Count(c => c.Enabled && c.ActiveOptions.Count == 0);
+            if (skipped > 0)
+                warnings.Add($"{skipped} aktive Kategorien haben keine Option und tauchen im Panel nicht auf.");
+
+            var overflow = categories.Count(c => c.Enabled && c.ActiveOptions.Count > 0) - PanelCategories.Count;
+            if (overflow > 0)
+                warnings.Add($"{overflow} Kategorien passen nicht mehr ins Panel. Eine Nachricht trägt höchstens 25 Buttons.");
+
+            foreach (var category in PanelCategories.Where(c => c.ChunkCount > DiscordLimits.ActionRowsPerMessage - 1))
+                warnings.Add($"„{category.Name}\" braucht mehr Platz, als ein Menü hergibt. Die hinteren Optionen fehlen dort.");
+
+            return warnings;
+        }
+    }
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task Save()
+    {
+        var error = Validate();
+        if (error is not null)
+        {
+            ToastService.Notify(error, "bad");
+            Tracker.RejectSave();
+            return;
+        }
+
+        panel.HeaderTitle = panel.HeaderTitle.Trim();
+        panel.HeaderText = panel.HeaderText.Trim();
+        panel.AuthorName = panel.AuthorName.Trim();
+        panel.BannerUrl = panel.BannerUrl.Trim();
+        panel.Color = panel.Color.Trim().TrimStart('#');
+
+        await SelfroleService.UpdatePanelSettingsAsync(panel);
+        await SelfroleService.SetPanelEnabledAsync(enabled);
+
+        const string section = SelfroleService.Section;
+        await RuntimeSettings.SetAsync(section, "StickyRetentionDays", stickyRetentionDays.ToString());
+        await RuntimeSettings.SetAsync(section, "AutoDetect", autoDetect.ToString().ToLowerInvariant());
+        await RuntimeSettings.SetAsync(section, "AutoDetectNotify", autoDetectNotify.ToString().ToLowerInvariant());
+
+        SelfroleComponents.QueueRefresh();
+        await LoadAsync();
+    }
+
+    private string? Validate()
+    {
+        if (stickyRetentionDays is < 0 or > 3650) return "Die Aufbewahrung muss zwischen 0 und 3650 Tagen liegen.";
+
+        var title = DiscordLimits.Check("Überschrift", panel.HeaderTitle, DiscordLimits.EmbedTitle);
+        if (title is not null) return title;
+
+        return DiscordLimits.Check("Text", panel.HeaderText, DiscordLimits.TextDisplayContent);
+    }
+
+    private async Task SaveAndNotify()
+    {
+        if (await Tracker.SaveAsync())
+            ToastService.Notify(enabled ? "Einstellungen gespeichert." : "Gespeichert. Das System ist noch aus.",
+                enabled ? "ok" : "warn");
+    }
+
+    private void Discard() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    private async Task Move(SelfroleCategory category, int offset)
+    {
+        var from = categories.IndexOf(category);
+        var to = from + offset;
+        if (to < 0 || to >= categories.Count) return;
+
+        (categories[from], categories[to]) = (categories[to], categories[from]);
+
+        for (var i = 0; i < categories.Count; i++)
+        {
+            categories[i].Position = i;
+            await SelfroleService.UpsertCategoryAsync(categories[i]);
+        }
+
+        SelfroleComponents.QueueRefresh();
+        ToastService.Notify("Reihenfolge gespeichert.", "ok");
+    }
+
+    private async Task Delete(SelfroleCategory category)
+    {
+        busy = true;
+        await SelfroleService.DeleteCategoryAsync(category.Id);
+        pendingDelete = null;
+        await LoadAsync();
+        busy = false;
+        SelfroleComponents.QueueRefresh();
+        ToastService.Notify($"Kategorie {category.Name} gelöscht.", "ok");
+    }
+
+    private async Task Create()
+    {
+        var id = (newId ?? "").Trim().ToLowerInvariant();
+        var name = (newName ?? "").Trim();
+
+        if (id.Length == 0 || name.Length == 0)
+        {
+            ToastService.Notify("Kennung und Name werden beide gebraucht.", "bad");
+            return;
+        }
+
+        if (!id.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+        {
+            ToastService.Notify("Die Kennung darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.", "bad");
+            return;
+        }
+
+        if (await SelfroleService.CategoryExistsAsync(id))
+        {
+            ToastService.Notify("Diese Kennung gibt es bereits.", "bad");
+            return;
+        }
+
+        busy = true;
+        await SelfroleService.UpsertCategoryAsync(new SelfroleCategory
+        {
+            Id = id,
+            Name = name,
+            Kind = newKind,
+            Placeholder = name,
+            Position = categories.Count,
+            Enabled = false
+        });
+        busy = false;
+
+        Nav.NavigateTo($"/konfiguration/selfroles/{id}");
+    }
+
+    private async Task SendPanel()
+    {
+        if (selectedChannelId == 0)
+        {
+            ToastService.Notify("Bitte zuerst einen Channel wählen.", "bad");
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            await SelfroleComponents.SendPanelToChannelAsync(selectedChannelId);
+            await LoadAsync();
+            enabled = true;
+            ToastService.Notify("Panel gesendet.", "ok");
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Error(e, "Selfroles: Senden aus dem Dashboard fehlgeschlagen");
+            ToastService.Notify("Das Panel konnte nicht gesendet werden. Darf der Bot in diesem Channel schreiben?",
+                "bad");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RefreshPanel()
+    {
+        busy = true;
+        var refreshed = await SelfroleComponents.RefreshPanelAsync(true);
+        busy = false;
+
+        await LoadAsync();
+
+        ToastService.Notify(refreshed
+            ? "Nachricht aktualisiert."
+            : "Die Nachricht konnte nicht aktualisiert werden. Steht sie noch im Channel?", refreshed ? "ok" : "bad");
+    }
+}

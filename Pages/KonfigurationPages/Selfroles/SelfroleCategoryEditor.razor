@@ -1,0 +1,508 @@
+@page "/konfiguration/selfroles/{CategoryId}"
+@using System.Text.Json
+@using AGC_Management.Components
+@using AGC_Management.Entities.Metrics
+@using AGC_Management.Entities.Selfroles
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@inject NavigationManager Nav
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="@(draft?.Name ?? "Kategorie")"
+            Lead="Welche Rollen in dieser Kategorie stehen und wie das private Menü sie zeigt."
+            BackHref="/konfiguration/selfroles" BackText="Selfroles"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Kategorie wird geladen"
+                Description="Optionen, Rollen und Nutzungszahlen werden abgefragt."/>
+}
+else if (draft is null)
+{
+    <StateBlock Kind="StateBlock.StateKind.Error"
+                Title="Kategorie nicht gefunden"
+                Description="Diese Kategorie existiert nicht mehr, oder sie wurde gelöscht."
+                ActionText="Zu den Selfroles" ActionHref="/konfiguration/selfroles"/>
+}
+else
+{
+    <div class="detail-grid">
+        <div>
+            <Panel Title="Kategorie">
+                <div class="field-grid">
+                    <div class="field">
+                        <label class="field__label" for="sc-name">Name</label>
+                        <input id="sc-name" class="form-control" maxlength="@DiscordLimits.ButtonLabel"
+                               @bind="draft.Name" @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">Steht auf dem Button im Panel.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-emoji">Emoji</label>
+                        <input id="sc-emoji" class="form-control" @bind="draft.Emoji" @bind:after="OnFieldChanged"
+                               placeholder="🎮"/>
+                        <span class="field__hint">Unicode-Emoji oder &lt;:name:id&gt;. Leer lassen geht auch.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-style">Button-Farbe</label>
+                        <select id="sc-style" class="form-select" @bind="draft.ButtonStyle" @bind:after="OnFieldChanged">
+                            <option value="1">Blau</option>
+                            <option value="2">Grau</option>
+                            <option value="3">Grün</option>
+                            <option value="4">Rot</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-kind">Darstellung</label>
+                        <select id="sc-kind" class="form-select" @bind="draft.Kind" @bind:after="OnFieldChanged">
+                            <option value="@SelfroleCategory.KindSelect">Auswahlmenü</option>
+                            <option value="@SelfroleCategory.KindButtons">Buttons</option>
+                        </select>
+                        <span class="field__hint">
+                            Buttons zeigen den Zustand als Farbe, brauchen aber eine Reihe je fünf Rollen.
+                        </span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-placeholder">Platzhalter</label>
+                        <input id="sc-placeholder" class="form-control" maxlength="@DiscordLimits.SelectPlaceholder"
+                               @bind="draft.Placeholder" @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">Die graue Zeile im Auswahlmenü. Leer nimmt den Namen.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-min">Mindestens</label>
+                        <input id="sc-min" type="number" min="0" max="25" class="form-control"
+                               @bind="draft.MinValues" @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">
+                            1 heißt: wer eine Rolle hat, kann nur noch wechseln. „Alle entfernen" entfällt dann.
+                        </span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="sc-max">Höchstens</label>
+                        <input id="sc-max" type="number" min="0" max="25" class="form-control"
+                               @bind="draft.MaxValues" @bind:after="OnFieldChanged"/>
+                        <span class="field__hint">0 heißt beliebig viele, 1 macht die Kategorie exklusiv.</span>
+                    </div>
+                </div>
+
+                <div class="form-check form-switch field mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sc-clear"
+                           @bind="draft.AllowClear" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="sc-clear">Button „Alle entfernen" anbieten</label>
+                    @if (draft.AutoAssign)
+                    {
+                        <span class="field__hint">
+                            Zählt als Zurücksetzen, nicht als Absage: die automatische Erkennung darf diese Rollen
+                            danach wieder vergeben. Wer eine einzelne Rolle abwählt, bekommt sie nicht zurück.
+                        </span>
+                    }
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sc-sticky"
+                           @bind="draft.Sticky" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="sc-sticky">Rollen bei Wiederbeitritt zurückgeben</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sc-auto"
+                           @bind="draft.AutoAssign" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="sc-auto">Automatisch nach gespieltem Spiel vergeben</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="sc-enabled"
+                           @bind="draft.Enabled" @bind:after="OnFieldChanged"/>
+                    <label class="form-check-label" for="sc-enabled">Kategorie aktiv</label>
+                </div>
+            </Panel>
+
+            <Panel Title="Optionen" Lead="Die Reihenfolge ist die Reihenfolge im Menü.">
+                @if (draft.Options.Count == 0)
+                {
+                    <StateBlock Inline="true" Title="Noch keine Option"
+                                Description="Ohne Option taucht die Kategorie nicht im Panel auf. Füge unten die erste hinzu."/>
+                }
+                else
+                {
+                    @foreach (var option in draft.Options)
+                    {
+                        var index = draft.Options.IndexOf(option);
+                        <div class="step-block">
+                            <div class="section-title-row">
+                                <h3 class="section-title">@(index + 1). @(string.IsNullOrWhiteSpace(option.Label) ? "Ohne Bezeichnung" : option.Label)</h3>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" disabled="@(index == 0)"
+                                            @onclick="() => MoveOption(option, -1)">Hoch
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                            disabled="@(index == draft.Options.Count - 1)"
+                                            @onclick="() => MoveOption(option, 1)">Runter
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                            @onclick="() => RemoveOption(option)">Entfernen
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label class="field__label" for="@($"sc-role-{option.Id}")">Rolle</label>
+                                    <SearchableSelect Id="@($"sc-role-{option.Id}")" Items="RoleItems"
+                                                      NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                                      SelectedId="option.RoleId"
+                                                      SelectedIdChanged="@((ulong id) => SetRole(option, id))"/>
+                                    @if (option.RoleId != 0 && !RoleExists(option))
+                                    {
+                                        <span class="field__hint field__hint--bad">Diese Rolle gibt es nicht mehr.</span>
+                                    }
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="@($"sc-label-{option.Id}")">Bezeichnung</label>
+                                    <input id="@($"sc-label-{option.Id}")" class="form-control"
+                                           maxlength="@DiscordLimits.SelectOptionLabel"
+                                           @bind="option.Label" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="@($"sc-emoji-{option.Id}")">Emoji</label>
+                                    <input id="@($"sc-emoji-{option.Id}")" class="form-control"
+                                           @bind="option.Emoji" @bind:after="OnFieldChanged"/>
+                                </div>
+                                <div class="field field--wide">
+                                    <label class="field__label" for="@($"sc-desc-{option.Id}")">Beschreibung</label>
+                                    <input id="@($"sc-desc-{option.Id}")" class="form-control"
+                                           maxlength="@DiscordLimits.SelectOptionDescription"
+                                           @bind="option.Description" @bind:after="OnFieldChanged"/>
+                                    <span class="field__hint">Steht im Auswahlmenü unter der Bezeichnung. Buttons zeigen sie nicht.</span>
+                                </div>
+                                @if (draft.AutoAssign)
+                                {
+                                    <div class="field field--wide">
+                                        <label class="field__label" for="@($"sc-match-{option.Id}")">Erkennungsmuster</label>
+                                        <input id="@($"sc-match-{option.Id}")" class="form-control"
+                                               value="@string.Join(", ", option.MatchPatterns)"
+                                               @onchange="e => SetPatterns(option, e.Value?.ToString())"/>
+                                        <span class="field__hint">
+                                            Mit Komma trennen. Groß- und Kleinschreibung, Leerzeichen und Sonderzeichen
+                                            sind egal. Greift nur bei Spielen ohne Zuordnung im Katalog.
+                                        </span>
+                                    </div>
+                                    <div class="field field--wide">
+                                        <p class="field__label">Zugeordnete Spiele</p>
+                                        @if (BoundGames(option).Count == 0)
+                                        {
+                                            <span class="field__hint">
+                                                Keines. Im <a href="/konfiguration/selfroles/spiele">Spielkatalog</a>
+                                                zugeordnete Spiele vergeben diese Rolle exakt, ohne Umweg über das Muster.
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <div class="chip-list">
+                                                @foreach (var game in BoundGames(option))
+                                                {
+                                                    <code>@game.DisplayName</code>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="@($"sc-on-{option.Id}")" @bind="option.Enabled" @bind:after="OnFieldChanged"/>
+                                <label class="form-check-label" for="@($"sc-on-{option.Id}")">Option aktiv</label>
+                            </div>
+                        </div>
+                    }
+                }
+
+                <div class="form-foot">
+                    <button type="button" class="btn btn-secondary" @onclick="AddOption">Option hinzufügen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveAndNotify">Speichern</button>
+                </div>
+            </Panel>
+        </div>
+
+        <div>
+            <Panel Title="Menü">
+                <dl class="facts">
+                    <dt>Aktive Optionen</dt>
+                    <dd class="tnum">@draft.ActiveOptions.Count</dd>
+                    <dt>@(draft.IsSelect ? "Auswahlmenüs" : "Button-Reihen")</dt>
+                    <dd class="tnum">@draft.ChunkCount</dd>
+                    <dt>Auswahl</dt>
+                    <dd>@LimitLabel</dd>
+                </dl>
+                @if (draft.ChunkCount > DiscordLimits.ActionRowsPerMessage - 1)
+                {
+                    <div class="notice notice--warn">
+                        <p class="notice__title">Passt nicht ins Menü</p>
+                        <p>
+                            Eine Nachricht trägt fünf Reihen. Die hinteren Optionen erscheinen nicht — teile die
+                            Kategorie auf oder schalte welche ab.
+                        </p>
+                    </div>
+                }
+            </Panel>
+
+            <Panel Title="Nutzung" Lead="Mitglieder mit der Rolle, und die Veränderung über 30 Tage.">
+                @if (draft.Options.Count == 0)
+                {
+                    <StateBlock Inline="true" Title="Keine Zahlen"
+                                Description="Die Kategorie hat noch keine Option, also gibt es nichts zu zählen."/>
+                }
+                else
+                {
+                    <ul class="rows">
+                        @foreach (var option in draft.Options)
+                        {
+                            <li>
+                                <div class="rows__main">
+                                    <p class="rows__title">@(string.IsNullOrWhiteSpace(option.Label) ? option.Id : option.Label)</p>
+                                    <p class="rows__text">@TrendText(option)</p>
+                                </div>
+                                <div class="rows__side">
+                                    <span class="tnum">@UsageOf(option).Current</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </Panel>
+
+            <Panel Title="Kategorie löschen">
+                @if (!confirmingDelete)
+                {
+                    <button type="button" class="btn btn-danger" @onclick="() => confirmingDelete = true">
+                        Kategorie löschen
+                    </button>
+                }
+                else
+                {
+                    <ConfirmInline Title="Kategorie wirklich löschen?" ConfirmText="Ja, löschen" Busy="deleting"
+                                   OnConfirm="Delete" OnCancel="() => confirmingDelete = false">
+                        <p>
+                            Die Optionen gehen mit. Die Rollen selbst bleiben bestehen, Mitglieder behalten sie also.
+                            Deaktivieren nimmt den Button nur aus dem Panel.
+                        </p>
+                    </ConfirmInline>
+                }
+            </Panel>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string CategoryId { get; set; } = "";
+
+    private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web);
+
+    private bool loaded;
+    private bool deleting;
+    private bool confirmingDelete;
+
+    private SelfroleCategory? draft;
+    private string snapshot = "";
+    private List<string> savedOptionIds = [];
+    private Dictionary<string, SelfroleUsage> usage = [];
+    private List<GameCatalogEntry> boundGames = [];
+
+    private List<DiscordRole> roles = [];
+    private List<(ulong Id, string Label)> RoleItems => roles.Select(r => (r.Id, $"@{r.Name}")).ToList();
+
+    private string LimitLabel
+    {
+        get
+        {
+            if (draft is null) return "";
+            var max = draft.MaxValues <= 0 ? "beliebig viele" : $"höchstens {draft.MaxValues}";
+            return draft.MinValues > 0 ? $"{max}, mindestens {draft.MinValues}" : max;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        roles = guild is null
+            ? []
+            : [.. guild.Roles.Values.Where(r => !r.IsManaged && r.Id != guild.Id).OrderByDescending(r => r.Position)];
+
+        await Load();
+        if (draft is not null) Tracker.Register(Save, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private async Task Load()
+    {
+        SelfroleService.Invalidate();
+        var category = await SelfroleService.GetCategoryAsync(CategoryId);
+        if (category is null)
+        {
+            draft = null;
+            return;
+        }
+
+        snapshot = JsonSerializer.Serialize(category, CloneOptions);
+        draft = Clone();
+        savedOptionIds = [.. category.Options.Select(option => option.Id)];
+        usage = await SelfroleService.GetUsageAsync(category);
+
+        boundGames = [];
+        foreach (var option in category.Options)
+            boundGames.AddRange(await GameCatalogService.GetBoundToAsync(option.Id));
+    }
+
+    private SelfroleCategory Clone() => JsonSerializer.Deserialize<SelfroleCategory>(snapshot, CloneOptions)!;
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private static bool RoleExists(SelfroleOption option) =>
+        CurrentApplication.TargetGuild?.GetRole(option.RoleId) is not null;
+
+    private List<GameCatalogEntry> BoundGames(SelfroleOption option) =>
+        [.. boundGames.Where(game => string.Equals(game.OptionId, option.Id, StringComparison.Ordinal))];
+
+    private SelfroleUsage UsageOf(SelfroleOption option) =>
+        usage.TryGetValue(option.Id, out var value) ? value : new SelfroleUsage(0, null);
+
+    private string TrendText(SelfroleOption option)
+    {
+        var value = UsageOf(option);
+        if (value.Change is null) return "Noch kein Vergleichswert";
+        return value.Change switch
+        {
+            0 => "Unverändert in 30 Tagen",
+            > 0 => $"+{value.Change} in 30 Tagen",
+            _ => $"{value.Change} in 30 Tagen"
+        };
+    }
+
+    private void SetRole(SelfroleOption option, ulong roleId)
+    {
+        option.RoleId = roleId;
+        if (string.IsNullOrWhiteSpace(option.Label))
+            option.Label = CurrentApplication.TargetGuild?.GetRole(roleId)?.Name ?? "";
+        OnFieldChanged();
+    }
+
+    private void SetPatterns(SelfroleOption option, string? raw)
+    {
+        option.MatchPatterns = (raw ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        OnFieldChanged();
+    }
+
+    private void AddOption()
+    {
+        if (draft is null) return;
+        draft.Options.Add(new SelfroleOption { Id = ToolSet.GenerateCaseID(), CategoryId = draft.Id });
+        OnFieldChanged();
+    }
+
+    private void RemoveOption(SelfroleOption option)
+    {
+        draft?.Options.Remove(option);
+        OnFieldChanged();
+    }
+
+    private void MoveOption(SelfroleOption option, int offset)
+    {
+        if (draft is null) return;
+        var from = draft.Options.IndexOf(option);
+        var to = from + offset;
+        if (to < 0 || to >= draft.Options.Count) return;
+
+        (draft.Options[from], draft.Options[to]) = (draft.Options[to], draft.Options[from]);
+        OnFieldChanged();
+    }
+
+    private async Task Save()
+    {
+        if (draft is null) return;
+
+        var error = Validate(draft);
+        if (error is not null)
+        {
+            ToastService.Notify(error, "bad");
+            Tracker.RejectSave();
+            return;
+        }
+
+        draft.Name = draft.Name.Trim();
+        draft.Placeholder = draft.Placeholder.Trim();
+        draft.Emoji = draft.Emoji.Trim();
+
+        for (var index = 0; index < draft.Options.Count; index++)
+        {
+            var option = draft.Options[index];
+            option.CategoryId = draft.Id;
+            option.Position = index;
+            option.Label = option.Label.Trim();
+            option.Description = option.Description.Trim();
+            option.Emoji = option.Emoji.Trim();
+            await SelfroleService.UpsertOptionAsync(option);
+        }
+
+        foreach (var removed in savedOptionIds.Where(id => draft.Options.All(option => option.Id != id)))
+            await SelfroleService.DeleteOptionAsync(draft.Id, removed);
+
+        await SelfroleService.UpsertCategoryAsync(draft);
+
+        SelfroleComponents.QueueRefresh();
+        await Load();
+    }
+
+    private string? Validate(SelfroleCategory category)
+    {
+        if (string.IsNullOrWhiteSpace(category.Name)) return "Bitte einen Namen vergeben.";
+        if (category.MinValues < 0 || category.MaxValues < 0) return "Mindestens und Höchstens dürfen nicht negativ sein.";
+        if (category.MaxValues > 0 && category.MinValues > category.MaxValues)
+            return "Mindestens darf nicht größer als Höchstens sein.";
+        if (category.MinValues > category.ActiveOptions.Count)
+            return "Mindestens liegt über der Anzahl aktiver Optionen.";
+
+        var withoutRole = category.Options.Count(option => option.RoleId == 0);
+        if (withoutRole > 0) return "Es gibt Optionen ohne Rolle.";
+
+        var duplicate = category.Options
+            .GroupBy(option => option.RoleId)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null) return "Dieselbe Rolle steht mehrfach in der Kategorie.";
+
+        var nameError = DiscordLimits.Check("Name", category.Name, DiscordLimits.ButtonLabel);
+        if (nameError is not null) return nameError;
+
+        return category.Options
+            .Select(option => DiscordLimits.Check("Bezeichnung", option.Label, DiscordLimits.SelectOptionLabel))
+            .FirstOrDefault(error => error is not null);
+    }
+
+    private async Task SaveAndNotify()
+    {
+        if (await Tracker.SaveAsync())
+            ToastService.Notify(draft is { Enabled: true } ? "Gespeichert." : "Gespeichert. Die Kategorie ist noch aus.",
+                draft is { Enabled: true } ? "ok" : "warn");
+    }
+
+    private void Discard() => _ = InvokeAsync(() =>
+    {
+        draft = Clone();
+        StateHasChanged();
+    });
+
+    private async Task Delete()
+    {
+        if (deleting || draft is null) return;
+
+        deleting = true;
+        await SelfroleService.DeleteCategoryAsync(draft.Id);
+        deleting = false;
+        Tracker.Unregister();
+        SelfroleComponents.QueueRefresh();
+        ToastService.Notify("Kategorie gelöscht.", "ok");
+        Nav.NavigateTo("/konfiguration/selfroles");
+    }
+}

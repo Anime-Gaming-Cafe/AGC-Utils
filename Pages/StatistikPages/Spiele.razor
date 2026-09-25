@@ -1,0 +1,91 @@
+@page "/statistiken/spiele"
+@using AGC_Management.Services
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Spiele" Lead="Letzte 12 Wochen." BackHref="/statistiken" BackText="Statistiken"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Spielzeiten werden geladen"
+                Description="Gespielte Minuten, Top-Spiele und offene Zuordnungen werden abgefragt."/>
+}
+else
+{
+    <WeeklyBarChart Title="Gespielte Minuten pro Woche, letzte 12 Wochen" Points="weekly" ValueLabel="Minuten"/>
+
+    <Panel Title="Top-Spiele" Lead="Letzte 12 Wochen." Flush="@(top.Count > 0)">
+        @if (top.Count == 0)
+        {
+            <StateBlock Inline="true" Title="Keine Daten"
+                        Description="Im gewählten Zeitraum wurde keine Spielzeit erfasst. Der Bot braucht dafür Mitglieder mit sichtbarem Spielstatus."/>
+        }
+        else
+        {
+            <ul class="rows">
+                @foreach (var game in top)
+                {
+                    <li>
+                        <div class="rows__main">
+                            <p class="rows__title">@Name(game)</p>
+                            <p class="rows__text">@game.Players.ToString("N0") Mitglieder</p>
+                        </div>
+                        <div class="rows__side">
+                            <span class="tnum">@game.Minutes.ToString("N0") Minuten</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    <Panel Title="Meistgespielt ohne Rolle"
+           Lead="Wofür es noch keine Selfrole gibt. Zuordnen lässt sich das im Spielkatalog."
+           Flush="@(unbound.Count > 0)">
+        <Actions>
+            <a class="btn btn-secondary btn-sm" href="/konfiguration/selfroles/spiele">Zum Katalog</a>
+        </Actions>
+        <ChildContent>
+            @if (unbound.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Keine Lücken"
+                            Description="Alles, was gespielt wurde, hängt bereits an einer Option."/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var game in unbound)
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">@Name(game)</p>
+                                <p class="rows__text">@game.Players.ToString("N0") Mitglieder</p>
+                            </div>
+                            <div class="rows__side">
+                                <span class="tnum">@game.Minutes.ToString("N0") Minuten</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </ChildContent>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private List<WeeklyCount> weekly = [];
+    private List<GameCount> top = [];
+    private List<GameCount> unbound = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        weekly = await AnalyticsService.GetWeeklyGameMinutes();
+        top = await AnalyticsService.GetTopGames();
+        unbound = await AnalyticsService.GetTopGames(unboundOnly: true);
+        loaded = true;
+    }
+
+    private static string Name(GameCount game) =>
+        string.IsNullOrWhiteSpace(game.DisplayName) ? $"Unbekannt ({game.ActivityId})" : game.DisplayName;
+}

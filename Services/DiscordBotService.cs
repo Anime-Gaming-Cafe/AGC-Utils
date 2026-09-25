@@ -52,7 +52,7 @@ public class DiscordBotService : IHostedService
             Token = dcApiToken,
             TokenType = TokenType.Bot,
             Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildMembers |
-                      DiscordIntents.MessageContent,
+                      DiscordIntents.MessageContent | DiscordIntents.GuildPresences,
             ServiceProvider = _serviceProvider,
             Gateway = new()
             {
@@ -183,7 +183,7 @@ public class DiscordBotService : IHostedService
         ModerationSystemTasks MST = new();
         _ = MST.StartRemovingWarnsPeriodically(discord);
 
-        TempVoiceTasks TVT = new();
+        // TempVoiceTasks TVT = new();
         // _ = TVT.StartRemoveEmptyTempVoices(discord);
 
         _ = StatusUpdateTask(discord);
@@ -201,6 +201,7 @@ public class DiscordBotService : IHostedService
         _ = InfoPanelRefreshTask.LaunchLoops();
         _ = AutopostTask.LaunchLoops();
         _ = BirthdayTask.LaunchLoops();
+        _ = SelfroleTask.LaunchLoops();
 
         return Task.CompletedTask;
     }

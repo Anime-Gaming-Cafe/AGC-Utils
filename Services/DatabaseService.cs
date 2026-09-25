@@ -22,7 +22,7 @@ public static class DatabaseService
         var DbUser = BotConfig.GetConfig()[dbConfigSection]["Database_User"];
         var DbPass = BotConfig.GetConfig()[dbConfigSection]["Database_Password"];
         var DbName = BotConfig.GetConfig()[dbConfigSection]["Database"];
-        return $"Host={DbHost};Username={DbUser};Password={DbPass};Database={DbName};Maximum Pool Size=25;Keepalive=30;";
+        return $"Host={DbHost};Username={DbUser};Password={DbPass};Database={DbName};Maximum Pool Size=30;Keepalive=30;";
     }
 
 
@@ -164,7 +164,31 @@ public static class DatabaseService
             },
             {
                 "metrics_activitymap",
-                "CREATE TABLE IF NOT EXISTS metrics_activitymap (activityname TEXT, activityid BIGINT)"
+                "CREATE TABLE IF NOT EXISTS metrics_activitymap (activityname TEXT, activityid BIGINT, displayname TEXT DEFAULT '', applicationid BIGINT DEFAULT 0, optionid TEXT DEFAULT '', boundat BIGINT DEFAULT 0, firstseen BIGINT DEFAULT 0, lastseen BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_metrics_activitymap_name",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_activitymap_name ON metrics_activitymap (activityname)"
+            },
+            {
+                "metrics_activitydaily",
+                "CREATE TABLE IF NOT EXISTS metrics_activitydaily (activityid BIGINT, userid BIGINT, day DATE, minutes INTEGER DEFAULT 0)"
+            },
+            {
+                "idx_metrics_activitydaily_key",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_activitydaily_key ON metrics_activitydaily (activityid, userid, day)"
+            },
+            {
+                "idx_metrics_activitydaily_day",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_activitydaily_day ON metrics_activitydaily (day)"
+            },
+            {
+                "idx_metrics_activity_timestamp",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_activity_timestamp ON metrics_activity (timestamp)"
+            },
+            {
+                "idx_metrics_activity_game",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_activity_game ON metrics_activity (activityid, timestamp, userid)"
             },
             {
                 "idx_metrics_activitymap_userid",
@@ -523,6 +547,66 @@ public static class DatabaseService
             {
                 "autopost_queue",
                 "CREATE TABLE IF NOT EXISTS autopost_queue (queue_id TEXT PRIMARY KEY, autopost_id TEXT, step_index INTEGER DEFAULT 0, due_at BIGINT DEFAULT 0, check_filters BOOLEAN DEFAULT false)"
+            },
+            {
+                "selfrole_panel",
+                "CREATE TABLE IF NOT EXISTS selfrole_panel (id TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT DEFAULT '', header_text TEXT DEFAULT '', author_name TEXT DEFAULT '', author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT DEFAULT '', banner_mode TEXT DEFAULT 'guild', banner_url TEXT DEFAULT '', color TEXT DEFAULT '2F84A2', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT DEFAULT '')"
+            },
+            {
+                "idx_selfrole_panel_id",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_panel_id ON selfrole_panel (id)"
+            },
+            {
+                "selfrole_categories",
+                "CREATE TABLE IF NOT EXISTS selfrole_categories (id TEXT, name TEXT DEFAULT '', emoji TEXT DEFAULT '', button_style INTEGER DEFAULT 2, kind TEXT DEFAULT 'select', placeholder TEXT DEFAULT '', min_values INTEGER DEFAULT 0, max_values INTEGER DEFAULT 0, allow_clear BOOLEAN DEFAULT true, sticky BOOLEAN DEFAULT true, auto_assign BOOLEAN DEFAULT false, position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true)"
+            },
+            {
+                "idx_selfrole_categories_id",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_categories_id ON selfrole_categories (id)"
+            },
+            {
+                "selfrole_options",
+                "CREATE TABLE IF NOT EXISTS selfrole_options (id TEXT, category_id TEXT, role_id BIGINT DEFAULT 0, label TEXT DEFAULT '', description TEXT DEFAULT '', emoji TEXT DEFAULT '', match_patterns TEXT[] DEFAULT '{}', position INTEGER DEFAULT 0, enabled BOOLEAN DEFAULT true)"
+            },
+            {
+                "idx_selfrole_options_category",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_options_category ON selfrole_options (category_id, id)"
+            },
+            {
+                "idx_selfrole_options_role",
+                "CREATE INDEX IF NOT EXISTS idx_selfrole_options_role ON selfrole_options (role_id)"
+            },
+            {
+                "selfrole_stats",
+                "CREATE TABLE IF NOT EXISTS selfrole_stats (option_id TEXT, day DATE, member_count INTEGER DEFAULT 0)"
+            },
+            {
+                "idx_selfrole_stats_option_day",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_stats_option_day ON selfrole_stats (option_id, day)"
+            },
+            {
+                "selfrole_sticky",
+                "CREATE TABLE IF NOT EXISTS selfrole_sticky (user_id BIGINT, option_id TEXT, saved_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_selfrole_sticky_user_option",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_sticky_user_option ON selfrole_sticky (user_id, option_id)"
+            },
+            {
+                "selfrole_autoassign",
+                "CREATE TABLE IF NOT EXISTS selfrole_autoassign (user_id BIGINT, option_id TEXT, assigned_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_selfrole_autoassign_user_option",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_autoassign_user_option ON selfrole_autoassign (user_id, option_id)"
+            },
+            {
+                "selfrole_optout",
+                "CREATE TABLE IF NOT EXISTS selfrole_optout (user_id BIGINT, opted_out_at BIGINT DEFAULT 0)"
+            },
+            {
+                "idx_selfrole_optout_user",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_selfrole_optout_user ON selfrole_optout (user_id)"
             },
             {
                 "idx_metrics_messages_channel_timestamp",
@@ -1763,6 +1847,65 @@ public static class DatabaseService
                         "CREATE UNIQUE INDEX IF NOT EXISTS idx_birthdays_user_id ON birthdays (user_id)"
                     }
                 }
+            },
+            {
+                "metrics_activitymap", new Dictionary<string, string>
+                {
+                    {
+                        "displayname",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS displayname TEXT DEFAULT ''"
+                    },
+                    {
+                        "applicationid",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS applicationid BIGINT DEFAULT 0"
+                    },
+                    {
+                        "optionid",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS optionid TEXT DEFAULT ''"
+                    },
+                    {
+                        "boundat",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS boundat BIGINT DEFAULT 0"
+                    },
+                    {
+                        "firstseen",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS firstseen BIGINT DEFAULT 0"
+                    },
+                    {
+                        "lastseen",
+                        "ALTER TABLE metrics_activitymap ADD COLUMN IF NOT EXISTS lastseen BIGINT DEFAULT 0"
+                    },
+                    {
+                        "dedupe",
+                        "DELETE FROM metrics_activitymap a USING metrics_activitymap b WHERE a.activityname = b.activityname AND a.ctid < b.ctid"
+                    }
+                }
+            },
+            {
+                "selfrole_categories", new Dictionary<string, string>
+                {
+                    {
+                        "allow_clear",
+                        "ALTER TABLE selfrole_categories ADD COLUMN IF NOT EXISTS allow_clear BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "sticky",
+                        "ALTER TABLE selfrole_categories ADD COLUMN IF NOT EXISTS sticky BOOLEAN DEFAULT true"
+                    },
+                    {
+                        "auto_assign",
+                        "ALTER TABLE selfrole_categories ADD COLUMN IF NOT EXISTS auto_assign BOOLEAN DEFAULT false"
+                    }
+                }
+            },
+            {
+                "selfrole_options", new Dictionary<string, string>
+                {
+                    {
+                        "match_patterns",
+                        "ALTER TABLE selfrole_options ADD COLUMN IF NOT EXISTS match_patterns TEXT[] DEFAULT '{}'"
+                    }
+                }
             }
         };
 
@@ -1795,6 +1938,7 @@ public static class DatabaseService
         await InitBotSettings();
         await InitBanRequestStages();
         await InitTicketCategories();
+        await InitSelfroles();
         CurrentApplication.Logger.Information("Database tables updated.");
     }
 
@@ -1862,7 +2006,14 @@ public static class DatabaseService
                 "Alles Gute zum Geburtstag, {user}!\nDu hast für heute die Rolle {role}\n\n" +
                 "Feier schön, {user}!\nDu hast für heute die Rolle {role}"),
             ("Birthday", "PurgeLimit", "90"),
-            ("Birthday", "LastRunDate", "")
+            ("Birthday", "LastRunDate", ""),
+            ("Selfroles", "AutoDetect", "false"),
+            ("Selfroles", "AutoDetectNotify", "true"),
+            ("Selfroles", "StickyRetentionDays", "365"),
+            ("Selfroles", "LastStatsDate", ""),
+            ("GameMetrics", "SampleRetentionDays", "90"),
+            ("GameMetrics", "DailyRetentionDays", "0"),
+            ("GameMetrics", "LastRollupUntil", "0")
         };
 
         foreach (var (section, key, value) in defaults)
@@ -1880,6 +2031,41 @@ public static class DatabaseService
     ///     Seeds the escalation ladder once, so a fresh install pings sensibly before anyone touches the
     ///     dashboard. Role stages are skipped when their config key is missing.
     /// </summary>
+    /// <summary>
+    ///     Brings over the selfrole catalogue the Python bot kept in code, once. The marker lives in
+    ///     botsettings rather than relying on ON CONFLICT, because a category deleted in the dashboard has
+    ///     to stay deleted instead of reappearing on the next start. Nothing is posted to Discord here:
+    ///     the panel stays disabled until an admin presses the button.
+    /// </summary>
+    private static async Task InitSelfroles()
+    {
+        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
+        await using (var check = con.CreateCommand(
+                         "SELECT 1 FROM botsettings WHERE section = 'Selfroles' AND key = 'Seeded'"))
+        {
+            if (await check.ExecuteScalarAsync() is not null) return;
+        }
+
+        await SelfroleService.UpsertPanelAsync(SelfroleSeedData.BuildPanel());
+
+        var categories = SelfroleSeedData.BuildCategories();
+        for (var index = 0; index < categories.Count; index++)
+        {
+            var category = categories[index];
+            category.Position = index;
+            await SelfroleService.UpsertCategoryAsync(category);
+
+            foreach (var option in category.Options) await SelfroleService.UpsertOptionAsync(option);
+        }
+
+        await using var mark = con.CreateCommand(
+            "INSERT INTO botsettings (section, key, value) VALUES ('Selfroles', 'Seeded', 'true') ON CONFLICT (section, key) DO NOTHING");
+        await mark.ExecuteNonQueryAsync();
+
+        CurrentApplication.Logger.Information("Selfroles: {Count} Kategorien aus dem alten Bot uebernommen",
+            categories.Count);
+    }
+
     private static async Task InitBanRequestStages()
     {
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();

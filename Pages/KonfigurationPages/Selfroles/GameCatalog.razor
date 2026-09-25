@@ -1,0 +1,240 @@
+@page "/konfiguration/selfroles/spiele"
+@using AGC_Management.Entities.Metrics
+@using AGC_Management.Entities.Selfroles
+@using AGC_Management.Services
+@using AGC_Management.Utils
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Spiele"
+            Lead="Was der Bot tatsächlich gespielt gesehen hat. Ein zugeordnetes Spiel vergibt seine Rolle exakt, ohne Raten am Namen."
+            BackHref="/konfiguration/selfroles" BackText="Selfroles"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Spiele werden geladen"
+                Description="Katalog, Spielzeiten und Selfrole-Optionen werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Katalog"
+           Lead="Nach Spielzeit der letzten 12 Wochen sortiert. Ohne Zuordnung entscheidet weiter das Textmuster der Option."
+           Flush="@(Visible.Count > 0)">
+        <Actions>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleFilter">
+                @(unboundOnly ? "Alle anzeigen" : "Nur ohne Zuordnung")
+            </button>
+        </Actions>
+
+        <ChildContent>
+
+                    @if (entries.Count == 0)
+                    {
+                        <StateBlock Inline="true" Title="Noch nichts gesehen"
+                                    Description="Der Katalog füllt sich von selbst, sobald Mitglieder mit sichtbarem Spielstatus spielen. Der erste Eintrag kann eine Minute dauern."/>
+                    }
+                    else if (Visible.Count == 0)
+                    {
+                        <StateBlock Inline="true" Title="Alles zugeordnet"
+                                    Description="Jedes gesehene Spiel hängt an einer Option. Schalte den Filter um, wenn du die Zuordnungen prüfen willst."/>
+                    }
+                    else
+                    {
+                        <ul class="rows">
+                            @foreach (var entry in Page)
+                            {
+                                var current = entry;
+                                <li>
+                                    <div class="rows__main">
+                                        <p class="rows__title">@current.DisplayName</p>
+                                        <p class="rows__text">
+                                            @Minutes(current) · @Players(current) · zuletzt @LastSeen(current)
+                                            @if (current.ApplicationId != 0)
+                                            {
+                                                <text> · App-ID <code>@current.ApplicationId</code></text>
+                                            }
+                                        </p>
+                                        @if (!current.IsBound && Suggestion(current) is { } hint)
+                                        {
+                                            <p class="rows__text">
+                                                Sieht aus wie <strong>@hint.Option.Label</strong>
+                                                <button type="button" class="btn btn-ghost btn-sm"
+                                                        @onclick="() => Bind(current, hint.Option.Id)">Übernehmen
+                                                </button>
+                                            </p>
+                                        }
+                                    </div>
+                                    <div class="rows__side">
+                                        <StatusPill Text="@(current.IsBound ? "Zugeordnet" : "Offen")"
+                                                    Tone="@(current.IsBound ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
+                                        <SearchableSelect TKey="string" Items="OptionItems" NoneLabel="Keine Zuordnung"
+                                                          NoneValue="@("")" Placeholder="Option suchen..."
+                                                          SelectedId="current.OptionId"
+                                                          SelectedIdChanged="@((string id) => Bind(current, id))"/>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+        </ChildContent>
+    </Panel>
+
+    <Pager @bind-Current="page" TotalPages="TotalPages" TotalItems="Visible.Count"/>
+
+    <Panel Title="Aufbewahrung"
+           Lead="Rohproben sind eine Zeile je Mitglied und Minute, die Tageswerte entstehen daraus einmal täglich.">
+        <dl class="facts mb-3">
+            <dt>Spiele im Katalog</dt>
+            <dd class="tnum">@entries.Count</dd>
+            <dt>Davon ohne Zuordnung</dt>
+            <dd class="tnum">@entries.Count(entry => !entry.IsBound)</dd>
+        </dl>
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="gc-samples">Rohproben in Tagen</label>
+                <input id="gc-samples" type="number" min="0" max="3650" class="form-control"
+                       @bind="sampleRetentionDays" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 behält sie unbegrenzt. Sie sind die genaueste, aber mit Abstand größte Datenmenge.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="gc-daily">Tageswerte in Tagen</label>
+                <input id="gc-daily" type="number" min="0" max="3650" class="form-control"
+                       @bind="dailyRetentionDays" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">0 behält sie unbegrenzt. Auf ihnen beruhen die Statistiken.</span>
+            </div>
+        </div>
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="SaveAndNotify">Einstellungen speichern</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private const int PageSize = 25;
+
+    private bool loaded;
+    private bool unboundOnly = true;
+    private int page = 1;
+
+    private List<GameCatalogEntry> entries = [];
+    private List<SelfroleOption> options = [];
+    private Dictionary<long, GameCount> usage = [];
+
+    private int sampleRetentionDays = 90;
+    private int dailyRetentionDays;
+
+    private List<GameCatalogEntry> Visible =>
+        [.. entries.Where(entry => !unboundOnly || !entry.IsBound)];
+
+    private List<GameCatalogEntry> Page =>
+        [.. Visible.Skip((page - 1) * PageSize).Take(PageSize)];
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(Visible.Count / (double)PageSize));
+
+    private List<(string Id, string Label)> OptionItems =>
+        options.Select(option => (option.Id, option.Label)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        Tracker.Register(Save, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private async Task LoadAsync()
+    {
+        GameCatalogService.Invalidate();
+        SelfroleService.Invalidate();
+
+        usage = await AnalyticsService.GetGameUsage();
+        var panel = await SelfroleService.GetPanelAsync();
+        options =
+        [
+            .. panel.Categories
+                .Where(category => category.AutoAssign)
+                .SelectMany(category => category.Options)
+                .OrderBy(option => option.Label, StringComparer.OrdinalIgnoreCase)
+        ];
+
+        entries =
+        [
+            .. (await GameCatalogService.GetAllAsync())
+                .OrderByDescending(entry => usage.TryGetValue(entry.ActivityId, out var u) ? u.Minutes : 0)
+                .ThenBy(entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
+        ];
+
+        sampleRetentionDays = await RuntimeSettings.GetIntAsync(GameCatalogService.Section, "SampleRetentionDays", 90);
+        dailyRetentionDays = await RuntimeSettings.GetIntAsync(GameCatalogService.Section, "DailyRetentionDays", 0);
+    }
+
+    private string Minutes(GameCatalogEntry entry) =>
+        usage.TryGetValue(entry.ActivityId, out var value) && value.Minutes > 0
+            ? $"{value.Minutes:N0} Minuten"
+            : "keine Spielzeit erfasst";
+
+    private string Players(GameCatalogEntry entry) =>
+        usage.TryGetValue(entry.ActivityId, out var value) && value.Players > 0
+            ? $"{value.Players:N0} Mitglieder"
+            : "niemand";
+
+    private static string LastSeen(GameCatalogEntry entry) =>
+        entry.LastSeen <= 0
+            ? "nie"
+            : DateTimeOffset.FromUnixTimeSeconds(entry.LastSeen).LocalDateTime.ToString("dd.MM.yyyy HH:mm");
+
+    private (SelfroleOption Option, double Score)? Suggestion(GameCatalogEntry entry) =>
+        GameCatalogService.Suggest(entry, options);
+
+    private void ToggleFilter()
+    {
+        unboundOnly = !unboundOnly;
+        page = 1;
+    }
+
+    private async Task Bind(GameCatalogEntry entry, string optionId)
+    {
+        if (string.Equals(entry.OptionId, optionId, StringComparison.Ordinal)) return;
+
+        await GameCatalogService.BindAsync(entry.Key, optionId);
+        await LoadAsync();
+
+        var label = options.FirstOrDefault(option => option.Id == optionId)?.Label;
+        ToastService.Notify(label is null
+            ? $"Zuordnung von {entry.DisplayName} gelöst."
+            : $"{entry.DisplayName} zählt jetzt als {label}.", "ok");
+    }
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task Save()
+    {
+        if (sampleRetentionDays is < 0 or > 3650 || dailyRetentionDays is < 0 or > 3650)
+        {
+            ToastService.Notify("Die Aufbewahrung muss zwischen 0 und 3650 Tagen liegen.", "bad");
+            Tracker.RejectSave();
+            return;
+        }
+
+        await RuntimeSettings.SetAsync(GameCatalogService.Section, "SampleRetentionDays",
+            sampleRetentionDays.ToString());
+        await RuntimeSettings.SetAsync(GameCatalogService.Section, "DailyRetentionDays",
+            dailyRetentionDays.ToString());
+    }
+
+    private async Task SaveAndNotify()
+    {
+        if (await Tracker.SaveAsync())
+            ToastService.Notify("Einstellungen gespeichert.", "ok");
+    }
+
+    private void Discard() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+}

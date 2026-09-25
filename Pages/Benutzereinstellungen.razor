@@ -1,6 +1,8 @@
 @page "/benutzereinstellungen/"
 @using AGC_Management.Controller
+@using AGC_Management.Services
 @using AGC_Management.Utils
+@using DisCatSharp.Enums
 @inject UserService UserService
 @attribute [Authorize(Policy = DashboardPolicies.AnyMember)]
 
@@ -33,6 +35,22 @@ else
             <a class="btn btn-secondary btn-sm mt-2" href="/benutzereinstellungen/levelsystem/adjustrankcard">Rangkarte anpassen</a>
         </div>
     </Panel>
+
+    @if (autoDetectAvailable)
+    {
+        <Panel Title="Selfroles">
+            <div class="form-check form-switch field">
+                <input class="form-check-input" type="checkbox" role="switch" id="selfroleAutoDetect"
+                       checked="@autoDetectActive" disabled="@saving" @onchange="ToggleAutoDetect"/>
+                <label class="form-check-label" for="selfroleAutoDetect">Rollen nach gespielten Spielen vergeben</label>
+                <span class="field__hint">
+                    @(autoDetectActive
+                        ? "Spielst du etwas, für das es eine Rolle gibt, bekommst du sie einmalig. Entfernte Rollen kommen nicht zurück."
+                        : "Es werden dir keine Rollen mehr automatisch gegeben. Bereits vergebene behältst du.")
+                </span>
+            </div>
+        </Panel>
+    }
 }
 
 @code
@@ -43,6 +61,8 @@ else
     private bool loaded;
     private bool saving;
     private bool pingActive;
+    private bool autoDetectAvailable;
+    private bool autoDetectActive;
 
     private ulong GetUserId() => UserService.GetUserId(_principal) ?? 0;
 
@@ -51,6 +71,11 @@ else
         _principal = AuthState is null ? null : (await AuthState).User;
 
         pingActive = await LevelUtils.IsLevelUpPingEnabled(GetUserId());
+
+        autoDetectAvailable = CurrentApplication.DiscordClient.Intents.HasIntent(DiscordIntents.GuildPresences) &&
+                              await SelfroleService.AutoDetectEnabledAsync();
+        if (autoDetectAvailable) autoDetectActive = !await SelfroleService.IsOptedOutAsync(GetUserId());
+
         loaded = true;
     }
 
@@ -60,6 +85,20 @@ else
         try
         {
             pingActive = await LevelUtils.ToggleLevelUpPing(GetUserId());
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ToggleAutoDetect()
+    {
+        saving = true;
+        try
+        {
+            autoDetectActive = !autoDetectActive;
+            await SelfroleService.SetOptOutAsync(GetUserId(), !autoDetectActive);
         }
         finally
         {

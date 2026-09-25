@@ -45,10 +45,15 @@ public static class MetricsQueryService
         return expanded;
     }
 
-    private static void AppendScopeFilters(StringBuilder sql, HashSet<ulong> include, HashSet<ulong> exclude)
+    /// <summary>
+    ///     The column a scope narrows down. Channels for the message and voice logs; a game metric would
+    ///     hand in <c>activityid</c> instead, so the same windowed counting works for "50 hours of X".
+    /// </summary>
+    private static void AppendScopeFilters(StringBuilder sql, HashSet<ulong> include, HashSet<ulong> exclude,
+        string scopeColumn = "channelid")
     {
-        if (include.Count > 0) sql.Append(" AND channelid = ANY(@include)");
-        if (exclude.Count > 0) sql.Append(" AND channelid != ALL(@exclude)");
+        if (include.Count > 0) sql.Append($" AND {scopeColumn} = ANY(@include)");
+        if (exclude.Count > 0) sql.Append($" AND {scopeColumn} != ALL(@exclude)");
     }
 
     private static void AddScopeParameters(NpgsqlCommand cmd, HashSet<ulong> include, HashSet<ulong> exclude)
