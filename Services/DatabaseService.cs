@@ -506,7 +506,7 @@ public static class DatabaseService
             },
             {
                 "infopanels",
-                "CREATE TABLE IF NOT EXISTS infopanels (id TEXT, name TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT, header_text TEXT, author_name TEXT, author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT, banner_mode TEXT DEFAULT 'guild', banner_url TEXT, color TEXT DEFAULT '2F3136', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT, sort_order INTEGER DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS infopanels (id TEXT, name TEXT, channel_id BIGINT DEFAULT 0, message_id BIGINT DEFAULT 0, enabled BOOLEAN DEFAULT false, header_title TEXT, header_text TEXT, author_name TEXT, author_icon_mode TEXT DEFAULT 'guild', author_icon_url TEXT, banner_mode TEXT DEFAULT 'guild', banner_url TEXT, color TEXT DEFAULT '2F3136', auto_repost BOOLEAN DEFAULT true, rendered_hash TEXT, sort_order INTEGER DEFAULT 0, log_channel_id BIGINT DEFAULT 0)"
             },
             {
                 "infopanel_groups",
@@ -1684,6 +1684,10 @@ public static class DatabaseService
                         // Explicit revert migration, not a silent removal - this already shipped.
                         "spacer_url",
                         "ALTER TABLE infopanels DROP COLUMN IF EXISTS spacer_url"
+                    },
+                    {
+                        "log_channel_id",
+                        "ALTER TABLE infopanels ADD COLUMN IF NOT EXISTS log_channel_id BIGINT DEFAULT 0"
                     }
                 }
             },

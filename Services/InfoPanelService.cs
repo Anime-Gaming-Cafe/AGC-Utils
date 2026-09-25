@@ -62,7 +62,8 @@ public static class InfoPanelService
             await using (var cmd = Db.CreateCommand(
                              "SELECT id, name, channel_id, message_id, enabled, header_title, header_text, " +
                              "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, " +
-                             "color, auto_repost, rendered_hash, sort_order FROM infopanels ORDER BY sort_order, id"))
+                             "color, auto_repost, rendered_hash, sort_order, log_channel_id " +
+                             "FROM infopanels ORDER BY sort_order, id"))
             {
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -83,7 +84,8 @@ public static class InfoPanelService
                         Color = Str(reader, 12, "2F3136"),
                         AutoRepost = reader.IsDBNull(13) || reader.GetBoolean(13),
                         RenderedHash = Str(reader, 14),
-                        SortOrder = reader.IsDBNull(15) ? 0 : reader.GetInt32(15)
+                        SortOrder = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+                        LogChannelId = reader.IsDBNull(16) ? 0 : (ulong)reader.GetInt64(16)
                     });
             }
 
@@ -203,7 +205,7 @@ public static class InfoPanelService
                          "author_name = @authorName, author_icon_mode = @authorIconMode, " +
                          "author_icon_url = @authorIconUrl, banner_mode = @bannerMode, banner_url = @bannerUrl, " +
                          "color = @color, auto_repost = @autoRepost, " +
-                         "rendered_hash = @hash, sort_order = @sort WHERE id = @id"))
+                         "rendered_hash = @hash, sort_order = @sort, log_channel_id = @logChannel WHERE id = @id"))
         {
             Bind(update, panel);
             if (await update.ExecuteNonQueryAsync() > 0)
@@ -216,10 +218,10 @@ public static class InfoPanelService
         await using var insert = Db.CreateCommand(
             "INSERT INTO infopanels (id, name, channel_id, message_id, enabled, header_title, header_text, " +
             "author_name, author_icon_mode, author_icon_url, banner_mode, banner_url, color, " +
-            "auto_repost, rendered_hash, sort_order) " +
+            "auto_repost, rendered_hash, sort_order, log_channel_id) " +
             "VALUES (@id, @name, @channel, @message, @enabled, @headerTitle, @headerText, @authorName, " +
             "@authorIconMode, @authorIconUrl, @bannerMode, @bannerUrl, @color, @autoRepost, " +
-            "@hash, @sort)");
+            "@hash, @sort, @logChannel)");
         Bind(insert, panel);
         await insert.ExecuteNonQueryAsync();
 
@@ -250,6 +252,7 @@ public static class InfoPanelService
         cmd.Parameters.AddWithValue("color", string.IsNullOrWhiteSpace(panel.Color) ? "2F3136" : panel.Color);
         cmd.Parameters.AddWithValue("autoRepost", panel.AutoRepost);
         cmd.Parameters.AddWithValue("sort", panel.SortOrder);
+        cmd.Parameters.AddWithValue("logChannel", (long)panel.LogChannelId);
     }
 
     /// <summary>
@@ -263,7 +266,7 @@ public static class InfoPanelService
             "UPDATE infopanels SET name = @name, header_title = @headerTitle, header_text = @headerText, " +
             "author_name = @authorName, author_icon_mode = @authorIconMode, author_icon_url = @authorIconUrl, " +
             "banner_mode = @bannerMode, banner_url = @bannerUrl, color = @color, " +
-            "auto_repost = @autoRepost, sort_order = @sort WHERE id = @id");
+            "auto_repost = @autoRepost, sort_order = @sort, log_channel_id = @logChannel WHERE id = @id");
         BindSettings(cmd, panel);
         await cmd.ExecuteNonQueryAsync();
 

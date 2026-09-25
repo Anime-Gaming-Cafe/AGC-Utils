@@ -97,6 +97,47 @@ public sealed class InfoPanelInteractionListener : BaseCommandModule
         await RespondAsync(args, InfoPanelTemplateResolver.Resolve(page.Content), color,
             string.IsNullOrWhiteSpace(page.Title) ? null : page.Title.Truncate(DiscordLimits.EmbedTitle),
             page.ImageUrl);
+
+        try
+        {
+            await LogReadAsync(panel, page, args.User);
+        }
+        catch (Exception e)
+        {
+            CurrentApplication.Logger.Warning(e, "InfoPanel: Lese-Log für {PanelId}/{PageId} fehlgeschlagen",
+                panel.Id, page.Id);
+        }
+    }
+
+    private static async Task LogReadAsync(InfoPanel panel, InfoPanelPage page, DiscordUser user)
+    {
+        if (panel.LogChannelId == 0) return;
+
+        if (!CurrentApplication.TargetGuild.Channels.TryGetValue(panel.LogChannelId, out var channel))
+        {
+            CurrentApplication.Logger.Warning("InfoPanel: Log-Channel {ChannelId} für {PanelId} nicht gefunden",
+                panel.LogChannelId, panel.Id);
+            return;
+        }
+
+        var group = panel.Groups.FirstOrDefault(g => g.Id == page.GroupId);
+        var label = string.IsNullOrWhiteSpace(page.Label) ? page.Id : page.Label;
+        var article = string.IsNullOrWhiteSpace(page.Title) ? label : page.Title;
+        var source = group is null ? "" : group.IsSelect ? group.Placeholder : "Buttons";
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle($"{(string.IsNullOrWhiteSpace(panel.Name) ? "Info-Panel" : panel.Name)} gelesen"
+                .Truncate(DiscordLimits.EmbedTitle))
+            .WithDescription($"{user.Mention} (`{user.Username}`) hat **{label}** geöffnet.")
+            .AddField(new DiscordEmbedField("Artikel", article.Truncate(DiscordLimits.EmbedTitle), true))
+            .WithColor(panel.DiscordColor)
+            .WithFooter($"User-ID: {user.Id}")
+            .WithTimestamp(DateTimeOffset.UtcNow);
+
+        if (!string.IsNullOrWhiteSpace(source))
+            embed.AddField(new DiscordEmbedField("Menü", source, true));
+
+        await channel.SendMessageAsync(embed);
     }
 
     private static DiscordColor ResolveColor(InfoPanelPage page, InfoPanel panel)

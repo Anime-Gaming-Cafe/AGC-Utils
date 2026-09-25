@@ -39,6 +39,9 @@ public class InfoPanel
 
     public int SortOrder { get; set; }
 
+    /// <summary>Where the bot reports who opened which page. 0 turns the log off.</summary>
+    public ulong LogChannelId { get; set; }
+
     public List<InfoPanelGroup> Groups { get; set; } = [];
 
     public bool IsPosted => ChannelId != 0 && MessageId != 0;

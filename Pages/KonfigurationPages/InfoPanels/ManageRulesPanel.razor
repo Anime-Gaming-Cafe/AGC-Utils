@@ -73,6 +73,19 @@ else
         }
     </Panel>
 
+    <Panel Title="Protokoll" Lead="Wer welchen Artikel geöffnet hat.">
+        <div class="field">
+            <label class="field__label" for="rp-log-channel">Log-Channel</label>
+            <SearchableSelect TKey="ulong" Id="rp-log-channel" Items="TextChannelItems" NoneLabel="Nicht protokollieren"
+                              Placeholder="Channel suchen..." SelectedId="panel.LogChannelId"
+                              SelectedIdChanged="OnLogChannelChanged"/>
+            <span class="field__hint">
+                Jedes Mal, wenn jemand eine Option oder einen Button im Panel anklickt, schreibt der Bot hier,
+                wer welchen Artikel gelesen hat. Link-Buttons werden nicht erfasst.
+            </span>
+        </div>
+    </Panel>
+
     <Panel Title="Kopfbereich" Lead="Titel und Text der Panel-Nachricht selbst.">
         <div class="field-grid">
             <div class="field field--wide">
@@ -334,6 +347,13 @@ else
         Tracker.MarkDirty();
     }
 
+    private void OnLogChannelChanged(ulong channelId)
+    {
+        if (panel is null) return;
+        panel.LogChannelId = channelId;
+        Tracker.MarkDirty();
+    }
+
     private void LoadChannels()
     {
         var guild = CurrentApplication.TargetGuild;
@@ -386,7 +406,8 @@ else
         Color = source.Color,
         AutoRepost = source.AutoRepost,
         RenderedHash = source.RenderedHash,
-        SortOrder = source.SortOrder
+        SortOrder = source.SortOrder,
+        LogChannelId = source.LogChannelId
     };
 
     /// <summary>Pages are not edited on this page, so they stay shared between the copies.</summary>
