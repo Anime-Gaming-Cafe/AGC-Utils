@@ -1,0 +1,241 @@
+@page "/konfiguration/birthdays"
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@implements IDisposable
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+
+<PageHeader Title="Geburtstage"
+            Lead="Um Mitternacht (Europe/Berlin) bekommen Geburtstagsmitglieder die Rolle und werden im Channel gratuliert."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Geburtstage werden geladen"
+                Description="Einstellungen, Channels, Rollen und Einträge werden abgefragt."/>
+}
+else
+{
+    @if (enabled && (channelId == 0 || roleId == 0))
+    {
+        <div class="notice notice--warn mb-3">
+            <p class="notice__title">Konfiguration unvollständig</p>
+            @if (channelId == 0)
+            {
+                <p>Das System ist aktiv, aber kein Channel gewählt. Der Tageslauf wird übersprungen, bis einer gesetzt ist.</p>
+            }
+            else
+            {
+                <p>Das System ist aktiv, aber keine Rolle gewählt. Gratuliert wird trotzdem, eine Rolle wird aber nicht vergeben.</p>
+            }
+        </div>
+    }
+
+    <Panel Title="Heute">
+        <dl class="facts">
+            <dt>Eingetragen</dt>
+            <dd class="tnum">@registered Mitglieder</dd>
+            <dt>Geburtstag am @BirthdayService.Humanize(BirthdayService.ToDate(today))</dt>
+            <dd class="tnum">@todayPresent auf dem Server, @todayTotal eingetragen</dd>
+            <dt>Letzter Lauf</dt>
+            <dd class="tnum">@(string.IsNullOrEmpty(lastRun) ? "Noch nie" : lastRun)</dd>
+        </dl>
+
+        @if (confirmRun)
+        {
+            <ConfirmInline Title="Heutigen Lauf jetzt ausführen?"
+                           ConfirmText="Ja, jetzt ausführen"
+                           Busy="running"
+                           OnConfirm="RunNow"
+                           OnCancel="() => confirmRun = false">
+                <p>
+                    Die letzten @purgeLimit Nachrichten im Geburtstags-Channel werden gelöscht, die Rolle wird neu verteilt
+                    und alle heutigen Gratulationen werden erneut gepostet.
+                </p>
+            </ConfirmInline>
+        }
+        else
+        {
+            <div class="form-foot">
+                <button type="button" class="btn btn-secondary" disabled="@(!enabled)" @onclick="() => confirmRun = true">Heutigen Lauf jetzt ausführen</button>
+            </div>
+        }
+    </Panel>
+
+    <Panel Title="Einstellungen">
+        <div class="field-grid">
+            <div class="field">
+                <label class="field__label" for="bd-channel">Geburtstags-Channel</label>
+                <SearchableSelect Id="bd-channel" Items="TextChannelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..."
+                                  @bind-SelectedId="channelId" @bind-SelectedId:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bd-role">Geburtstagsrolle</label>
+                <SearchableSelect Id="bd-role" Items="RoleItems" NoneLabel="Rolle wählen" Placeholder="Rolle suchen..."
+                                  @bind-SelectedId="roleId" @bind-SelectedId:after="OnFieldChanged"/>
+                <span class="field__hint">Wird jeden Tag allen entzogen und den heutigen Geburtstagsmitgliedern gegeben.</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bd-emoji">Reaktion</label>
+                <SearchableSelect Id="bd-emoji" Items="EmojiItems" NoneLabel="Keine Reaktion" Placeholder="Emoji suchen..."
+                                  @bind-SelectedId="emojiId" @bind-SelectedId:after="OnFieldChanged"/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bd-purge">Nachrichten löschen</label>
+                <input id="bd-purge" type="number" min="0" max="100" class="form-control" @bind="purgeLimit" @bind:after="OnFieldChanged"/>
+                <span class="field__hint">So viele Nachrichten werden vor dem Tageslauf aus dem Channel entfernt, 0 schaltet das ab.</span>
+            </div>
+            <div class="field field--wide">
+                <label class="field__label" for="bd-messages">Glückwünsche</label>
+                <textarea id="bd-messages" class="form-control" rows="6" @bind="messages" @bind:after="OnFieldChanged"></textarea>
+                <span class="field__hint">Glückwünsche mit einer Leerzeile trennen, pro Geburtstag wird zufällig einer gewählt. Zeilenumbrüche innerhalb eines Glückwunschs bleiben erhalten. Platzhalter: {user}, {role}</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bd-thumb">Thumbnail-URL</label>
+                <input id="bd-thumb" class="form-control" @bind="thumbnailUrl" @bind:after="OnFieldChanged" placeholder="https://..."/>
+            </div>
+            <div class="field">
+                <label class="field__label" for="bd-image">Bild-URL</label>
+                <input id="bd-image" class="form-control" @bind="imageUrl" @bind:after="OnFieldChanged" placeholder="https://..."/>
+            </div>
+        </div>
+
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="bd-enabled" @bind="enabled" @bind:after="OnFieldChanged"/>
+            <label class="form-check-label" for="bd-enabled">Geburtstagssystem aktiviert</label>
+        </div>
+
+        <div class="form-foot">
+            <button type="button" class="btn btn-primary" @onclick="SaveAndNotify">Einstellungen speichern</button>
+        </div>
+    </Panel>
+}
+
+@code {
+    private bool loaded;
+    private bool confirmRun;
+    private bool running;
+
+    private List<DiscordChannel> textChannels = new();
+    private List<DiscordRole> roles = new();
+    private List<DiscordEmoji> emojis = new();
+
+    private List<(ulong Id, string Label)> TextChannelItems => textChannels.Select(c => (c.Id, $"#{c.Name}")).ToList();
+    private List<(ulong Id, string Label)> RoleItems => roles.Select(r => (r.Id, $"@{r.Name}")).ToList();
+    private List<(ulong Id, string Label)> EmojiItems => emojis.Select(e => (e.Id, $":{e.Name}:")).ToList();
+
+    private DateOnly today;
+    private int registered;
+    private int todayTotal;
+    private int todayPresent;
+    private string lastRun = "";
+
+    private bool enabled;
+    private ulong channelId;
+    private ulong roleId;
+    private ulong emojiId;
+    private int purgeLimit = 90;
+    private string messages = "";
+    private string thumbnailUrl = "";
+    private string imageUrl = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var guild = CurrentApplication.TargetGuild;
+        textChannels = guild.Channels.Values
+            .Where(c => c.Type == ChannelType.Text)
+            .OrderBy(c => c.Position)
+            .ToList();
+        roles = guild.Roles.Values
+            .Where(r => !r.IsManaged && r.Id != guild.Id)
+            .OrderByDescending(r => r.Position)
+            .ToList();
+        emojis = guild.Emojis.Values.OrderBy(e => e.Name).ToList();
+
+        await LoadSettings();
+        await LoadStats();
+        Tracker.Register(Save, Discard);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private async Task LoadSettings()
+    {
+        const string s = BirthdayService.Section;
+        enabled = await RuntimeSettings.GetBoolAsync(s, "Enabled", false);
+        channelId = ParseId(await RuntimeSettings.GetAsync(s, "ChannelId"));
+        roleId = ParseId(await RuntimeSettings.GetAsync(s, "RoleId"));
+        emojiId = ParseId(await RuntimeSettings.GetAsync(s, "ReactionEmojiId"));
+        purgeLimit = await RuntimeSettings.GetIntAsync(s, "PurgeLimit", 90);
+        messages = await RuntimeSettings.GetAsync(s, "Messages") ?? "";
+        thumbnailUrl = await RuntimeSettings.GetAsync(s, "ThumbnailUrl") ?? "";
+        imageUrl = await RuntimeSettings.GetAsync(s, "ImageUrl") ?? "";
+    }
+
+    private async Task LoadStats()
+    {
+        today = BirthdayService.TodayBerlin();
+        registered = await BirthdayService.CountAsync();
+        var entries = await BirthdayService.GetForDayAsync(today);
+        todayTotal = entries.Count;
+        todayPresent = entries.Count(e => CurrentApplication.TargetGuild.Members.ContainsKey(e.UserId));
+        lastRun = await RuntimeSettings.GetAsync(BirthdayService.Section, "LastRunDate") ?? "";
+    }
+
+    private static ulong ParseId(string? raw) => ulong.TryParse(raw, out var id) ? id : 0;
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task Save()
+    {
+        if (purgeLimit is < 0 or > 100)
+        {
+            ToastService.Notify("Nachrichten löschen muss zwischen 0 und 100 liegen.", "bad");
+            Tracker.RejectSave();
+            return;
+        }
+
+        const string s = BirthdayService.Section;
+        await RuntimeSettings.SetAsync(s, "Enabled", enabled.ToString().ToLowerInvariant());
+        await RuntimeSettings.SetAsync(s, "ChannelId", channelId.ToString());
+        await RuntimeSettings.SetAsync(s, "RoleId", roleId.ToString());
+        await RuntimeSettings.SetAsync(s, "ReactionEmojiId", emojiId.ToString());
+        await RuntimeSettings.SetAsync(s, "PurgeLimit", purgeLimit.ToString());
+        await RuntimeSettings.SetAsync(s, "Messages", messages.Trim());
+        await RuntimeSettings.SetAsync(s, "ThumbnailUrl", thumbnailUrl.Trim());
+        await RuntimeSettings.SetAsync(s, "ImageUrl", imageUrl.Trim());
+    }
+
+    private async Task SaveAndNotify()
+    {
+        if (await Tracker.SaveAsync())
+            ToastService.Notify("Einstellungen gespeichert.", "ok");
+    }
+
+    private void Discard() => _ = InvokeAsync(async () =>
+    {
+        await LoadSettings();
+        StateHasChanged();
+    });
+
+    private async Task RunNow()
+    {
+        if (Tracker.IsDirty)
+        {
+            ToastService.Notify("Bitte zuerst die Einstellungen speichern.", "warn");
+            confirmRun = false;
+            return;
+        }
+
+        running = true;
+        var ran = await BirthdayService.RunDailyAsync(true);
+        running = false;
+        confirmRun = false;
+        await LoadStats();
+        ToastService.Notify(ran ? "Tageslauf wurde ausgeführt." : "Tageslauf wurde nicht ausgeführt. Channel gesetzt und System aktiv?",
+            ran ? "ok" : "bad");
+    }
+}

@@ -527,6 +527,10 @@ public static class DatabaseService
             {
                 "idx_metrics_messages_channel_timestamp",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_messages_channel_timestamp ON metrics_messages (channelid, timestamp)"
+            },
+            {
+                "birthdays",
+                "CREATE TABLE IF NOT EXISTS birthdays (user_id BIGINT NOT NULL, datum VARCHAR NOT NULL, ping BOOLEAN NOT NULL DEFAULT true)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);
@@ -1743,6 +1747,22 @@ public static class DatabaseService
                         "ALTER TABLE activity_announcement_group_rules ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT ''"
                     }
                 }
+            },
+            {
+                "birthdays", new Dictionary<string, string>
+                {
+                    { "drop_incomplete", "DELETE FROM birthdays WHERE user_id IS NULL OR datum IS NULL" },
+                    {
+                        "dedupe",
+                        "DELETE FROM birthdays a USING birthdays b WHERE a.user_id = b.user_id AND a.ctid < b.ctid"
+                    },
+                    { "ping_fill", "UPDATE birthdays SET ping = true WHERE ping IS NULL" },
+                    { "ping_default", "ALTER TABLE birthdays ALTER COLUMN ping SET DEFAULT true" },
+                    {
+                        "idx_birthdays_user_id",
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_birthdays_user_id ON birthdays (user_id)"
+                    }
+                }
             }
         };
 
@@ -1829,7 +1849,20 @@ public static class DatabaseService
             ("TeamApplications", "NotifyNewApplicationText", "Neue Bewerbung eingegangen."),
             ("BanRequests", "PingLifetimeSeconds", "0"),
             ("BanRequests", "RequestTimeoutHours", "6"),
-            ("BanRequests", "EstimateWindowMinutes", "15")
+            ("BanRequests", "EstimateWindowMinutes", "15"),
+            ("Birthday", "Enabled", "false"),
+            ("Birthday", "ChannelId", "0"),
+            ("Birthday", "RoleId", "0"),
+            ("Birthday", "ReactionEmojiId", "0"),
+            ("Birthday", "ThumbnailUrl",
+                "https://media.discordapp.net/attachments/894932456690556938/923494763917881354/Birtday_Icon.png"),
+            ("Birthday", "ImageUrl",
+                "https://cdn.discordapp.com/attachments/896348122387718195/952358046544326686/Happy.gif"),
+            ("Birthday", "Messages",
+                "Alles Gute zum Geburtstag, {user}!\nDu hast für heute die Rolle {role}\n\n" +
+                "Feier schön, {user}!\nDu hast für heute die Rolle {role}"),
+            ("Birthday", "PurgeLimit", "90"),
+            ("Birthday", "LastRunDate", "")
         };
 
         foreach (var (section, key, value) in defaults)

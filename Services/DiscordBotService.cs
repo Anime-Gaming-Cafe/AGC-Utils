@@ -200,6 +200,7 @@ public class DiscordBotService : IHostedService
         _ = TicketAutoCloseTask.LaunchLoops();
         _ = InfoPanelRefreshTask.LaunchLoops();
         _ = AutopostTask.LaunchLoops();
+        _ = BirthdayTask.LaunchLoops();
 
         return Task.CompletedTask;
     }
