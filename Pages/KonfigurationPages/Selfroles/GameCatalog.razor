@@ -1,4 +1,4 @@
-@page "/konfiguration/selfroles/spiele"
+@page "/konfiguration/selfroles/games"
 @using AGC_Management.Entities.Metrics
 @using AGC_Management.Entities.Selfroles
 @using AGC_Management.Services
@@ -24,6 +24,8 @@ else
            Lead="Nach Spielzeit der letzten 12 Wochen sortiert. Ohne Zuordnung entscheidet weiter das Textmuster der Option."
            Flush="@(Visible.Count > 0)">
         <Actions>
+            <input type="search" class="form-control form-control-sm" placeholder="Spiel suchen..."
+                   aria-label="Spiel suchen" @bind="search" @bind:event="oninput" @bind:after="OnSearchChanged"/>
             <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleFilter">
                 @(unboundOnly ? "Alle anzeigen" : "Nur ohne Zuordnung")
             </button>
@@ -35,6 +37,11 @@ else
                     {
                         <StateBlock Inline="true" Title="Noch nichts gesehen"
                                     Description="Der Katalog füllt sich von selbst, sobald Mitglieder mit sichtbarem Spielstatus spielen. Der erste Eintrag kann eine Minute dauern."/>
+                    }
+                    else if (Visible.Count == 0 && !string.IsNullOrWhiteSpace(search))
+                    {
+                        <StateBlock Inline="true" Title="Kein Treffer"
+                                    Description="@($"Kein Spiel passt auf \"{search}\". Vielleicht schreibt Discord es anders, oder der Filter blendet es aus.")"/>
                     }
                     else if (Visible.Count == 0)
                     {
@@ -57,21 +64,13 @@ else
                                                 <text> · App-ID <code>@current.ApplicationId</code></text>
                                             }
                                         </p>
-                                        @if (!current.IsBound && Suggestion(current) is { } hint)
-                                        {
-                                            <p class="rows__text">
-                                                Sieht aus wie <strong>@hint.Option.Label</strong>
-                                                <button type="button" class="btn btn-ghost btn-sm"
-                                                        @onclick="() => Bind(current, hint.Option.Id)">Übernehmen
-                                                </button>
-                                            </p>
-                                        }
                                     </div>
                                     <div class="rows__side">
                                         <StatusPill Text="@(current.IsBound ? "Zugeordnet" : "Offen")"
                                                     Tone="@(current.IsBound ? StatusPill.PillTone.Ok : StatusPill.PillTone.Neutral)"/>
-                                        <SearchableSelect TKey="string" Items="OptionItems" NoneLabel="Keine Zuordnung"
-                                                          NoneValue="@("")" Placeholder="Option suchen..."
+                                        <SearchableSelect TKey="string" Items="OptionItemsFor(current)"
+                                                          NoneLabel="Keine Zuordnung" NoneValue="@("")"
+                                                          Placeholder="Zuweisungsvorschlag..."
                                                           SelectedId="current.OptionId"
                                                           SelectedIdChanged="@((string id) => Bind(current, id))"/>
                                     </div>
@@ -118,24 +117,45 @@ else
     private bool loaded;
     private bool unboundOnly = true;
     private int page = 1;
+    private string search = "";
 
     private List<GameCatalogEntry> entries = [];
     private List<SelfroleOption> options = [];
     private Dictionary<long, GameCount> usage = [];
 
+    // Einmal beim Laden gerechnet statt bei jedem Render: der Matcher laeuft sonst pro Zeile
+    // ueber alle Optionen, und das bei jedem Tastendruck in der Suche.
+    private Dictionary<string, SelfroleOption> suggestions = [];
+
     private int sampleRetentionDays = 90;
     private int dailyRetentionDays;
 
     private List<GameCatalogEntry> Visible =>
-        [.. entries.Where(entry => !unboundOnly || !entry.IsBound)];
+    [
+        .. entries
+            .Where(entry => !unboundOnly || !entry.IsBound)
+            .Where(entry => string.IsNullOrWhiteSpace(search) ||
+                            entry.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase))
+    ];
 
     private List<GameCatalogEntry> Page =>
         [.. Visible.Skip((page - 1) * PageSize).Take(PageSize)];
 
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(Visible.Count / (double)PageSize));
 
-    private List<(string Id, string Label)> OptionItems =>
-        options.Select(option => (option.Id, option.Label)).ToList();
+    /// <summary>Die vorgeschlagene Option steht oben und ist als solche markiert, der Rest folgt alphabetisch.</summary>
+    private List<(string Id, string Label)> OptionItemsFor(GameCatalogEntry entry)
+    {
+        var items = new List<(string Id, string Label)>();
+        if (suggestions.TryGetValue(entry.Key, out var suggested))
+            items.Add((suggested.Id, $"{suggested.Label}  (Vorschlag)"));
+
+        items.AddRange(options
+            .Where(option => suggested is null || option.Id != suggested.Id)
+            .Select(option => (option.Id, option.Label)));
+
+        return items;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -168,6 +188,11 @@ else
                 .ThenBy(entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
         ];
 
+        suggestions = [];
+        foreach (var entry in entries.Where(entry => !entry.IsBound))
+            if (GameCatalogService.Suggest(entry, options) is { } hit)
+                suggestions[entry.Key] = hit.Option;
+
         sampleRetentionDays = await RuntimeSettings.GetIntAsync(GameCatalogService.Section, "SampleRetentionDays", 90);
         dailyRetentionDays = await RuntimeSettings.GetIntAsync(GameCatalogService.Section, "DailyRetentionDays", 0);
     }
@@ -187,14 +212,13 @@ else
             ? "nie"
             : DateTimeOffset.FromUnixTimeSeconds(entry.LastSeen).LocalDateTime.ToString("dd.MM.yyyy HH:mm");
 
-    private (SelfroleOption Option, double Score)? Suggestion(GameCatalogEntry entry) =>
-        GameCatalogService.Suggest(entry, options);
-
     private void ToggleFilter()
     {
         unboundOnly = !unboundOnly;
         page = 1;
     }
+
+    private void OnSearchChanged() => page = 1;
 
     private async Task Bind(GameCatalogEntry entry, string optionId)
     {

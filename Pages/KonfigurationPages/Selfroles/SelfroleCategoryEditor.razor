@@ -187,20 +187,30 @@ else
                                         </span>
                                     </div>
                                     <div class="field field--wide">
-                                        <p class="field__label">Zugeordnete Spiele</p>
-                                        @if (BoundGames(option).Count == 0)
+                                        <label class="field__label" for="@($"sc-game-{option.Id}")">Zuweisungsvorschlag</label>
+                                        <SearchableSelect TKey="string" Id="@($"sc-game-{option.Id}")"
+                                                          Items="GameItemsFor(option)" AllowNone="false"
+                                                          NoneLabel="Spiel zuordnen..." Placeholder="Spiel suchen..."
+                                                          SelectedId="@("")"
+                                                          SelectedIdChanged="@((string key) => BindGame(option, key))"/>
+                                        <span class="field__hint">
+                                            Ein zugeordnetes Spiel vergibt diese Rolle exakt, ohne Umweg über das Muster.
+                                            Die Vorschläge stehen oben, darunter der ganze
+                                            <a href="/konfiguration/selfroles/games">Spielkatalog</a>.
+                                        </span>
+                                        @if (BoundGames(option).Count > 0)
                                         {
-                                            <span class="field__hint">
-                                                Keines. Im <a href="/konfiguration/selfroles/spiele">Spielkatalog</a>
-                                                zugeordnete Spiele vergeben diese Rolle exakt, ohne Umweg über das Muster.
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <div class="chip-list">
+                                            <div class="chip-list mt-2">
                                                 @foreach (var game in BoundGames(option))
                                                 {
-                                                    <code>@game.DisplayName</code>
+                                                    var bound = game;
+                                                    <span>
+                                                        <code>@bound.DisplayName</code>
+                                                        <button type="button" class="btn btn-ghost btn-sm"
+                                                                title="Zuordnung lösen"
+                                                                @onclick="() => UnbindGame(bound)">Entfernen
+                                                        </button>
+                                                    </span>
                                                 }
                                             </div>
                                         }
@@ -307,6 +317,10 @@ else
     private List<string> savedOptionIds = [];
     private Dictionary<string, SelfroleUsage> usage = [];
     private List<GameCatalogEntry> boundGames = [];
+    private List<GameCatalogEntry> catalog = [];
+
+    // Pro Option einmal gerechnet: der Matcher laeuft sonst bei jedem Render ueber den ganzen Katalog.
+    private readonly Dictionary<string, List<(string Id, string Label)>> gameItemCache = [];
 
     private List<DiscordRole> roles = [];
     private List<(ulong Id, string Label)> RoleItems => roles.Select(r => (r.Id, $"@{r.Name}")).ToList();
@@ -350,9 +364,7 @@ else
         savedOptionIds = [.. category.Options.Select(option => option.Id)];
         usage = await SelfroleService.GetUsageAsync(category);
 
-        boundGames = [];
-        foreach (var option in category.Options)
-            boundGames.AddRange(await GameCatalogService.GetBoundToAsync(option.Id));
+        await LoadCatalogAsync();
     }
 
     private SelfroleCategory Clone() => JsonSerializer.Deserialize<SelfroleCategory>(snapshot, CloneOptions)!;
@@ -361,6 +373,56 @@ else
 
     private static bool RoleExists(SelfroleOption option) =>
         CurrentApplication.TargetGuild?.GetRole(option.RoleId) is not null;
+
+    /// <summary>
+    ///     Nur der Katalog, nicht der Draft. Eine Zuordnung darf nicht die ungespeicherten Eingaben im
+    ///     Formular ueberschreiben - sie liegt ausserhalb des Draft/Snapshot-Zyklus.
+    /// </summary>
+    private async Task LoadCatalogAsync()
+    {
+        GameCatalogService.Invalidate();
+        catalog = await GameCatalogService.GetAllAsync();
+        boundGames = [.. catalog.Where(game => draft is not null && draft.Options.Any(o => o.Id == game.OptionId))];
+        gameItemCache.Clear();
+    }
+
+    /// <summary>Was zu dieser Option passen koennte, nach Score sortiert, danach der Rest des Katalogs.</summary>
+    private List<(string Id, string Label)> GameItemsFor(SelfroleOption option)
+    {
+        if (gameItemCache.TryGetValue(option.Id, out var cached)) return cached;
+
+        var patterns = option.MatchPatterns.Length > 0 ? option.MatchPatterns : [option.Label];
+        var ranked = catalog
+            .Where(game => !game.IsBound)
+            .Select(game => (Game: game, Score: ActivityMatcher.Score(patterns, game.DisplayName)))
+            .OrderByDescending(entry => entry.Score)
+            .ThenBy(entry => entry.Game.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select(entry => (entry.Game.Key,
+                entry.Score >= ActivityMatcher.Threshold
+                    ? $"{entry.Game.DisplayName}  (Vorschlag)"
+                    : entry.Game.DisplayName))
+            .ToList();
+
+        gameItemCache[option.Id] = ranked;
+        return ranked;
+    }
+
+    private async Task BindGame(SelfroleOption option, string gameKey)
+    {
+        if (string.IsNullOrEmpty(gameKey)) return;
+
+        var game = catalog.FirstOrDefault(entry => entry.Key == gameKey);
+        await GameCatalogService.BindAsync(gameKey, option.Id);
+        await LoadCatalogAsync();
+        ToastService.Notify($"{game?.DisplayName ?? gameKey} zählt jetzt als {option.Label}.", "ok");
+    }
+
+    private async Task UnbindGame(GameCatalogEntry game)
+    {
+        await GameCatalogService.BindAsync(game.Key, "");
+        await LoadCatalogAsync();
+        ToastService.Notify($"Zuordnung von {game.DisplayName} gelöst.", "ok");
+    }
 
     private List<GameCatalogEntry> BoundGames(SelfroleOption option) =>
         [.. boundGames.Where(game => string.Equals(game.OptionId, option.Id, StringComparison.Ordinal))];
