@@ -465,6 +465,14 @@ public static class DatabaseService
                 "CREATE TABLE IF NOT EXISTS ticketstore (ticket_id TEXT, ticket_owner BIGINT, tickettype TEXT, closed BOOLEAN DEFAULT false, opened_at BIGINT DEFAULT 0, closed_at BIGINT DEFAULT 0, user_transscript_url TEXT, team_transscript_url TEXT)"
             },
             {
+                "idx_ticketstore_ticket_id",
+                "CREATE INDEX IF NOT EXISTS idx_ticketstore_ticket_id ON ticketstore (ticket_id)"
+            },
+            {
+                "idx_ticketstore_owner",
+                "CREATE INDEX IF NOT EXISTS idx_ticketstore_owner ON ticketstore (ticket_owner)"
+            },
+            {
                 "ticketcache",
                 "CREATE TABLE IF NOT EXISTS ticketcache (ticket_id TEXT, ticket_owner BIGINT, tchannel_id BIGINT, claimed BOOLEAN DEFAULT false, claimed_from BIGINT, ticket_users BIGINT[] DEFAULT '{}', closed_users BIGINT[] DEFAULT '{}', last_activity BIGINT DEFAULT 0, reminder_sent_at BIGINT DEFAULT 0, header_message_id BIGINT DEFAULT 0)"
             },
