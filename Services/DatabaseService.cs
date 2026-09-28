@@ -199,14 +199,6 @@ public static class DatabaseService
                 "CREATE INDEX IF NOT EXISTS idx_metrics_activity_userid ON metrics_activity (userid)"
             },
             {
-                "idx_metrics_voice_userid",
-                "CREATE INDEX IF NOT EXISTS idx_metrics_voice_userid ON metrics_voice (userid)"
-            },
-            {
-                "idx_metrics_messages_userid",
-                "CREATE INDEX IF NOT EXISTS idx_metrics_messages_userid ON metrics_messages (userid)"
-            },
-            {
                 "idx_metrics_messages_timestamp",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_messages_timestamp ON metrics_messages (timestamp)"
             },
@@ -217,6 +209,22 @@ public static class DatabaseService
             {
                 "idx_metrics_voice_company",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_voice_company ON metrics_voice (channelid, timestamp, userid)"
+            },
+            {
+                "idx_metrics_messages_user_time",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_messages_user_time ON metrics_messages (userid, timestamp)"
+            },
+            {
+                "idx_metrics_voice_user_time",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_voice_user_time ON metrics_voice (userid, timestamp)"
+            },
+            {
+                "idx_metrics_voice_userid",
+                "DROP INDEX IF EXISTS idx_metrics_voice_userid"
+            },
+            {
+                "idx_metrics_messages_userid",
+                "DROP INDEX IF EXISTS idx_metrics_messages_userid"
             },
 
             {

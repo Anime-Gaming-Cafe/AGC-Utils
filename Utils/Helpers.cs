@@ -296,97 +296,31 @@ public static class ToolSet
     }
 
 
-    public static async Task<List<BannSystemWarn>?> GetBannsystemWarns(DiscordUser user)
-    {
-        using HttpClient client = new();
-        var apiKey = GlobalProperties.DebugMode
-            ? BotConfig.GetConfig()["ModHQConfigDBG"]["API_Key"]
-            : BotConfig.GetConfig()["ModHQConfig"]["API_Key"];
-        var apiUrl = GlobalProperties.DebugMode
-            ? BotConfig.GetConfig()["ModHQConfigDBG"]["API_URL"]
-            : BotConfig.GetConfig()["ModHQConfig"]["API_URL"];
+    private static readonly HttpClient BannSystemHttp = new() { Timeout = TimeSpan.FromSeconds(5) };
 
-        client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", apiKey);
-        var response = await client.GetAsync($"{apiUrl}{user.Id}");
-        if (response.IsSuccessStatusCode)
-        {
-            var json = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonConvert.DeserializeObject<UserInfoApiResponse>(json);
-            var data = apiResponse.warns;
-            return data;
-        }
-
-        return null;
-    }
-
-    public static async Task<List<BannSystemReport?>?> GetBannsystemReports(DiscordUser user)
-    {
-        using HttpClient client = new();
-        var apiKey = GlobalProperties.DebugMode
-            ? BotConfig.GetConfig()["ModHQConfigDBG"]["API_Key"]
-            : BotConfig.GetConfig()["ModHQConfig"]["API_Key"];
-        var apiUrl = GlobalProperties.DebugMode
-            ? BotConfig.GetConfig()["ModHQConfigDBG"]["API_URL"]
-            : BotConfig.GetConfig()["ModHQConfig"]["API_URL"];
-
-        client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", apiKey);
-        var response = await client.GetAsync($"{apiUrl}{user.Id}");
-        if (response.IsSuccessStatusCode)
-        {
-            var json = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonConvert.DeserializeObject<UserInfoApiResponse>(json);
-            var data = apiResponse.reports;
-            return data;
-        }
-
-        return null;
-    }
-
-    public static async Task<List<BannSystemReport?>?> BSReportToWarn(DiscordUser user)
+    public static async Task<(List<BannSystemWarn> Warns, List<BannSystemReport> Reports)> GetBannSystemEntries(
+        ulong userId)
     {
         try
         {
-            var data = await GetBannsystemReports(user);
+            var section = GlobalProperties.DebugMode ? "ModHQConfigDBG" : "ModHQConfig";
+            var config = BotConfig.GetConfig()[section];
+            if (!bool.Parse(config["API_ACCESS_ENABLED"])) return ([], []);
 
-            return [.. data.Select(warn => new BannSystemReport
-            {
-                reportId = warn.reportId,
-                authorId = warn.authorId,
-                reason = warn.reason,
-                timestamp = warn.timestamp,
-                active = warn.active
-            })];
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{config["API_URL"]}{userId}");
+            request.Headers.TryAddWithoutValidation("Authorization", config["API_Key"]);
+            using var response = await BannSystemHttp.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return ([], []);
+
+            var apiResponse =
+                JsonConvert.DeserializeObject<UserInfoApiResponse>(await response.Content.ReadAsStringAsync());
+            return (apiResponse?.warns ?? [], apiResponse?.reports?.Where(r => r != null).ToList() ?? []);
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            // ignored
+            return ([], []);
         }
-
-        return [];
     }
-
-    public static async Task<List<BannSystemWarn>> BSWarnToWarn(DiscordUser user)
-    {
-        try
-        {
-            var data = await GetBannsystemWarns(user);
-
-            return [.. data.Select(warn => new BannSystemWarn
-            {
-                warnId = warn.warnId,
-                authorId = warn.authorId,
-                reason = warn.reason,
-                timestamp = warn.timestamp
-            })];
-        }
-        catch (Exception e)
-        {
-            // ignored
-        }
-
-        return [];
-    }
-
 
     public static bool HasActiveBannSystemReport(List<BannSystemReport> reports)
     {
