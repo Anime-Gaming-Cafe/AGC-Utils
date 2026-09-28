@@ -649,7 +649,8 @@ public static class ExtraPermissionService
 
     #region Status
 
-    public static async Task<List<ExtraPermissionStatus>> GetStatusAsync(ulong userId, DiscordMember? member)
+    public static async Task<List<ExtraPermissionStatus>> GetStatusAsync(ulong userId, DiscordMember? member,
+        bool evaluateConditions = true)
     {
         var result = new List<ExtraPermissionStatus>();
         var permissions = await GetPermissionsAsync();
@@ -668,7 +669,8 @@ public static class ExtraPermissionService
                 HasRole = member != null && member.Roles.Any(r => r.Id == permission.RoleId)
             };
 
-            if (member != null) status.ConditionMet = await ConditionsMetAsync(member, permission);
+            if (member != null && evaluateConditions)
+                status.ConditionMet = await ConditionsMetAsync(member, permission);
 
             result.Add(status);
         }

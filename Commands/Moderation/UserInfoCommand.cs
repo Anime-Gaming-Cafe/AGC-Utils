@@ -2,6 +2,7 @@
 
 using AGC_Management.Attributes;
 using AGC_Management.Entities;
+using AGC_Management.Entities.ExtraPermissions;
 using AGC_Management.Services;
 using AGC_Management.Utils;
 using DisCatSharp.Exceptions;
@@ -34,7 +35,9 @@ public sealed class UserInfoCommand : BaseCommandModule
         var lastSeenTask = AvailabilityService.GetLastSeenAsync(user.Id, member);
         var bannSystemTask = ToolSet.GetBannSystemEntries(user.Id);
         var casesTask = LoadCasesAsync(user.Id);
-        var extraPermissionsTask = ExtraPermissionService.GetStatusAsync(user.Id, member);
+        var extraPermissionsTask = isMember
+            ? ExtraPermissionService.GetStatusAsync(user.Id, member, false)
+            : Task.FromResult(new List<ExtraPermissionStatus>());
         var banTask = isMember ? Task.FromResult((false, "")) : GetBanStatusAsync(ctx.Guild, user.Id);
         await Task.WhenAll(ticketCountTask, lastSeenTask, bannSystemTask, casesTask, extraPermissionsTask, banTask);
 
@@ -177,8 +180,6 @@ public sealed class UserInfoCommand : BaseCommandModule
             userinfostring += casesSection;
             userinfostring += "\n**Lokaler Bannstatus**\n";
             userinfostring += banStatus;
-            userinfostring += "\n\n**__Extra Permissions__**\n";
-            userinfostring += extraPermissionsSection;
             description = "Ich konnte folgende Informationen über den User finden.\n\n" + userinfostring;
         }
 
