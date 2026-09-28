@@ -81,7 +81,7 @@ Discord only ships a subset of members and DisCatSharp clears `guild.Members` on
 
 ### Feature subsystems
 
-`Commands/`, `Eventlistener/`, `Tasks/`, and `Utils/` are each split by feature, and a feature usually spans all of them (e.g. levelsystem = `Commands/Levelsystem` + `Eventlistener/Levelsystem` + `Tasks/Levelsystem` + `Utils/LevelUtils.cs`). Notable ones: moderation (warns/bans/flags with case ids), ticket system (transcripts exported via the bundled `tools/exporter/DiscordChatExporter.Cli`), temp voice channels, level system (SkiaSharp rank cards), booster colors, application system, and **extra permissions** — condition-driven role grants where `ExtraPermissionService.ResolveAsync` is the single decision point (manual override beats automatic evaluation; `Untouched` means "leave the role alone").
+`Commands/`, `Eventlistener/`, `Tasks/`, and `Utils/` are each split by feature, and a feature usually spans all of them (e.g. levelsystem = `Commands/Levelsystem` + `Eventlistener/Levelsystem` + `Tasks/Levelsystem` + `Utils/LevelUtils.cs`). Notable ones: moderation (warns/bans/flags with case ids), ticket system (transcripts exported via the bundled `tools/exporter/DiscordChatExporter.Cli`), level system (SkiaSharp rank cards), booster colors, application system, and **extra permissions** — condition-driven role grants where `ExtraPermissionService.ResolveAsync` is the single decision point (manual override beats automatic evaluation; `Untouched` means "leave the role alone").
 
 ## Conventions
 

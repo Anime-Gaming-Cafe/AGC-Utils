@@ -183,9 +183,6 @@ public class DiscordBotService : IHostedService
         ModerationSystemTasks MST = new();
         _ = MST.StartRemovingWarnsPeriodically(discord);
 
-        // TempVoiceTasks TVT = new();
-        // _ = TVT.StartRemoveEmptyTempVoices(discord);
-
         _ = StatusUpdateTask(discord);
         _ = ExtendedModerationSystemLoop.LaunchLoops();
         _ = RecalculateRanks.LaunchLoops();
