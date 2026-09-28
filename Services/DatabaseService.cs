@@ -286,14 +286,6 @@ public static class DatabaseService
                 "flags",
                 "CREATE TABLE IF NOT EXISTS flags (userid BIGINT, punisherid BIGINT, datum BIGINT, description VARCHAR, caseid VARCHAR)"
             },
-            {
-                "tempvoice",
-                "CREATE TABLE IF NOT EXISTS tempvoice (channelid BIGINT, ownerid BIGINT, lastedited BIGINT, laststatusedited BIGINT, channelmods VARCHAR)"
-            },
-            {
-                "tempvoicesession",
-                "CREATE TABLE IF NOT EXISTS tempvoicesession (userid BIGINT, channelname VARCHAR, channelbitrate INTEGER, channellimit INTEGER, blockedusers VARCHAR, permitedusers VARCHAR, locked BOOLEAN, hidden BOOLEAN, sessionskip BOOLEAN, channelmods VARCHAR)"
-            },
             { "vorstellungscooldown", "CREATE TABLE IF NOT EXISTS vorstellungscooldown (user_id BIGINT, time BIGINT)" },
             { "warnreasons", "CREATE TABLE IF NOT EXISTS warnreasons (reason TEXT, custom_id VARCHAR)" },
             {
@@ -671,16 +663,6 @@ public static class DatabaseService
                 }
             },
             {
-                "tempvoicesession_unique",
-                new Dictionary<string, string>
-                {
-                    {
-                        "tempvoicesession_unique",
-                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_tempvoicesession_userid ON tempvoicesession (userid)"
-                    }
-                }
-            },
-            {
                 "userrankcardsettings",
                 new Dictionary<string, string>
                 {
@@ -836,32 +818,15 @@ public static class DatabaseService
             },
 
             {
-                "tempvoice",
-                new Dictionary<string, string>
+                "tempvoice", new Dictionary<string, string>
                 {
-                    { "channelid", "ALTER TABLE tempvoice ADD COLUMN IF NOT EXISTS channelid BIGINT" },
-                    { "ownerid", "ALTER TABLE tempvoice ADD COLUMN IF NOT EXISTS ownerid BIGINT" },
-                    { "lastedited", "ALTER TABLE tempvoice ADD COLUMN IF NOT EXISTS lastedited BIGINT" },
-                    { "laststatusedited", "ALTER TABLE tempvoice ADD COLUMN IF NOT EXISTS laststatusedited BIGINT" },
-                    { "channelmods", "ALTER TABLE tempvoice ADD COLUMN IF NOT EXISTS channelmods VARCHAR" }
+                    { "drop", "DROP TABLE IF EXISTS tempvoice" }
                 }
             },
             {
-                "tempvoicesession",
-                new Dictionary<string, string>
+                "tempvoicesession", new Dictionary<string, string>
                 {
-                    { "userid", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS userid BIGINT" },
-                    { "channelname", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS channelname VARCHAR" },
-                    {
-                        "channelbitrate", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS channelbitrate INTEGER"
-                    },
-                    { "channellimit", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS channellimit INTEGER" },
-                    { "blockedusers", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS blockedusers VARCHAR" },
-                    { "permitedusers", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS permitedusers VARCHAR" },
-                    { "locked", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS locked BOOLEAN" },
-                    { "hidden", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS hidden BOOLEAN" },
-                    { "sessionskip", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS sessionskip BOOLEAN" },
-                    { "channelmods", "ALTER TABLE tempvoicesession ADD COLUMN IF NOT EXISTS channelmods VARCHAR" }
+                    { "drop", "DROP TABLE IF EXISTS tempvoicesession" }
                 }
             },
             {
