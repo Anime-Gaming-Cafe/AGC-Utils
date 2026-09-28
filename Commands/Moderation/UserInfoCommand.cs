@@ -13,21 +13,6 @@ namespace AGC_Management.Commands.Moderation;
 
 public sealed class UserInfoCommand : BaseCommandModule
 {
-    private const string Loading = "*Lade …*";
-    private const string Unavailable = "*Nicht verfügbar*";
-
-    private sealed record UserInfoSections(
-        string LastSeen,
-        string Tickets,
-        string Cases,
-        string ExtraPermissions,
-        string BanStatus,
-        bool IsBanned,
-        bool BannSystemActive);
-
-    private static readonly UserInfoSections LoadingSections = new(Loading, Loading,
-        $"**__Verwarnungen & Markierungen__**\n{Loading}\n", Loading, Loading, false, false);
-
     [Command("userinfo")]
     [RequireDatabase]
     [RequireStaffRole]
@@ -44,90 +29,48 @@ public sealed class UserInfoCommand : BaseCommandModule
         {
         }
 
-        var title = $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied";
-        var footer = $"Bericht angefordert von {ctx.User.GetFormattedUserName()}";
-        var thumbnail = member?.AvatarUrl ?? user.AvatarUrl;
+        var isMember = member is not null;
 
-        var placeholder = new DiscordEmbedBuilder()
-            .WithTitle(title)
-            .WithDescription(BuildDescription(ctx, user, member, LoadingSections))
-            .WithColor(BotConfig.GetEmbedColor())
-            .WithThumbnail(thumbnail)
-            .WithFooter(footer, ctx.User.AvatarUrl);
-        var message = await ctx.RespondAsync(placeholder.Build());
-
-        var sections = await LoadSectionsAsync(ctx, user, member);
-
-        await EmbedPaginator.ShowPaginatedEmbed(
-            ctx.Client,
-            message,
-            ctx.User,
-            title,
-            BuildDescription(ctx, user, member, sections),
-            sections.BannSystemActive ? DiscordColor.Red : BotConfig.GetEmbedColor(),
-            thumbnail,
-            footer,
-            ctx.User.AvatarUrl
-        );
-    }
-
-    private static async Task<UserInfoSections> LoadSectionsAsync(CommandContext ctx, DiscordUser user,
-        DiscordMember? member)
-    {
-        var ticketsTask = LoadSectionAsync("tickets",
-            async () => (await ToolSet.GetTicketCount(user.Id)).ToString());
-        var lastSeenTask = LoadSectionAsync("last seen", async () =>
-        {
-            var lastSeen = await AvailabilityService.GetLastSeenAsync(user.Id, member);
-            return lastSeen.LastSeenUnix > 0
-                ? $"{Formatter.Timestamp(Converter.ConvertUnixTimestamp(lastSeen.LastSeenUnix), TimestampFormat.RelativeTime)} · {AvailabilityService.DescribeSignal(lastSeen.Signal)}"
-                : "Keine Aktivität aufgezeichnet";
-        });
-        var extraPermissionsTask = member is null
-            ? Task.FromResult("")
-            : LoadSectionAsync("extra permissions", async () =>
-                ExtraPermissionFormatter.BuildUserInfoSection(
-                    await ExtraPermissionService.GetStatusAsync(user.Id, member, false)));
-        var banTask = member is null ? GetBanStatusAsync(ctx.Guild, user.Id) : Task.FromResult((false, ""));
+        var ticketCountTask = ToolSet.GetTicketCount(user.Id);
+        var lastSeenTask = AvailabilityService.GetLastSeenAsync(user.Id, member);
         var bannSystemTask = ToolSet.GetBannSystemEntries(user.Id);
-        var casesTask = LoadSectionAsync("cases", async () =>
-        {
-            var (bsWarns, bsReports) = await bannSystemTask;
-            return await BuildCasesSectionAsync(ctx.Client, user.Id, bsWarns, bsReports);
-        }, $"**__Verwarnungen & Markierungen__**\n{Unavailable}\n");
+        var casesTask = LoadCasesAsync(user.Id);
+        var extraPermissionsTask = isMember
+            ? ExtraPermissionService.GetStatusAsync(user.Id, member, false)
+            : Task.FromResult(new List<ExtraPermissionStatus>());
+        var banTask = isMember ? Task.FromResult((false, "")) : GetBanStatusAsync(ctx.Guild, user.Id);
+        await Task.WhenAll(ticketCountTask, lastSeenTask, bannSystemTask, casesTask, extraPermissionsTask, banTask);
 
-        await Task.WhenAll(ticketsTask, lastSeenTask, extraPermissionsTask, banTask, bannSystemTask, casesTask);
-
+        var ticketcount = ticketCountTask.Result.ToString();
+        var lastSeen = lastSeenTask.Result;
+        var (bsflaglist, bsreportlist) = bannSystemTask.Result;
+        var (warnlist, permawarnlist, flaglist) = casesTask.Result;
         var (isBanned, banStatus) = banTask.Result;
-        return new UserInfoSections(lastSeenTask.Result, ticketsTask.Result, casesTask.Result,
-            extraPermissionsTask.Result, banStatus, isBanned,
-            ToolSet.HasActiveBannSystemReport(bannSystemTask.Result.Reports));
-    }
-
-    private static async Task<string> LoadSectionAsync(string name, Func<Task<string>> load,
-        string fallback = Unavailable)
-    {
-        try
-        {
-            return await load();
-        }
-        catch (Exception e)
-        {
-            CurrentApplication.Logger.Warning(e, "Userinfo: loading {Section} failed", name);
-            return fallback;
-        }
-    }
-
-    private static async Task<string> BuildCasesSectionAsync(DiscordClient client, ulong userId,
-        List<BannSystemWarn> bsflaglist, List<BannSystemReport> bsreportlist)
-    {
-        var (warnlist, permawarnlist, flaglist) = await LoadCasesAsync(userId);
 
         var authorIds = warnlist.Concat(permawarnlist).Concat(flaglist).Select(c => c.PunisherId)
             .Concat(bsflaglist.Select(w => w.authorId))
             .Concat(bsreportlist.Select(r => r.authorId));
-        var names = await ResolveUsernamesAsync(client, authorIds);
+        var names = await ResolveUsernamesAsync(ctx.Client, authorIds);
         string NameOf(ulong id) => names.TryGetValue(id, out var name) ? name : "Unbekannt";
+
+        var bot_indicator = user.IsBot ? "<:bot:1012035481573265458>" : "";
+        var showPresence = ctx.Client.Intents.HasIntent(DiscordIntents.GuildPresences);
+        var lastSeenText = lastSeen.LastSeenUnix > 0
+            ? $"{Formatter.Timestamp(Converter.ConvertUnixTimestamp(lastSeen.LastSeenUnix), TimestampFormat.RelativeTime)} · {AvailabilityService.DescribeSignal(lastSeen.Signal)}"
+            : "Keine Aktivität aufgezeichnet";
+        var user_status = member?.Presence?.Status.ToString() ?? "Offline";
+        var status_indicator = user_status switch
+        {
+            "Online" => "<:online:1012032516934352986>",
+            "Idle" => "<:abwesend:1012032002771406888>",
+            "DoNotDisturb" => "<:do_not_disturb:1012031711263064104>",
+            "Invisible" or "Offline" => "<:offline:946831431798227056>",
+            "Streaming" => "<:twitch_streaming:1012033234080632983>",
+            _ => "<:offline:946831431798227056>"
+        };
+
+        var bs_status = ToolSet.HasActiveBannSystemReport(bsreportlist);
+        var bs_icon = bs_status ? "<:BannSystem:1012006073751830529>" : "";
 
         var warnResults = warnlist.Select(w =>
             $"[{NameOf(w.PunisherId)}, ``{w.CaseId}``] {Formatter.Timestamp(Converter.ConvertUnixTimestamp(w.Datum), TimestampFormat.RelativeTime)} - {w.Description}").ToList();
@@ -153,27 +96,11 @@ public sealed class UserInfoCommand : BaseCommandModule
         casesSection += flagResults.Count == 0
             ? "Es wurden keine gefunden.\n"
             : string.Join("\n\n", flagResults) + "\n";
-        return casesSection;
-    }
 
-    private static string BuildDescription(CommandContext ctx, DiscordUser user, DiscordMember? member,
-        UserInfoSections sections)
-    {
-        var bot_indicator = user.IsBot ? "<:bot:1012035481573265458>" : "";
-        var bs_icon = sections.BannSystemActive ? "<:BannSystem:1012006073751830529>" : "";
-        var showPresence = ctx.Client.Intents.HasIntent(DiscordIntents.GuildPresences);
-        var user_status = member?.Presence?.Status.ToString() ?? "Offline";
-        var status_indicator = user_status switch
-        {
-            "Online" => "<:online:1012032516934352986>",
-            "Idle" => "<:abwesend:1012032002771406888>",
-            "DoNotDisturb" => "<:do_not_disturb:1012031711263064104>",
-            "Invisible" or "Offline" => "<:offline:946831431798227056>",
-            "Streaming" => "<:twitch_streaming:1012033234080632983>",
-            _ => "<:offline:946831431798227056>"
-        };
+        var extraPermissionsSection = ExtraPermissionFormatter.BuildUserInfoSection(extraPermissionsTask.Result);
 
         string userinfostring;
+        string description;
         if (member is not null)
         {
             var Teamler = member.Roles.Any(r => r.Id == GlobalProperties.StaffRoleId);
@@ -215,42 +142,56 @@ public sealed class UserInfoCommand : BaseCommandModule
             }
 
             userinfostring += "**Zuletzt gesehen**\n";
-            userinfostring += $"{sections.LastSeen}\n\n";
+            userinfostring += $"{lastSeenText}\n\n";
             userinfostring += "**Kommunikations-Timeout**\n";
             userinfostring +=
                 $"{(member.IsCommunicationDisabled ? $"Nutzer getimeouted bis: {member.CommunicationDisabledUntil.Value.Timestamp()}" : "Nutzer nicht getimeouted")}\n\n";
             userinfostring += "**Anzahl Tickets**\n";
-            userinfostring += $"{sections.Tickets}\n\n";
+            userinfostring +=
+                $"{ticketcount}\n\n";
             userinfostring +=
                 $"**Aktueller Voice-Channel**\n{(member.VoiceState != null && member.VoiceState.Channel != null ? member.VoiceState.Channel.Mention : "Mitglied nicht in einem Voice-Channel")}\n\n";
-            userinfostring += sections.Cases;
+            userinfostring += casesSection;
             userinfostring += "\n**__Extra Permissions__**\n";
-            userinfostring += sections.ExtraPermissions;
-            return $"Ich konnte folgende Informationen über {userindicator} finden.\n\n" + userinfostring;
+            userinfostring += extraPermissionsSection;
+            description = $"Ich konnte folgende Informationen über {userindicator} finden.\n\n" + userinfostring;
         }
-
-        var banicon = sections.IsBanned ? "<:banicon:1012003595727671337>" : "";
-
-        userinfostring =
-            $"**Der User**\n{user.GetFormattedUserName()} ``{user.Id}``\n\n";
-        userinfostring += "**Erstellung, Beitritt und mehr**\n";
-        userinfostring += $"**Erstellt:** {user.CreationTimestamp.Timestamp()}\n";
-        userinfostring += "**Beitritt:** *User nicht auf dem Server*\n";
-        userinfostring += $"**Infobadges:**  {bot_indicator} {bs_icon} {banicon}\n\n";
-        if (showPresence)
+        else
         {
-            userinfostring += "**Der Online-Status und die Plattform**\n";
-            userinfostring += $"{status_indicator} | Nicht ermittelbar - User ist nicht auf dem Server\n\n";
+            var banicon = isBanned ? "<:banicon:1012003595727671337>" : "";
+
+            userinfostring =
+                $"**Der User**\n{user.GetFormattedUserName()} ``{user.Id}``\n\n";
+            userinfostring += "**Erstellung, Beitritt und mehr**\n";
+            userinfostring += $"**Erstellt:** {user.CreationTimestamp.Timestamp()}\n";
+            userinfostring += "**Beitritt:** *User nicht auf dem Server*\n";
+            userinfostring += $"**Infobadges:**  {bot_indicator} {bs_icon} {banicon}\n\n";
+            if (showPresence)
+            {
+                userinfostring += "**Der Online-Status und die Plattform**\n";
+                userinfostring += $"{status_indicator} | Nicht ermittelbar - User ist nicht auf dem Server\n\n";
+            }
+
+            userinfostring += "**Zuletzt gesehen**\n";
+            userinfostring += $"{lastSeenText}\n\n";
+            userinfostring += "**Anzahl Tickets**\n";
+            userinfostring +=
+                $"{ticketcount}\n\n";
+            userinfostring += casesSection;
+            userinfostring += "\n**Lokaler Bannstatus**\n";
+            userinfostring += banStatus;
+            description = "Ich konnte folgende Informationen über den User finden.\n\n" + userinfostring;
         }
 
-        userinfostring += "**Zuletzt gesehen**\n";
-        userinfostring += $"{sections.LastSeen}\n\n";
-        userinfostring += "**Anzahl Tickets**\n";
-        userinfostring += $"{sections.Tickets}\n\n";
-        userinfostring += sections.Cases;
-        userinfostring += "\n**Lokaler Bannstatus**\n";
-        userinfostring += sections.BanStatus;
-        return "Ich konnte folgende Informationen über den User finden.\n\n" + userinfostring;
+        await EmbedPaginator.SendPaginatedEmbed(
+            ctx,
+            $"Infos über ein {BotConfig.GetConfig()["ServerConfig"]["ServerNameInitials"]} Mitglied",
+            description,
+            bs_status ? DiscordColor.Red : BotConfig.GetEmbedColor(),
+            member?.AvatarUrl ?? user.AvatarUrl,
+            $"Bericht angefordert von {ctx.User.GetFormattedUserName()}",
+            ctx.User.AvatarUrl
+        );
     }
 
     private sealed record CaseEntry(ulong PunisherId, string CaseId, long Datum, string Description);
@@ -284,17 +225,7 @@ public sealed class UserInfoCommand : BaseCommandModule
     private static async Task<Dictionary<ulong, string>> ResolveUsernamesAsync(DiscordClient client,
         IEnumerable<ulong> userIds)
     {
-        var lookups = userIds.Distinct().Select(async id =>
-        {
-            try
-            {
-                return (id, user: await client.TryGetUserAsync(id, false));
-            }
-            catch (Exception)
-            {
-                return (id, user: (DiscordUser?)null);
-            }
-        });
+        var lookups = userIds.Distinct().Select(async id => (id, user: await client.TryGetUserAsync(id, false)));
         var users = await Task.WhenAll(lookups);
         return users.Where(u => u.user != null).ToDictionary(u => u.id, u => u.user!.Username);
     }
