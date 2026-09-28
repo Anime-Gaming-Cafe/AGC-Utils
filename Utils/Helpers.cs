@@ -214,9 +214,9 @@ public static class ToolSet
             if (index > 0)
             {
                 value = value[(index + BuildVersionMetadataPrefix.Length)..];
-                if (DateTime.TryParseExact(value, "yyyyMMddHHmmss", CultureInfo.CurrentCulture,
-                        DateTimeStyles.AssumeLocal, out var result))
-                    return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(result, TimeZoneInfo.Local))
+                if (DateTime.TryParseExact(value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var result))
+                    return new DateTimeOffset(result, TimeSpan.Zero)
                         .ToUnixTimeSeconds();
             }
         }

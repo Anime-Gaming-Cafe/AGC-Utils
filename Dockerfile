@@ -15,7 +15,7 @@ RUN dotnet publish "AGC Management.csproj" \
       --self-contained false \
       -o /app/publish \
       --no-restore \
-      -p:InformationalVer="${GIT_TAG_VERSION}"
+      -p:GIT_TAG_VERSION="${GIT_TAG_VERSION}"
 
 # blazor.server.js is part of Microsoft.AspNetCore.App.Internal.Assets but
 # the MSBuild target doesn't copy it into the publish output for legacy
