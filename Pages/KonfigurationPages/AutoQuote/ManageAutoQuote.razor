@@ -1,0 +1,211 @@
+@page "/konfiguration/autoquote"
+@using AGC_Management.Services
+@using DisCatSharp.Enums
+@inject ToastService ToastService
+@inject UnsavedChangesTracker Tracker
+@attribute [Authorize(Policy = DashboardPolicies.AdminOnly)]
+@implements IDisposable
+
+<PageHeader Title="Auto-Quote"
+            Lead="Zitiert verlinkte Nachrichten automatisch. Nachrichten mit ! am Anfang werden nie zitiert."
+            BackHref="/konfiguration" BackText="Administration"/>
+
+@if (!loaded)
+{
+    <StateBlock Kind="StateBlock.StateKind.Loading"
+                Title="Auto-Quote wird geladen"
+                Description="Einstellungen und Ausnahmen werden abgefragt."/>
+}
+else
+{
+    <Panel Title="Allgemein">
+        <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="aq-enabled" @bind="enabled" @bind:after="OnFieldChanged"/>
+            <label class="form-check-label" for="aq-enabled">Auto-Quote aktiviert</label>
+        </div>
+    </Panel>
+
+    @RenderExclusionList(ExclusionKind.Source)
+
+    @RenderExclusionList(ExclusionKind.Listen)
+}
+
+@code {
+    private enum ExclusionKind
+    {
+        Source,
+        Listen
+    }
+
+    private bool loaded;
+    private bool enabled;
+    private bool originalEnabled;
+    private bool deleting;
+
+    private List<ulong> excludedSourceIds = new();
+    private List<ulong> excludedListenIds = new();
+    private ulong newSourceId;
+    private ulong newListenId;
+    private (ExclusionKind Kind, ulong Id)? pendingDelete;
+
+    private List<(ulong Id, string Label)> channelItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadChannelItems();
+        enabled = originalEnabled = await AutoQuoteService.GetEnabledAsync();
+        excludedSourceIds = [.. await AutoQuoteService.GetExcludedSourcesAsync()];
+        excludedListenIds = [.. await AutoQuoteService.GetExcludedListenAsync()];
+        Tracker.Register(SaveSettings, DiscardSettings);
+        loaded = true;
+    }
+
+    public void Dispose() => Tracker.Unregister();
+
+    private void OnFieldChanged() => Tracker.MarkDirty();
+
+    private async Task SaveSettings()
+    {
+        await AutoQuoteService.SetEnabledAsync(enabled);
+        originalEnabled = enabled;
+        ToastService.Notify("Einstellungen gespeichert.", "ok");
+    }
+
+    private void DiscardSettings()
+    {
+        enabled = originalEnabled;
+        StateHasChanged();
+    }
+
+    private void LoadChannelItems()
+    {
+        var channels = CurrentApplication.TargetGuild.Channels.Values;
+        var categories = channels.Where(c => c.Type == ChannelType.Category).OrderBy(c => c.Position);
+        var textChannels = channels
+            .Where(c => c.Type is ChannelType.Text or ChannelType.News or ChannelType.Forum)
+            .OrderBy(c => c.Position);
+
+        channelItems = categories.Concat(textChannels).Select(c => (c.Id, Label(c))).ToList();
+    }
+
+    private static string Label(DiscordChannel channel)
+    {
+        return channel.Type == ChannelType.Category ? $"Kategorie: {channel.Name}" : "#" + channel.Name;
+    }
+
+    private static string ChannelName(ulong channelId)
+    {
+        var channel = CurrentApplication.TargetGuild.GetChannel(channelId);
+        return channel is null ? $"Gelöscht ({channelId})" : Label(channel);
+    }
+
+    private List<ulong> ListFor(ExclusionKind kind) => kind == ExclusionKind.Source ? excludedSourceIds : excludedListenIds;
+
+    private Task PersistAsync(ExclusionKind kind)
+    {
+        return kind == ExclusionKind.Source
+            ? AutoQuoteService.SetExcludedSourcesAsync(excludedSourceIds)
+            : AutoQuoteService.SetExcludedListenAsync(excludedListenIds);
+    }
+
+    private async Task AddExclusion(ExclusionKind kind)
+    {
+        var id = kind == ExclusionKind.Source ? newSourceId : newListenId;
+        if (id == 0)
+        {
+            ToastService.Notify("Bitte einen Channel oder eine Kategorie wählen.", "bad");
+            return;
+        }
+
+        var list = ListFor(kind);
+        if (list.Contains(id))
+        {
+            ToastService.Notify("Der Eintrag steht bereits auf der Liste.", "bad");
+            return;
+        }
+
+        list.Add(id);
+        await PersistAsync(kind);
+        if (kind == ExclusionKind.Source) newSourceId = 0;
+        else newListenId = 0;
+        ToastService.Notify("Ausnahme wurde hinzugefügt.", "ok");
+    }
+
+    private async Task RemoveExclusion(ExclusionKind kind, ulong id)
+    {
+        if (deleting) return;
+        deleting = true;
+        ListFor(kind).Remove(id);
+        await PersistAsync(kind);
+        pendingDelete = null;
+        deleting = false;
+        ToastService.Notify("Ausnahme wurde entfernt.", "ok");
+    }
+
+    private RenderFragment RenderExclusionList(ExclusionKind kind) => __builder =>
+    {
+        var ids = ListFor(kind);
+        var isSource = kind == ExclusionKind.Source;
+        var selectId = isSource ? "aq-new-source" : "aq-new-listen";
+
+        <Panel Title="@(isSource ? "Nicht zitieren aus" : "Nicht zuhören in")"
+               Lead="@(isSource ? "Links auf Nachrichten aus diesen Channels oder Kategorien werden ignoriert." : "In diesen Channels oder Kategorien gepostete Links werden nicht zitiert.")"
+               Flush="@(ids.Count > 0)">
+            @if (ids.Count == 0)
+            {
+                <StateBlock Inline="true" Title="Keine Ausnahmen"
+                            Description="@(isSource ? "Nachrichten aus allen Channels werden zitiert." : "Links werden in allen Channels zitiert.")"/>
+            }
+            else
+            {
+                <ul class="rows">
+                    @foreach (var id in ids)
+                    {
+                        <li>
+                            <div class="rows__main">
+                                <p class="rows__title">@ChannelName(id)</p>
+                            </div>
+                            <div class="rows__side">
+                                @if (pendingDelete != (kind, id))
+                                {
+                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => pendingDelete = (kind, id)">Entfernen</button>
+                                }
+                            </div>
+                        </li>
+                        @if (pendingDelete == (kind, id))
+                        {
+                            <li>
+                                <ConfirmInline Title="Ausnahme entfernen?"
+                                               ConfirmText="Ja, entfernen"
+                                               Busy="deleting"
+                                               OnConfirm="() => RemoveExclusion(kind, id)"
+                                               OnCancel="() => pendingDelete = null">
+                                    <p>@(isSource ? $"Nachrichten aus {ChannelName(id)} werden danach wieder zitiert." : $"Links in {ChannelName(id)} werden danach wieder zitiert.")</p>
+                                </ConfirmInline>
+                            </li>
+                        }
+                    }
+                </ul>
+            }
+        </Panel>
+
+        <Panel Title="@(isSource ? "Quelle ausnehmen" : "Channel ausnehmen")">
+            <div class="field-grid">
+                <div class="field">
+                    <label class="field__label" for="@selectId">Channel oder Kategorie</label>
+                    @if (isSource)
+                    {
+                        <SearchableSelect Id="@selectId" Items="channelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..." @bind-SelectedId="newSourceId"/>
+                    }
+                    else
+                    {
+                        <SearchableSelect Id="@selectId" Items="channelItems" NoneLabel="Channel wählen" Placeholder="Channel suchen..." @bind-SelectedId="newListenId"/>
+                    }
+                </div>
+            </div>
+            <div class="form-foot">
+                <button type="button" class="btn btn-primary" @onclick="() => AddExclusion(kind)">Hinzufügen</button>
+            </div>
+        </Panel>
+    };
+}
