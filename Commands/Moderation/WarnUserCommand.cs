@@ -50,7 +50,7 @@ public sealed class WarnUserCommand : BaseCommandModule
         if (interaction.TimedOut)
         {
             var embed_ = new DiscordMessageBuilder()
-                .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Verwarnung abgebrochen")
                     .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Verwarnung wurde abgebrochen.\n\nGrund: Zeitüberschreitung. <:counting_warning:962007085426556989>")
@@ -63,7 +63,7 @@ public sealed class WarnUserCommand : BaseCommandModule
         {
             await interaction.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
             var embed_ = new DiscordMessageBuilder()
-                .AddEmbed(confirmEmbedBuilder.WithTitle("Ban abgebrochen")
+                .AddEmbed(confirmEmbedBuilder.WithTitle("Verwarnung abgebrochen")
                     .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithDescription(
                         "Die Verwarnung wurde abgebrochen.\n\nGrund: Abgebrochen. <:counting_warning:962007085426556989>")
@@ -154,14 +154,17 @@ public sealed class WarnUserCommand : BaseCommandModule
                 sent = false;
             }
 
-            if (!sent) await ToolSet.SendWarnAsChannel(ctx, user, uembed, caseid);
+            var delivered = sent || await ToolSet.SendWarnAsChannel(ctx, user, uembed, caseid);
 
-            var dmsent = sent ? "✅" : "⚠️";
+            var dmsent = sent ? "✅" : delivered ? "⚠️" : "❌ nicht zustellbar";
             var uAction = "Keine";
 
             var (KickEnabled, BanEnabled) = await ModerationHelper.UserActioningEnabled();
 
-            if (warncount >= warnsToBan)
+            if (((warncount >= warnsToBan && BanEnabled) || (warncount >= warnsToKick && KickEnabled)) &&
+                await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id))
+                uAction = "Übersprungen (Teammitglied)";
+            else if (warncount >= warnsToBan)
                 try
                 {
                     if (BanEnabled)

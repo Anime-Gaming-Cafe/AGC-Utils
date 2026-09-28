@@ -22,6 +22,19 @@ public sealed class BanRequestCommand : BaseCommandModule
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
+        if (await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id))
+        {
+            var errorEmbed = new DiscordEmbedBuilder()
+                .WithTitle("Fehler bei der Bannanfrage")
+                .WithDescription(
+                    "Der User kann nicht gebannt werden, da er ein Teammitglied ist. <:counting_warning:962007085426556989>")
+                .WithColor(DiscordColor.Red)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
+                .Build();
+            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(errorEmbed));
+            return;
+        }
+
         reason = await ReasonTemplateResolver.Resolve(reason);
         var caseid = ToolSet.GenerateCaseID();
         var staffrole = ctx.Guild.GetRole(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]));
@@ -193,8 +206,9 @@ public sealed class BanRequestCommand : BaseCommandModule
                 {
                     await ctx.Guild.BanMemberAsync(user.Id, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                         ReasonString);
+                    await ModerationHelper.RecordBanAsync(user.Id, result.Result.User.Id, reason, caseid);
                     var dm = sent ? "✅" : "❌";
-                    b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
+                    b_users += $"{user.GetFormattedUserName()} | DM: {dm} | Case-ID: {caseid}\n";
                     await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
                 }
                 catch (UnauthorizedException)

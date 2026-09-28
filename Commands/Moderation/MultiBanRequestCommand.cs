@@ -19,7 +19,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
     public async Task MultiBanRequest(CommandContext ctx, [RemainingText] string ids_and_reason)
     {
 		Converter.SeperateIdsAndReason(ids_and_reason, out List<ulong> ids, out string reason);
-		reason ??= await ModerationHelper.BanReasonSelector(ctx);
+		if (string.IsNullOrWhiteSpace(reason)) reason = await ModerationHelper.BanReasonSelector(ctx);
 
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
@@ -42,12 +42,19 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             return;
         }
 
+        var skippedTeam = new List<DiscordUser>();
         foreach (var id in setids)
         {
             var user = await ctx.Client.TryGetUserAsync(id);
-            if (user != null) users_to_ban.Add(user);
+            if (user == null) continue;
+            if (await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id)) skippedTeam.Add(user);
+            else users_to_ban.Add(user);
         }
 
+        var skippedTeamText = skippedTeam.Count == 0
+            ? ""
+            : "__Übersprungen (Teammitglied):__\n" +
+              $"```{string.Join("\n", skippedTeam.Select(u => u.GetFormattedUserName()))}```\n";
         var busers_formatted = string.Join("\n", users_to_ban.Select(buser => buser.GetFormattedUserName()));
         var caseid = ToolSet.GenerateCaseID();
         var confirmEmbedBuilder = new DiscordEmbedBuilder()
@@ -55,7 +62,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
             .WithDescription($"Bitte überprüfe deine Eingabe und bestätige mit ✅ um fortzufahren.\n\n" +
                              $"__Users:__\n" +
-                             $"```{busers_formatted}```\n__Grund:__```{reason}```")
+                             $"```{busers_formatted}```\n" + skippedTeamText + $"__Grund:__```{reason}```")
             .WithColor(BotConfig.GetEmbedColor());
         var embed = confirmEmbedBuilder.Build();
         List<DiscordButtonComponent> buttons =
@@ -110,7 +117,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                 .WithTitle($"Du wurdest von {ctx.Guild.Name} gebannt!").WithColor(DiscordColor.Red)
                 .WithDescription($"**Begründung:**```{reason}```\n" +
                                  $"**Du möchtest einen Entbannungsantrag stellen?**\n" +
-                                 $"Dann kannst du eine Entbannung beim [Entbannungsserver]( {ModerationHelper.GetUnbanURL()} ) beantragenen");
+                                 $"Dann kannst du eine Entbannung beim [Entbannungsserver]({ModerationHelper.GetUnbanURL()}) beantragen");
             var banEmbed = banEmbedBuilder.Build();
             var staffrole = ctx.Guild.GetRole(ulong.Parse(BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"]));
             var staffmembers = ctx.Guild.Members
@@ -179,6 +186,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
             
             if (staffresult.Result.Id == $"modbanrequest_cancel_{caseid}")
             {
+                await staffresult.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
                 var cancelEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Anfrage abgebrochen")
                     .WithDescription("Deine Anfrage wurde abgebrochen.")
@@ -194,6 +202,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
 
             if (staffresult.Result.Id == $"modbanrequest_deny_{caseid}")
             {
+                await staffresult.Result.Interaction.CreateResponseAsync(InteractionResponseType.DeferredMessageUpdate);
                 var denyEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Anfrage abgelehnt")
                     .WithDescription(
@@ -246,8 +255,10 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
                     {
                         await ctx.Guild.BanMemberAsync(user.Id, await ToolSet.GenerateBanDeleteMessageSeconds(user.Id),
                             ReasonString);
+                        var userCaseId = $"{caseid}-{ToolSet.GenerateCaseID()}";
+                        await ModerationHelper.RecordBanAsync(user.Id, staffresult.Result.User.Id, reason, userCaseId);
                         var dm = sent ? "✅" : "❌";
-                        b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
+                        b_users += $"{user.GetFormattedUserName()} | DM: {dm} | Case-ID: {userCaseId}\n";
                         await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
                     }
                     catch (UnauthorizedException)
@@ -281,7 +292,7 @@ public sealed class MultiBanRequestCommand : BaseCommandModule
 
                 var discordEmbedBuilder = new DiscordEmbedBuilder()
                     .WithTitle("Multibanrequest abgeschlossen")
-                    .WithDescription(e_string)
+                    .WithDescription(e_string + "\n" + skippedTeamText)
                     .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
                     .WithColor(ec);
                 var discordEmbed = discordEmbedBuilder.Build();

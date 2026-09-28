@@ -21,11 +21,7 @@ public sealed class BanUserCommand : BaseCommandModule
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
 
-        var staffRole = BotConfig.GetConfig()["ServerConfig"]["StaffRoleId"];
-        DiscordMember? guildMember = null;
-        try { guildMember = await ctx.Guild.GetMemberAsync(user.Id); }
-        catch (NotFoundException) { }
-        if (guildMember != null && guildMember.Roles.Any(r => r.Id == ulong.Parse(staffRole)))
+        if (await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id))
         {
             var errorEmbedBuilder = new DiscordEmbedBuilder()
             .WithTitle("Fehler beim Bannen des Users")
@@ -133,15 +129,7 @@ public sealed class BanUserCommand : BaseCommandModule
                 b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
                 await LoggingUtils.LogGuildBan(user.Id, ctx.User.Id, reason);
 
-                Dictionary<string, object> banData = new()
-                {
-                    { "userid", (long)user.Id },
-                    { "punisherid", (long)ctx.User.Id },
-                    { "datum", DateTimeOffset.Now.ToUnixTimeSeconds() },
-                    { "description", reason },
-                    { "caseid", caseid }
-                };
-                await DatabaseService.InsertDataIntoTable("bans", banData);
+                await ModerationHelper.RecordBanAsync(user.Id, ctx.User.Id, reason, caseid);
             }
             catch (UnauthorizedException)
             {

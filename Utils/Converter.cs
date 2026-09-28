@@ -12,13 +12,10 @@ public class Converter
         foreach (var part in parts)
             if (!isReasonStarted)
             {
-                if (part.StartsWith("<@") && part.EndsWith('>'))
+                if (part.StartsWith("<@") && part.EndsWith('>') &&
+                    ulong.TryParse(part[2..^1].TrimStart('!'), out var mentionId))
                 {
-                    var idString = part[2..^1];
-                    if (ulong.TryParse(idString, out var id))
-                        ids.Add(id);
-                    else
-                        break;
+                    ids.Add(mentionId);
                 }
                 else if (ulong.TryParse(part, out var id))
                 {

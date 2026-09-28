@@ -136,14 +136,7 @@ public sealed class MultiFlagUserCommand : BaseCommandModule
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             var for_str = "";
-            List<DiscordUser> users_to_flag_obj = [];
-            foreach (var id in setids)
-            {
-                var user = await ctx.Client.GetUserAsync(id);
-                if (user != null) users_to_flag_obj.Add(user);
-            }
-
-            foreach (var user in users_to_flag_obj)
+            foreach (var user in users_to_flag)
             {
                 var caseid_ = ToolSet.GenerateCaseID();
                 caseid_ = $"{caseid}-{caseid_}";

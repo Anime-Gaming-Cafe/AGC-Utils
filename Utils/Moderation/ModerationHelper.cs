@@ -2,6 +2,7 @@
 
 using System.Text;
 using AGC_Management.Services;
+using DisCatSharp.Exceptions;
 using DisCatSharp.Interactivity.Extensions;
 
 #endregion
@@ -39,6 +40,34 @@ public static class ModerationHelper
         }
 
         return (WarnsToKickEnabled, WarnsToBanEnabled);
+    }
+
+    public static async Task<bool> IsTeamMemberAsync(DiscordGuild? guild, ulong userId)
+    {
+        if (guild is null) return false;
+
+        try
+        {
+            var member = await guild.GetMemberAsync(userId);
+            return member.Roles.Any(r => r.Id == GlobalProperties.StaffRoleId);
+        }
+        catch (NotFoundException)
+        {
+            return false;
+        }
+    }
+
+    public static async Task RecordBanAsync(ulong userId, ulong punisherId, string reason, string caseId)
+    {
+        Dictionary<string, object> data = new()
+        {
+            { "userid", (long)userId },
+            { "punisherid", (long)punisherId },
+            { "datum", DateTimeOffset.Now.ToUnixTimeSeconds() },
+            { "description", reason },
+            { "caseid", caseId }
+        };
+        await DatabaseService.InsertDataIntoTable("bans", data);
     }
 
     public static async Task KickFlag(DiscordUser user, string reason, DiscordUser mod)

@@ -88,7 +88,7 @@ public sealed class CaseManagement : BaseCommandModule
             case_type = "Verwarnung";
             user = await ctx.Client.GetUserAsync((ulong)warn["userid"]);
             punisher = await ctx.Client.GetUserAsync((ulong)warn["punisherid"]);
-            datum = DateTimeOffset.FromUnixTimeSeconds(warn["datum"]).DateTime;
+            datum = DateTimeOffset.FromUnixTimeSeconds(warn["datum"]).UtcDateTime;
             reason = warn["description"];
             perma = warn["perma"];
         }
@@ -97,7 +97,7 @@ public sealed class CaseManagement : BaseCommandModule
             case_type = "Markierung";
             user = await ctx.Client.GetUserAsync((ulong)flag["userid"]);
             punisher = await ctx.Client.GetUserAsync((ulong)flag["punisherid"]);
-            datum = DateTimeOffset.FromUnixTimeSeconds(flag["datum"]).DateTime;
+            datum = DateTimeOffset.FromUnixTimeSeconds(flag["datum"]).UtcDateTime;
             reason = flag["description"];
             perma = false;
         }
@@ -106,7 +106,7 @@ public sealed class CaseManagement : BaseCommandModule
             case_type = "Bann";
             user = await ctx.Client.GetUserAsync((ulong)ban["userid"]);
             punisher = await ctx.Client.GetUserAsync((ulong)ban["punisherid"]);
-            datum = DateTimeOffset.FromUnixTimeSeconds(ban["datum"]).DateTime;
+            datum = DateTimeOffset.FromUnixTimeSeconds(ban["datum"]).UtcDateTime;
             reason = ban["description"];
             perma = false;
         }
@@ -149,7 +149,7 @@ public sealed class CaseManagement : BaseCommandModule
                 .AddField(new DiscordEmbedField("Case-ID:", $"``{caseid}``"))
                 .AddField(new DiscordEmbedField("Der betroffene Nutzer:",
                     user.GetFormattedUserName() + "\n" + $"``{user.Id}``"))
-                .AddField(new DiscordEmbedField("Ausgeführt von::",
+                .AddField(new DiscordEmbedField("Ausgeführt von:",
                     punisher.GetFormattedUserName() + "\n" + $"``{punisher.Id}``"))
                 .AddField(new DiscordEmbedField("Datum:", datum.Timestamp()))
                 .AddField(new DiscordEmbedField("Grund:", $"```{reason}```"));
@@ -257,7 +257,7 @@ public sealed class CaseManagement : BaseCommandModule
             if (await ToolSet.CheckForReason(ctx, reason)) return;
             sql = "UPDATE warns SET description = @description WHERE caseid = @caseid";
             await using var command = con.CreateCommand(sql);
-            command.Parameters.AddWithValue("@description", newreason);
+            command.Parameters.AddWithValue("@description", reason);
             command.Parameters.AddWithValue("@caseid", caseid);
 
             await command.ExecuteNonQueryAsync();

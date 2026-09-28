@@ -116,13 +116,6 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 .WithReply(ctx.Message.Id);
             await message.ModifyAsync(loadingMessage);
             var for_str = "";
-            List<DiscordUser> users_to_warn_obj = [];
-            foreach (var id in setids)
-            {
-                var user = await ctx.Client.GetUserAsync(id);
-                if (user != null) users_to_warn_obj.Add(user);
-            }
-
             var urls = "";
 
             var att = ctx.Message.Attachments;
@@ -148,7 +141,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 }
             }
 
-            foreach (var user in users_to_warn_obj)
+            foreach (var user in users_to_warn)
             {
                 var caseid_ = ToolSet.GenerateCaseID();
                 caseid_ = $"{caseid}-{caseid_}";
@@ -182,7 +175,7 @@ public sealed class MultiWarnCommand : BaseCommandModule
                 var warncount = warnlist.Count;
 
                 var uembed =
-                    await ModerationHelper.GenerateWarnEmbed(ctx, user, ctx.User, warncount, caseid, true, reason);
+                    await ModerationHelper.GenerateWarnEmbed(ctx, user, ctx.User, warncount, caseid_, true, reason);
                 var reasonString =
                     $"{warncount}. Verwarnung: {reason} | By Moderator: {ctx.User.GetFormattedUserName()} | Datum: {DateTime.Now:dd.MM.yyyy - HH:mm}";
                 bool sent;
@@ -196,14 +189,17 @@ public sealed class MultiWarnCommand : BaseCommandModule
                     sent = false;
                 }
 
-                if (!sent) await ToolSet.SendWarnAsChannel(ctx, user, uembed, caseid);
+                var delivered = sent || await ToolSet.SendWarnAsChannel(ctx, user, uembed, caseid_);
 
-                var dmsent = sent ? "✅" : "⚠️";
+                var dmsent = sent ? "✅" : delivered ? "⚠️" : "❌ nicht zustellbar";
                 var uAction = "Keine";
                 var (warnsToKick, warnsToBan) = await ModerationHelper.GetWarnKickValues();
                 var (KickEnabled, BanEnabled) = await ModerationHelper.UserActioningEnabled();
 
-                if (warncount >= warnsToBan)
+                if (((warncount >= warnsToBan && BanEnabled) || (warncount >= warnsToKick && KickEnabled)) &&
+                    await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id))
+                    uAction = "Übersprungen (Teammitglied)";
+                else if (warncount >= warnsToBan)
                     try
                     {
                         if (BanEnabled)

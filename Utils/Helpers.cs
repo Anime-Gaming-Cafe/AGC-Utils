@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using AGC_Management.Entities;
+using DisCatSharp.Exceptions;
 using DisCatSharp.Net;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
@@ -456,19 +457,30 @@ public static class ToolSet
     }
 
 
-    public static async Task SendWarnAsChannel(CommandContext ctx, DiscordUser user, DiscordEmbed uembed, string caseid)
+    public static async Task<bool> SendWarnAsChannel(CommandContext ctx, DiscordUser user, DiscordEmbed uembed, string caseid)
     {
+        DiscordMember member;
+        try
+        {
+            member = await ctx.Guild.GetMemberAsync(user.Id);
+        }
+        catch (NotFoundException)
+        {
+            return false;
+        }
+
         var userembed = uembed;
         var catid = BotConfig.GetConfig()["TicketConfig"]["SupportCategoryId"];
         var wchannel = await ctx.Guild.CreateChannelAsync($"warn-{caseid}",
             ChannelType.Text, ctx.Guild.GetChannel(Convert.ToUInt64(catid)), user.Id.ToString());
-        await wchannel.AddOverwriteAsync(await user.ConvertToMember(ctx.Guild),
+        await wchannel.AddOverwriteAsync(member,
             Permissions.AccessChannels, Permissions.SendMessages | Permissions.AddReactions, "Warn eröffnet");
         var buttonack = new DiscordButtonComponent(ButtonStyle.Primary, "ackwarn", "Kenntnisnahme",
             emoji: new DiscordComponentEmoji(DiscordEmoji.FromName(ctx.Client, ":white_check_mark:")));
         var mb = new DiscordMessageBuilder()
             .AddEmbed(userembed).AddComponents(buttonack).WithContent(user.Mention);
         await wchannel.SendMessageAsync(mb);
+        return true;
     }
 
     public static async Task<bool> TicketUrlCheck(CommandContext ctx, string reason)

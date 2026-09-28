@@ -19,6 +19,19 @@ public sealed class KickUserCommand : BaseCommandModule
     {
         if (await ToolSet.CheckForReason(ctx, reason)) return;
         if (await ToolSet.TicketUrlCheck(ctx, reason)) return;
+        if (await ModerationHelper.IsTeamMemberAsync(ctx.Guild, user.Id))
+        {
+            var errorEmbed = new DiscordEmbedBuilder()
+                .WithTitle("Fehler beim Kicken des Users")
+                .WithDescription(
+                    "Der User kann nicht gekickt werden, da er ein Teammitglied ist. <:counting_warning:962007085426556989>")
+                .WithColor(DiscordColor.Red)
+                .WithFooter(ctx.User.GetFormattedUserName(), ctx.User.AvatarUrl)
+                .Build();
+            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().AddEmbed(errorEmbed));
+            return;
+        }
+
         reason = await ReasonTemplateResolver.Resolve(reason);
         var caseid = ToolSet.GenerateCaseID();
         var embedBuilder = new DiscordEmbedBuilder()
@@ -109,6 +122,7 @@ public sealed class KickUserCommand : BaseCommandModule
                 await user.RemoveAsync(ReasonString);
                 var dm = sent ? "✅" : "❌";
                 b_users += $"{user.GetFormattedUserName()} | DM: {dm}\n";
+                await ModerationHelper.KickFlag(user, reason, ctx.User);
             }
             catch (UnauthorizedException)
             {
@@ -140,8 +154,6 @@ public sealed class KickUserCommand : BaseCommandModule
                            $"```{b_users}```";
                 ec = DiscordColor.Green;
             }
-
-            await ModerationHelper.KickFlag(user, reason, ctx.User);
 
             var discordEmbedBuilder = new DiscordEmbedBuilder()
                 .WithTitle("Kick abgeschlossen")
