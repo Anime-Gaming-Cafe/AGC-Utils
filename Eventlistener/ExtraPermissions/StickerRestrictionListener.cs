@@ -1,6 +1,8 @@
 #region
 
 using System.Collections.Concurrent;
+using AGC_Management.Entities.ExtraPermissions;
+using AGC_Management.Enums.ExtraPermissions;
 using AGC_Management.Services;
 using DisCatSharp.Exceptions;
 
@@ -30,7 +32,7 @@ public sealed class StickerRestrictionListener : BaseCommandModule
                 if (permission == null) return;
 
                 await args.Message.DeleteAsync($"ExtraPermission: Sticker ohne {permission.PermName}");
-                await NotifyAsync(member, permission.DisplayName);
+                await NotifyAsync(member, permission);
             }
             catch (Exception e) when (e is NotFoundException or UnauthorizedException)
             {
@@ -45,7 +47,7 @@ public sealed class StickerRestrictionListener : BaseCommandModule
         return Task.CompletedTask;
     }
 
-    private static async Task NotifyAsync(DiscordMember member, string permissionName)
+    private static async Task NotifyAsync(DiscordMember member, ExtraPermission permission)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (DmCooldown.TryGetValue(member.Id, out var last) && now - last < DmCooldownSeconds) return;
@@ -53,11 +55,14 @@ public sealed class StickerRestrictionListener : BaseCommandModule
         DmCooldown[member.Id] = now;
         PruneDmCooldown(now);
 
+        var state = await ExtraPermissionService.GetMemberStateAsync(member.Id, permission.PermName);
+        var reason = state.EffectiveState == ExtraPermissionState.Revoked
+            ? $"dir die **{permission.DisplayName}** entzogen wurde"
+            : $"du noch keine Sticker senden darfst. Dafür benötigst du die **{permission.DisplayName}**";
+
         try
         {
-            await member.SendMessageAsync(
-                $"Deine Nachricht wurde gelöscht, da du noch keine Sticker senden darfst. " +
-                $"Dafür benötigst du die **{permissionName}**.");
+            await member.SendMessageAsync($"Deine Nachricht wurde gelöscht, da {reason}.");
         }
         catch
         {
