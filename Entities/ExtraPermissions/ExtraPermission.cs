@@ -16,5 +16,6 @@ public class ExtraPermission
     public ExtraPermissionAutoRevoke AutoRevoke { get; set; } = ExtraPermissionAutoRevoke.Inherit;
     public ulong CreatedBy { get; set; }
     public long CreatedAt { get; set; }
+    public bool BlockStickers { get; set; }
     public List<ExtraPermissionCondition> Conditions { get; set; } = [];
 }

@@ -168,9 +168,10 @@ public partial class Perms : ApplicationCommandsModule
         var roleText = role?.Mention ?? $"``{permission.RoleId}``";
         var mode = ExtraPermissionFormatter.DescribeMode(permission);
         var modeText = string.IsNullOrEmpty(mode) ? "" : $" · {mode}";
+        var stickerText = permission.BlockStickers ? " · Sticker ohne Rolle gesperrt" : "";
 
         var line = $"**{permission.DisplayName}** ``{permission.PermName}``\n" +
-                   $"Rolle: {roleText}{modeText} · Auto-Revoke: {ExtraPermissionFormatter.DescribeAutoRevoke(permission)}\n" +
+                   $"Rolle: {roleText}{modeText} · Auto-Revoke: {ExtraPermissionFormatter.DescribeAutoRevoke(permission)}{stickerText}\n" +
                    $"Bedingungen:\n{ExtraPermissionFormatter.DescribeConditions(permission, "> ")}";
 
         if (!string.IsNullOrWhiteSpace(permission.Description))

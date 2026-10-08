@@ -90,6 +90,12 @@ public partial class Perms
             "Ab Werk steht sie auf **aus**. Solange du nichts umstellst, verhält sich ``Inherit`` also wie " +
             "``Off`` und einmal vergebene Rollen bleiben liegen."),
 
+        ("Sticker-Sperre",
+            "Discord kennt keine eigene Berechtigung für Server-Sticker. Mit ``block-stickers:True`` löscht " +
+            "der Bot Sticker von allen Mitgliedern, die die Rolle der Permission nicht haben, egal ob sie " +
+            "die Bedingungen noch nicht erfüllen oder die Rolle entzogen wurde. Teammitglieder sind ausgenommen.\n\n" +
+            "``/perms edit-permission-role permission:media block-stickers:True``"),
+
         ("Manuelle Overrides",
             "Ein Override schlägt die Automatik immer, egal was die Bedingungen sagen.\n\n" +
             "``/perms grant member:@User permission:media reason:Sonderfall``\n" +
@@ -172,7 +178,7 @@ public partial class Perms
         ("Alle Befehle",
             "**Anlegen und ändern**\n" +
             "> ``add-permission-role`` legt eine Permission samt erster Bedingung an\n" +
-            "> ``edit-permission-role`` ändert Rolle, Modus, Auto-Revoke, Name, Beschreibung\n" +
+            "> ``edit-permission-role`` ändert Rolle, Modus, Auto-Revoke, Name, Beschreibung, Sticker-Sperre\n" +
             "> ``remove-permission-role`` löscht eine Permission, optional mit ``strip-role``\n\n" +
             "**Bedingungen**\n" +
             "> ``add-condition`` hängt eine weitere Bedingung an\n" +

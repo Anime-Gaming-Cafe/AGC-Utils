@@ -31,7 +31,9 @@ public partial class Perms
         string? autoRevoke = null,
         [Option("name", "Neuer Anzeigename")] string? displayName = null,
         [Option("description", "Wofür ist diese Permission gedacht?")]
-        string? description = null)
+        string? description = null,
+        [Option("block-stickers", "Sticker für Mitglieder ohne diese Rolle sperren")]
+        bool? blockStickers = null)
     {
         var permission = await ExtraPermissionService.GetPermissionAsync(permName);
         if (permission == null)
@@ -64,6 +66,7 @@ public partial class Perms
         if (autoRevoke != null) permission.AutoRevoke = Enum.Parse<ExtraPermissionAutoRevoke>(autoRevoke);
         if (displayName != null) permission.DisplayName = displayName.Trim();
         if (description != null) permission.Description = description;
+        if (blockStickers.HasValue) permission.BlockStickers = blockStickers.Value;
 
         await ExtraPermissionService.UpdatePermissionAsync(permission);
 

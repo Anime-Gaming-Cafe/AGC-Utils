@@ -67,7 +67,7 @@ public static class ExtraPermissionService
         var permissions = new List<ExtraPermission>();
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using (var cmd = con.CreateCommand(
-                         "SELECT permname, displayname, description, roleid, trigger_mode, auto_revoke, created_by, created_at FROM extra_permissions ORDER BY permname"))
+                         "SELECT permname, displayname, description, roleid, trigger_mode, auto_revoke, created_by, created_at, block_stickers FROM extra_permissions ORDER BY permname"))
         {
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync()) permissions.Add(ReadPermission(reader));
@@ -110,7 +110,8 @@ public static class ExtraPermissionService
             AutoRevoke = ParseEnum(reader.IsDBNull(5) ? "inherit" : reader.GetString(5),
                 ExtraPermissionAutoRevoke.Inherit),
             CreatedBy = reader.IsDBNull(6) ? 0 : (ulong)reader.GetInt64(6),
-            CreatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7)
+            CreatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7),
+            BlockStickers = !reader.IsDBNull(8) && reader.GetBoolean(8)
         };
     }
 
@@ -123,8 +124,8 @@ public static class ExtraPermissionService
     {
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand(
-            "INSERT INTO extra_permissions (permname, displayname, description, roleid, trigger_mode, auto_revoke, created_by, created_at) " +
-            "VALUES (@permname, @displayname, @description, @roleid, @trigger_mode, @auto_revoke, @created_by, @created_at)");
+            "INSERT INTO extra_permissions (permname, displayname, description, roleid, trigger_mode, auto_revoke, created_by, created_at, block_stickers) " +
+            "VALUES (@permname, @displayname, @description, @roleid, @trigger_mode, @auto_revoke, @created_by, @created_at, @block_stickers)");
         cmd.Parameters.AddWithValue("permname", permission.PermName);
         cmd.Parameters.AddWithValue("displayname", permission.DisplayName);
         cmd.Parameters.AddWithValue("description", permission.Description);
@@ -133,6 +134,7 @@ public static class ExtraPermissionService
         cmd.Parameters.AddWithValue("auto_revoke", permission.AutoRevoke.ToString().ToLowerInvariant());
         cmd.Parameters.AddWithValue("created_by", (long)permission.CreatedBy);
         cmd.Parameters.AddWithValue("created_at", permission.CreatedAt);
+        cmd.Parameters.AddWithValue("block_stickers", permission.BlockStickers);
         await cmd.ExecuteNonQueryAsync();
         InvalidatePermissionCache();
     }
@@ -142,13 +144,14 @@ public static class ExtraPermissionService
         var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
         await using var cmd = con.CreateCommand(
             "UPDATE extra_permissions SET displayname = @displayname, description = @description, roleid = @roleid, " +
-            "trigger_mode = @trigger_mode, auto_revoke = @auto_revoke WHERE permname = @permname");
+            "trigger_mode = @trigger_mode, auto_revoke = @auto_revoke, block_stickers = @block_stickers WHERE permname = @permname");
         cmd.Parameters.AddWithValue("permname", permission.PermName);
         cmd.Parameters.AddWithValue("displayname", permission.DisplayName);
         cmd.Parameters.AddWithValue("description", permission.Description);
         cmd.Parameters.AddWithValue("roleid", (long)permission.RoleId);
         cmd.Parameters.AddWithValue("trigger_mode", permission.TriggerMode.ToString().ToLowerInvariant());
         cmd.Parameters.AddWithValue("auto_revoke", permission.AutoRevoke.ToString().ToLowerInvariant());
+        cmd.Parameters.AddWithValue("block_stickers", permission.BlockStickers);
         await cmd.ExecuteNonQueryAsync();
         InvalidatePermissionCache();
     }
@@ -643,6 +646,22 @@ public static class ExtraPermissionService
             var decision = await ResolveAsync(member, permission, state);
             await ApplyAsync(member, permission, decision);
         }
+    }
+
+    #endregion
+
+    #region Sticker restriction
+
+    public static async Task<ExtraPermission?> GetStickerBlockingPermissionAsync(DiscordMember member)
+    {
+        if (member.IsBot || BoosterColorService.IsStaff(member)) return null;
+
+        var guild = member.Guild ?? CurrentApplication.TargetGuild;
+        if (guild == null) return null;
+
+        var permissions = await GetPermissionsAsync();
+        return permissions.FirstOrDefault(p =>
+            p.BlockStickers && guild.GetRole(p.RoleId) != null && member.Roles.All(r => r.Id != p.RoleId));
     }
 
     #endregion

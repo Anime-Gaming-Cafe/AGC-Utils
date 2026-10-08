@@ -41,7 +41,9 @@ public partial class Perms
         [Option("auto-revoke", "Rolle entziehen wenn die Bedingungen wegfallen")]
         ExtraPermissionAutoRevoke autoRevoke = ExtraPermissionAutoRevoke.Inherit,
         [Option("description", "Wofür ist diese Permission gedacht?")]
-        string description = "")
+        string description = "",
+        [Option("block-stickers", "Sticker für Mitglieder ohne diese Rolle sperren")]
+        bool blockStickers = false)
     {
         var permName = ExtraPermissionService.Slugify(name);
         if (string.IsNullOrWhiteSpace(permName))
@@ -89,6 +91,7 @@ public partial class Perms
             RoleId = role.Id,
             TriggerMode = mode,
             AutoRevoke = autoRevoke,
+            BlockStickers = blockStickers,
             CreatedBy = ctx.User.Id,
             CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };

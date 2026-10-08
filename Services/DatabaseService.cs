@@ -303,7 +303,7 @@ public static class DatabaseService
             },
             {
                 "extra_permissions",
-                "CREATE TABLE IF NOT EXISTS extra_permissions (permname TEXT PRIMARY KEY, displayname TEXT, description TEXT, roleid BIGINT, trigger_type TEXT DEFAULT 'none', trigger_value BIGINT DEFAULT 0, trigger_mode TEXT DEFAULT 'recurring', auto_revoke TEXT DEFAULT 'inherit', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0)"
+                "CREATE TABLE IF NOT EXISTS extra_permissions (permname TEXT PRIMARY KEY, displayname TEXT, description TEXT, roleid BIGINT, trigger_type TEXT DEFAULT 'none', trigger_value BIGINT DEFAULT 0, trigger_mode TEXT DEFAULT 'recurring', auto_revoke TEXT DEFAULT 'inherit', created_by BIGINT DEFAULT 0, created_at BIGINT DEFAULT 0, block_stickers BOOLEAN DEFAULT false)"
             },
             {
                 "extra_permission_members",
@@ -898,6 +898,10 @@ public static class DatabaseService
                     {
                         "created_at",
                         "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0"
+                    },
+                    {
+                        "block_stickers",
+                        "ALTER TABLE extra_permissions ADD COLUMN IF NOT EXISTS block_stickers BOOLEAN DEFAULT false"
                     }
                 }
             },
