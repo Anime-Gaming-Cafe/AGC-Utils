@@ -171,9 +171,7 @@ public static class ToolSet
     {
         try
         {
-            var cachedmembers = CurrentApplication.DiscordClient.UserCache.Values.ToList();
-
-            return cachedmembers.Any(member => member.Id == userId);
+            return CurrentApplication.DiscordClient.UserCache.ContainsKey(userId);
         }
         catch (Exception ex)
         {
@@ -229,9 +227,7 @@ public static class ToolSet
     {
         try
         {
-            var serverMembers = CurrentApplication.TargetGuild.Members.Values.ToList();
-
-            return serverMembers.Any(member => member.Id == userId);
+            return CurrentApplication.TargetGuild.Members.ContainsKey(userId);
         }
         catch (Exception ex)
         {

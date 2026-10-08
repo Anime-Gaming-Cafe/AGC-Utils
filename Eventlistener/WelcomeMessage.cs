@@ -107,24 +107,21 @@ public class WelcomeMessage : BaseCommandModule
     private async Task AddCosmeticRolesAndLevel0OnJoin(DiscordMember member)
     {
         List<ulong> roles = [767031029068201994, 767056290148384799, 875679019054551050, 767031210055958538, 750450099871547462, 1546951817689038868];
-        List<DiscordRole> rolesToAdd = [];
-        foreach (var role in roles)
+        var rolesToAdd = roles
+            .Where(id => member.Roles.All(r => r.Id != id))
+            .Select(id => member.Guild.GetRole(id))
+            .OfType<DiscordRole>()
+            .ToList();
+
+        foreach (var role in rolesToAdd)
         {
-            var r = await member.Guild.GetRoleAsync(role);
-            if (r != null) rolesToAdd.Add(r);
-        }
-        if (rolesToAdd.Count > 0)
-        {
-            foreach (var role in rolesToAdd)
+            try
             {
-                try
-                {
-                    await member.GrantRoleAsync(role);
-                }
-                catch (Exception e)
-                {
-                    CurrentApplication.DiscordClient.Logger.LogError(e, "Error while adding role to member");
-                }
+                await member.GrantRoleAsync(role);
+            }
+            catch (Exception e)
+            {
+                CurrentApplication.DiscordClient.Logger.LogError(e, "Error while adding role to member");
             }
         }
     }
