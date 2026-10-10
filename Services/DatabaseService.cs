@@ -250,10 +250,6 @@ public static class DatabaseService
                 "CREATE TABLE IF NOT EXISTS banlogs (userid BIGINT, executorid BIGINT, reason TEXT, timestamp BIGINT)"
             },
             {
-                "userrankcardunallowedimagelog",
-                "CREATE TABLE IF NOT EXISTS userrankcardunallowedimagelog (userid BIGINT, imagedata TEXT, timestamp BIGINT,  blockreason TEXT)"
-            },
-            {
                 "cachetable",
                 "CREATE TABLE IF NOT EXISTS cachetable (cachetype TEXT, content jsonb)"
             },
@@ -1511,6 +1507,12 @@ public static class DatabaseService
                 "dashboardlogins", new Dictionary<string, string>
                 {
                     { "drop", "DROP TABLE IF EXISTS dashboardlogins" }
+                }
+            },
+            {
+                "userrankcardunallowedimagelog", new Dictionary<string, string>
+                {
+                    { "drop", "DROP TABLE IF EXISTS userrankcardunallowedimagelog" }
                 }
             },
             {

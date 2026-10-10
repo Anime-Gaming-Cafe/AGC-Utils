@@ -26,7 +26,7 @@ reach the staff team. Also via email: support@animegamingcafe.de
 
 ### 3.1 Activity metrics
 
-Collected automatically for every member, with no opt-out. Its for User stats purpose and automating things
+Collected automatically for every member, with no opt-out. It is used for user statistics and to automate role and permission decisions.
 
 | Data | Detail |
 |---|---|
@@ -36,16 +36,12 @@ Collected automatically for every member, with no opt-out. Its for User stats pu
 These records are used for server statistics, for the leveling system, and to evaluate role and
 permission conditions such as "has sent at least N messages in the last N days".
 
-A table for tracking game and rich-presence activity exists in the database schema but no code
-writes to it at the currnet state
-
 ### 3.2 Leveling
 
 | Data | Detail |
 |---|---|
 | Level state | Your user ID, current XP, current level, the timestamps of your last text and voice XP awards, and whether you want to be pinged on level up. |
 | Rank card settings | If you customise your rank card on the dashboard: your chosen background image, stored as base64 image data in the database, plus bar colour, font, and box transparency. |
-| Rejected images | If a background image you upload is rejected by the automated image check, the **full rejected image** is stored together with your user ID, the rejection reason, and a timestamp. |
 | XP transfers | When staff move XP between accounts: source user, destination user, the staff member who did it, the amount, and a timestamp. |
 
 ### 3.3 Moderation
@@ -113,13 +109,11 @@ the database:
 
 - If you report a message, the reported message content, the reported user's details, and your own
   user ID and note are posted to the report channel and the staff chat.
-- Automated  AutoMod alerts post the message content and the author's details to an alert
+- Automated AutoMod alerts post the message content and the author's details to an alert
   channel.
 - The anti-raid kick posts the affected username, user ID and account creation date to a log
   channel.
 - Errors post the exception details
-- Webhook for deleted or edited messages for moderation purposes
-
 
 ## 4. Legal bases
 
@@ -145,6 +139,9 @@ Where processing rests on legitimate interests, you have the right to object. Se
 The transcript host and the image host are operated by the server operator, not by an outside
 company.
 
+All data the bot stores, including the database, ticket transcripts and re-hosted images, is kept
+on encrypted disks.
+
 The bot is not used to sell data, and there is no advertising or profiling for marketing purposes. Also there is no collecting without a purpose.
 
 ## 6. Publicly hosted content
@@ -158,9 +155,13 @@ Directory listing is disabled, so the file can only be found by knowing its cryp
 
 If you are uncomfortable with this, keep it in mind when sharing sensitive material in a ticket.
 
+**Moderation evidence images.** Screenshots staff attach to a warning or flag are stored on the
+operator's image host. They are not listed or indexed anywhere and are only reachable through the link
+stored in the case record, which only staff can see.
+
 ## 7. Retention
 
-The bot has **no automated deletion routine** for personal data as they are needed for the moderation. Records are kept until they are
+The bot has **no automated deletion routine** for personal data, because the records are needed for moderation. Records are kept until they are
 removed manually. Specifically:
 
 | Data | Retention |
@@ -170,11 +171,10 @@ removed manually. Specifically:
 | Message and voice metrics, command records | Indefinite |
 | Ticket records, transcripts, and re-hosted attachments | Indefinite |
 | Staff applications | Indefinite |
-| Rejected rank card images | Indefinite |
 | Leveling data, counting stats, temp voice settings | Kept while you are a member and beyond, until removed manually |
 | Server log files | Daily rolling files with no configured retention limit |
 | Dashboard session | 30 minutes of inactivity |
-| In-memory caches | Up to 10,000 recent messages with their content for deletion tracking purposes, the full member list refreshed every 30 minutes, and every ticket transcript. All are lost when the bot restarts. |
+| In-memory caches | The full member list refreshed every 30 minutes, and every ticket transcript. All are lost when the bot restarts. |
 
 Warning notification channels created for you are deleted after 24 hours.
 

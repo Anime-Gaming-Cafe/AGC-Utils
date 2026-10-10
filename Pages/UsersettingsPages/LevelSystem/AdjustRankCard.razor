@@ -221,64 +221,9 @@ else
         var userId = ulong.Parse(UserService.GetUserId(_principal).ToString());
         if (!string.IsNullOrWhiteSpace(imageToInstall) && hasImageChanged)
         {
-            bool isActivated = false;
-            try
-            {
-                isActivated = bool.Parse(BotConfig.GetConfig()["LinkLens"]["Active"]);
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
-
-            if (hasImageChanged)
-            {
-                try
-                {
-                    if (isActivated)
-                    {
-                        ToastService.Notify("Bild wird gepr�ft.", "ok");
-                        using var client = new HttpClient();
-                        var apikey = BotConfig.GetConfig()["LinkLens"]["API-KEY"];
-                        client.DefaultRequestHeaders.Add("api-key", apikey);
-                        client.DefaultRequestHeaders.Add("User-Agent",
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.1000.0 Safari/537.36");
-                        var content = new StringContent($"{{\"imageBase64\":\"{imageToInstall}\"}}", null, "application/json");
-                        var response = await client.PostAsync("https://api.linklens.xyz/analyze-levelcard", content);
-                        var responseString = await response.Content.ReadAsStringAsync();
-                        var result = JsonSerializer.Deserialize<RootObject>(responseString);
-                        if (result?.analysis.summary.reject_reason.Count > 0)
-                        {
-                            var rejectReasons = "";
-                            foreach (var reason in result.analysis.summary.reject_reason)
-                            {
-                                rejectReasons += reason.text;
-                                if (reason != result.analysis.summary.reject_reason.Last())
-                                {
-                                    rejectReasons += ", ";
-                                }
-                            }
-
-                            ToastService.Notify($"Das Bild wurde abgelehnt, da es folgende Gr�nde hat: {rejectReasons}", "bad");
-                            await LogRuleViolatingImageUpload(userId, rejectReasons, imageToInstall);
-                            return;
-                        }
-
-                        ToastService.Notify("Bild wurde moderativ gepr�ft und ist in Ordnung. Bild wird gespeichert...", "ok");
-
-                        await Task.Delay(500);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ToastService.Notify($"Fehler beim moderativen pr�fen der Datei: {ex.Message}", "bad");
-                    return;
-                }
-
-                await SaveCustomRankCardSetting("imagedata", imageToInstall, userId);
-                ToastService.Notify("Bild wurde erfolgreich gespeichert.", "ok");
-                hasImageChanged = false;
-            }
+            await SaveCustomRankCardSetting("imagedata", imageToInstall, userId);
+            ToastService.Notify("Bild wurde erfolgreich gespeichert.", "ok");
+            hasImageChanged = false;
         }
 
         if (hasColorChanged)
@@ -299,29 +244,6 @@ else
         await ReloadAsync();
     }
 
-
-    public class RejectReason
-    {
-        public string id { get; set; }
-        public string text { get; set; }
-    }
-
-    public class Summary
-    {
-        public string action { get; set; }
-        public double reject_prob { get; set; }
-        public List<RejectReason> reject_reason { get; set; }
-    }
-
-    public class Analysis
-    {
-        public Summary summary { get; set; }
-    }
-
-    public class RootObject
-    {
-        public Analysis analysis { get; set; }
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -367,20 +289,6 @@ else
         StateHasChanged();
     }
 
-
-    private async Task LogRuleViolatingImageUpload(ulong userid, string reason, string imageData)
-    {
-        var userid_ = (long)userid;
-        var unixnow = DateTimeOffset.Now.ToUnixTimeSeconds();
-        var con = CurrentApplication.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-        await using var cmd = con.CreateCommand();
-        cmd.CommandText = @"INSERT INTO userrankcardunallowedimagelog (userid, blockreason, imagedata, timestamp) VALUES (@userid, @reason, @imagedata, @timestamp)";
-        cmd.Parameters.AddWithValue("userid", userid_);
-        cmd.Parameters.AddWithValue("reason", reason);
-        cmd.Parameters.AddWithValue("imagedata", imageData);
-        cmd.Parameters.AddWithValue("timestamp", unixnow);
-        await cmd.ExecuteNonQueryAsync();
-    }
 
     private async Task RenderPreview()
     {
