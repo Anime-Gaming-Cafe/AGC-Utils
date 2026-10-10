@@ -1,6 +1,6 @@
 # Privacy Notice
 
-Last updated: 2026-09-11
+Last updated: 2026-10-10
 
 This notice describes what personal data the AGC Utils bot ("the bot") collects, why, who it is
 shared with, and how long it is kept. It reflects the behaviour of the code in this repository. If
