@@ -154,6 +154,7 @@ exported to an HTML file and published at `https://ticketsystem.animegamingcafe.
 Directory listing is disabled, so the file can only be found by knowing its cryptic address, which is the access token itself. Anyone who has the link, or who obtains it later, can read the entire ticket. The link is sent to the ticket owner by direct message and posted in the staff log channel.
 
 If you are uncomfortable with this, keep it in mind when sharing sensitive material in a ticket.
+Transcripts are kept for 1 year after the ticket is closed and then deleted, unless a dispute or moderation case connected to the ticket is still open (see section 7).
 
 **Moderation evidence images.** Screenshots staff attach to a warning or flag are stored on the
 operator's image host. They are not listed or indexed anywhere and are only reachable through the link
@@ -169,7 +170,7 @@ removed manually. Specifically:
 | Warnings | A non-permanent warning leaves your active warning list after a configurable period, by default 7 days. It is **not deleted**. It is converted into a flag, keeping the original reason text and prefixing it, and retained indefinitely. Permanent warnings stay on the active list. |
 | Flags, ban log, XP transfer log | Indefinite |
 | Message and voice metrics, command records | Indefinite |
-| Ticket records, transcripts, and re-hosted attachments | Indefinite |
+| Ticket records, transcripts, and re-hosted attachments | 1 year after the ticket is closed, unless a dispute or moderation case connected to the ticket is still open. In that case they are kept until it is resolved. |
 | Staff applications | Indefinite |
 | Leveling data, counting stats, temp voice settings | Kept while you are a member and beyond, until removed manually |
 | Server log files | Daily rolling files with no configured retention limit |
