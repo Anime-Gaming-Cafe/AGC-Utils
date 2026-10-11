@@ -20,32 +20,6 @@ public class AGCEasterEggs : BaseCommandModule
     private static readonly Random _rng = new();
 
     [AGCEasterEggsEnabled]
-    [Command("savas")]
-    public async Task Savas(CommandContext ctx)
-    {
-        ulong guildId = ctx.Guild?.Id ?? ctx.Channel.Id;
-
-        if (_savascooldown.TryGetValue(guildId, out var lastUsed))
-        {
-            DateTime now = DateTime.UtcNow;
-            if (now < lastUsed)
-            {
-                await ctx.RespondAsync($"⏳ Savaş hatte eben erst eine Tomate, erinnere ihn gerne später erneut :3\n[￶](https://imgur.com/a/fJmQX4V)");
-                return;
-            }
-        }
-
-        int cooldown = _rng.Next(60, 501);
-        _savascooldown[guildId] = DateTime.UtcNow.AddSeconds(cooldown);
-
-        DiscordMessageBuilder msgBuilder = new DiscordMessageBuilder()
-            .WithAllowedMentions(Mentions.None)
-            .WithContent(
-                "POV <@443114493992763392>:\n### Ich liebe Tomaten <3\n[￶](https://i.imgur.com/YIwkLm5.gif)");
-        await ctx.Channel.SendMessageAsync(msgBuilder);
-    }
-
-    [AGCEasterEggsEnabled]
     [Command("brian")]
     [Aliases("briana", "brain")]
     public async Task Brian(CommandContext ctx)
