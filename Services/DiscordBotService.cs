@@ -52,7 +52,7 @@ public class DiscordBotService : IHostedService
             Token = dcApiToken,
             TokenType = TokenType.Bot,
             Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildMembers |
-                      DiscordIntents.MessageContent | DiscordIntents.GuildPresences,
+                      DiscordIntents.MessageContent,
             ServiceProvider = _serviceProvider,
             Gateway = new()
             {
