@@ -619,6 +619,34 @@ public static class DatabaseService
             {
                 "birthdays",
                 "CREATE TABLE IF NOT EXISTS birthdays (user_id BIGINT NOT NULL, datum VARCHAR NOT NULL, ping BOOLEAN NOT NULL DEFAULT true)"
+            },
+            {
+                "abstimmungen",
+                "CREATE TABLE IF NOT EXISTS abstimmungen (channel_id BIGINT PRIMARY KEY, message_id BIGINT NOT NULL, expires_at BIGINT NOT NULL, created_by BIGINT NOT NULL DEFAULT 0, pvotes INTEGER NOT NULL DEFAULT 0, nvotes INTEGER NOT NULL DEFAULT 0, endpending BOOLEAN NOT NULL DEFAULT false)"
+            },
+            {
+                "abstimmungen_teamler",
+                "CREATE TABLE IF NOT EXISTS abstimmungen_teamler (user_id BIGINT NOT NULL, vote_id VARCHAR NOT NULL, votevalue INTEGER NOT NULL, PRIMARY KEY (user_id, vote_id))"
+            },
+            {
+                "antragsverlauf",
+                "CREATE TABLE IF NOT EXISTS antragsverlauf (user_id BIGINT NOT NULL, antrags_id VARCHAR NOT NULL, entbannt BOOLEAN NOT NULL, reason VARCHAR NOT NULL DEFAULT '', mod_id BIGINT NOT NULL, timestamp BIGINT NOT NULL, PRIMARY KEY (user_id, antrags_id))"
+            },
+            {
+                "antragssperre",
+                "CREATE TABLE IF NOT EXISTS antragssperre (user_id BIGINT PRIMARY KEY, reason VARCHAR NOT NULL DEFAULT '', expires_at BIGINT NOT NULL)"
+            },
+            {
+                "permas",
+                "CREATE TABLE IF NOT EXISTS permas (userid BIGINT PRIMARY KEY)"
+            },
+            {
+                "autocompletions",
+                "CREATE TABLE IF NOT EXISTS autocompletions (type VARCHAR NOT NULL, data VARCHAR NOT NULL, PRIMARY KEY (type, data))"
+            },
+            {
+                "disabled_automations",
+                "CREATE TABLE IF NOT EXISTS disabled_automations (channel_id BIGINT PRIMARY KEY, disabled_by BIGINT NOT NULL, timestamp BIGINT NOT NULL)"
             }
         };
         var progressBar = new ConsoleProgressBar(tableCommands.Count);

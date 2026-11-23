@@ -2,6 +2,7 @@
 
 using System.Data;
 using AGC_Management.Managers;
+using AGC_Management.Utils;
 using DisCatSharp.ApplicationCommands.Attributes;
 using DisCatSharp.ApplicationCommands.Context;
 
@@ -175,5 +176,16 @@ public class ApplicationCommandRequireModerationTeam : ApplicationCommandCheckBa
         var supportRoleId = ulong.Parse(servercfg["SupportRoleId"]);
 
         return Task.FromResult(ctx.Member.Roles.Any(r => r.Id == modRoleId || r.Id == supportRoleId));
+    }
+}
+
+public class ApplicationCommandRequireUnbanTeam : ApplicationCommandCheckBaseAttribute
+{
+    public override Task<bool> ExecuteChecksAsync(BaseContext ctx)
+    {
+        if (GlobalProperties.DebugMode) return Task.FromResult(true);
+        if (ctx.Member is null) return Task.FromResult(false);
+        var teamRoleId = EntbannungConfig.TeamRoleId;
+        return Task.FromResult(ctx.Member.Roles.Any(r => r.Id == teamRoleId));
     }
 }

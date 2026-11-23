@@ -1395,6 +1395,7 @@ public class TicketManagerHelperListener : BaseCommandModule
     [Event]
     public static async Task GuildMemberRemoved(DiscordClient client, GuildMemberRemoveEventArgs args)
     {
+        if (EntbannungConfig.IsUnbanGuild(args.Guild)) return;
         _ = Task.Run(async () => { await TicketManagerHelper.CloseTicketOnLastUserLeave(args.Member, client); });
     }
 }

@@ -17,7 +17,8 @@ namespace AGC_Management.Services;
 /// </summary>
 public static class MemberCacheService
 {
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    private static readonly ConcurrentDictionary<ulong, SemaphoreSlim> Gates = new();
+    private static readonly ConcurrentDictionary<ulong, byte> DownloadedGuilds = new();
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
     private static readonly ConcurrentDictionary<ulong, byte> PendingCompletions = new();
 
@@ -29,6 +30,11 @@ public static class MemberCacheService
     ///     of running against a cache that is still empty or only holds the initial GUILD_CREATE subset.
     /// </summary>
     public static bool InitialDownloadComplete { get; private set; }
+
+    public static bool IsDownloaded(ulong guildId)
+    {
+        return DownloadedGuilds.ContainsKey(guildId);
+    }
 
     /// <summary>
     ///     Safety net in case a refresh is missed. The actual trigger is GuildAvailable.
@@ -51,7 +57,8 @@ public static class MemberCacheService
     /// </summary>
     public static async Task RefreshAsync(DiscordClient client, ulong guildId, string reason)
     {
-        if (!await Gate.WaitAsync(TimeSpan.Zero))
+        var gate = Gates.GetOrAdd(guildId, _ => new SemaphoreSlim(1, 1));
+        if (!await gate.WaitAsync(TimeSpan.Zero))
         {
             CurrentApplication.Logger.Debug($"Member download already running, skipping trigger '{reason}'.");
             return;
@@ -65,12 +72,16 @@ public static class MemberCacheService
 
             // READY replaces every cached guild object, so the globals have to point at the live
             // instance again - otherwise everything reading .Members off them sees a dead cache.
-            GlobalProperties.AGCGuild = guild;
-            CurrentApplication.TargetGuild = guild;
+            var isTarget = guildId == TargetGuildId;
+            if (isTarget)
+            {
+                GlobalProperties.AGCGuild = guild;
+                CurrentApplication.TargetGuild = guild;
+            }
 
             var expected = guild.MemberCount ?? 0;
             CurrentApplication.Logger.Information(
-                $"Starting member download ({expected} members expected, trigger: {reason})...");
+                $"Starting member download for {guild.Name} ({expected} members expected, trigger: {reason})...");
 
             if (!await RequestViaGatewayAsync(client, guild, expected))
             {
@@ -80,8 +91,9 @@ public static class MemberCacheService
             }
 
             CurrentApplication.Logger.Information(
-                $"Member download complete: cache now holds {guild.Members.Count} members.");
-            InitialDownloadComplete = true;
+                $"Member download for {guild.Name} complete: cache now holds {guild.Members.Count} members.");
+            DownloadedGuilds[guildId] = 0;
+            if (isTarget) InitialDownloadComplete = true;
         }
         catch (Exception ex)
         {
@@ -89,7 +101,7 @@ public static class MemberCacheService
         }
         finally
         {
-            Gate.Release();
+            gate.Release();
         }
     }
 

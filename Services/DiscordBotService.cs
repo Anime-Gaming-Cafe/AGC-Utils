@@ -18,6 +18,7 @@ using Npgsql;
 using NpgsqlTypes;
 using AGC_Management.Utils;
 using AGC_Management.Tasks;
+using AGC_Management.Tasks.Entbannung;
 using AGC_Management.Eventlistener;
 using AGC_Management.Services;
 
@@ -125,7 +126,7 @@ public class DiscordBotService : IHostedService
         });
         appCommands.SlashCommandExecuted += LogCommandExecution;
         appCommands.SlashCommandErrored += Discord_SlashCommandErrored;
-        appCommands.RegisterGlobalCommands(Assembly.GetExecutingAssembly());
+        RegisterApplicationCommands(appCommands);
 
         await discord.ConnectAsync();
         await Task.Delay(5000, cancellationToken);
@@ -140,6 +141,8 @@ public class DiscordBotService : IHostedService
         GlobalProperties.AGCGuild = CurrentApplication.TargetGuild;
 
         _ = MemberCacheService.StartPeriodicRefresh(discord, targetGuildId);
+        if (EntbannungConfig.Active)
+            _ = MemberCacheService.StartPeriodicRefresh(discord, EntbannungConfig.ServerId);
 
         IsReady = true;
     }
@@ -150,6 +153,22 @@ public class DiscordBotService : IHostedService
         if (Client != null)
         {
             await Client.DisconnectAsync();
+        }
+    }
+
+    private static void RegisterApplicationCommands(ApplicationCommandsExtension appCommands)
+    {
+        var entbannungActive = EntbannungConfig.Active;
+        var unbanGuildId = EntbannungConfig.ServerId;
+        var moduleTypes = Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => t.IsPublic && !t.IsAbstract && typeof(ApplicationCommandsModule).IsAssignableFrom(t));
+
+        foreach (var type in moduleTypes)
+        {
+            if (type.Namespace != typeof(Commands.Entbannung.AbstimmungsCommand).Namespace)
+                appCommands.RegisterGlobalCommands(type);
+            else if (entbannungActive)
+                appCommands.RegisterGuildCommands(type, unbanGuildId);
         }
     }
 
@@ -198,6 +217,7 @@ public class DiscordBotService : IHostedService
         _ = BirthdayTask.LaunchLoops();
         _ = SelfroleTask.LaunchLoops();
         _ = GetGameMetrics.LaunchLoops();
+        _ = EntbannungTasks.LaunchLoops();
 
         return Task.CompletedTask;
     }
@@ -264,7 +284,8 @@ public class DiscordBotService : IHostedService
         {
             if (ex.FailedChecks.Any(x => x is ApplicationCommandRequireUserPermissionsAttribute
                     or ApplicationCommandRequirePermissionsAttribute
-                    or ApplicationCommandRequireModerationTeam))
+                    or ApplicationCommandRequireModerationTeam
+                    or ApplicationCommandRequireUnbanTeam))
             {
                 var embed = EmbedGenerator.GetErrorEmbed(
                     "You don't have the required permissions to execute this command.");

@@ -1,6 +1,7 @@
 ﻿#region
 
 using AGC_Management.Services;
+using AGC_Management.Utils;
 
 #endregion
 
@@ -16,7 +17,8 @@ public class MemberCacheListener : BaseCommandModule
     [Event]
     public static Task GuildAvailable(DiscordClient client, GuildCreateEventArgs args)
     {
-        if (args.Guild.Id != MemberCacheService.TargetGuildId) return Task.CompletedTask;
+        if (args.Guild.Id != MemberCacheService.TargetGuildId && !EntbannungConfig.IsUnbanGuild(args.Guild))
+            return Task.CompletedTask;
 
         _ = MemberCacheService.RefreshAsync(client, args.Guild.Id, "guild available");
         return Task.CompletedTask;
@@ -33,7 +35,9 @@ public class MemberCacheListener : BaseCommandModule
     [Event]
     public static Task GuildMemberUpdated(DiscordClient client, GuildMemberUpdateEventArgs args)
     {
-        if (args.Guild is null || args.Guild.Id != MemberCacheService.TargetGuildId) return Task.CompletedTask;
+        if (args.Guild is null ||
+            (args.Guild.Id != MemberCacheService.TargetGuildId && !EntbannungConfig.IsUnbanGuild(args.Guild)))
+            return Task.CompletedTask;
 
         _ = MemberCacheService.EnsureCompleteAsync(args.Guild, args.Member);
         return Task.CompletedTask;
